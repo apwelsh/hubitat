@@ -8,7 +8,6 @@ metadata {
 		capability "TV"
 		capability "AudioVolume"
 		capability "Switch"
-		capability "PushableButton"
 		capability "Polling"
 		capability "Refresh"
 
