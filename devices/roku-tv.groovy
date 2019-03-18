@@ -46,7 +46,7 @@ def updated() {
 	log.debug "updated"
 	poll()
 	runEvery5Minutes(poll)
-	runEvery1Minutes(queryCurrentApp)
+	runEvery1Minute(queryCurrentApp)
 }
 
 def parse(String description) {
