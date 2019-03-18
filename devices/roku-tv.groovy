@@ -1,3 +1,21 @@
+/**
+ * Roku TV
+ * Download: https://github.com/apwelsh/hubitat
+ * Description:
+ * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
+ * as the Hubitat hub.  This device handler requires the installation of a child device handler available from
+ * the github repo.
+ *-------------------------------------------------------------------------------------------------------------------
+ *  Licensed under the Apache License, Version 2.0 (the "License"); you may not use this file except
+ *  in compliance with the License. You may obtain a copy of the License at:
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *  Unless required by applicable law or agreed to in writing, software distributed under the License is distributed
+ *  on an "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the License
+ *  for the specific language governing permissions and limitations under the License.
+ *-------------------------------------------------------------------------------------------------------------------
+ **/
 preferences {
 	input "deviceIp", "text", title: "Device IP", required: true
 	input "deviceMac", "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
@@ -28,6 +46,7 @@ def updated() {
 	log.debug "updated"
 	poll()
 	runEvery5Minutes(poll)
+	runEvery1Minutes(queryCurrentApp)
 }
 
 def parse(String description) {
@@ -221,7 +240,7 @@ def refresh() {
 	log.debug "Executing 'refresh'"
 	queryDeviceState()
 	queryInstalledApps()
-	queryCurrentApp()
+	//queryCurrentApp()
 }
 
 def queryDeviceState() {
