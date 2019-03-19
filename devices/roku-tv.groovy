@@ -33,6 +33,7 @@ metadata {
 		command "hdmi2"
 		command "hdmi3"
 		command "hdmi4"
+		command "home"
 		
 		command "reloadApps"
   }
@@ -185,6 +186,10 @@ def on() {
 def off() {
 	sendEvent(name: "switch", value: "off")
 	keypress('PowerOff')
+}
+
+def home() {
+	keypress('Home')
 }
 
 def channelUp() {
