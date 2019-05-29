@@ -161,6 +161,7 @@ def parsePowerState(Node body) {
 				} 
 				break;
 			case "PowerOff":
+			case "DisplayOff":
 			case "Headless":
 				if (this.state!="off") {
 					sendEvent(name: "switch", value: "off")
