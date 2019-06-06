@@ -28,7 +28,7 @@ metadata {
 
 def on() {
 	sendEvent (name: "switch", value:"on")
-	def appId = device.deviceNetworkId.split("-")[1]
+	def appId = parent.appIdForNetworkId(device.deviceNetworkId)
 	parent.launchApp(appId)
 	
 	runInMillis(3000, 'off')
