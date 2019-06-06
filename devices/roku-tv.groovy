@@ -82,10 +82,7 @@ def networkIdForApp(String appId) {
 }
 
 def appIdForNetworkId(String netId) {
-    ​def group = (netId =~ /^(.*)\-([^-]*)$/)
-    if (group.size() == 1)
-        return "${group[0][2]}"
-    return netId
+    return netId.replaceAll(~/.*\-/,"")
 }
 
 def parseInstalledApps(Node body) {
