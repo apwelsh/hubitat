@@ -281,6 +281,8 @@ def keypress(key) {
 		method: "POST",
 		path: "/keypress/${key}",
 		headers: [ HOST: "${deviceIp}:8060" ],
+		body: "",
+
 	)
 }
 
@@ -290,6 +292,7 @@ def launchApp(appId) {
 		method: "POST",
 		path: "/launch/${appId}",
 		headers: [ HOST: "${deviceIp}:8060" ],
+		body: "",
 	)
 	sendHubCommand(result)
 	runInMillis(3000, 'queryCurrentApp')
