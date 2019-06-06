@@ -312,7 +312,7 @@ def updateChild(String appId, String appName) {
 		createChildDevice(appId, appName)
 		child = getChild(appId)
 	} else {
-		log.error "Cannot create child device for ${appId} due to missing 'activityName'"
+		log.error "Cannot create child device for ${appId} due to missing 'appName'"
 	}
 }
 
@@ -328,7 +328,7 @@ private def getChild(String appId) {
         }
 		return result
     } catch(e) {
-        log.error "Failed to find child without exception: ${e}";
+        log.error "Failed to find child with exception: ${e}";
     }
 	return null
 }
@@ -341,7 +341,7 @@ private void createChildDevice(String appId, String appName) {
              isComponent: false, name: "${appName}"])
         log.trace "Created child device with network id: ${netId}"
     } catch(e) {
-        log.error "Failed to create child device with error = ${e}"
+        log.error "Failed to create child device with exception: ${e}"
     }
 }
 
