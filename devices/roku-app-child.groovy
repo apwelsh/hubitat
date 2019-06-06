@@ -30,12 +30,11 @@ def on() {
 	sendEvent (name: "switch", value:"on")
 	def appId = parent.appIdForNetworkId(device.deviceNetworkId)
 	parent.launchApp(appId)
-	
-	runInMillis(3000, 'off')
 }
 
 def off() {
 	sendEvent (name: "switch", value:"off")	
+	parent.home()
 }
 
 def push() {
@@ -45,4 +44,3 @@ def push() {
 def parse(String description) {
     log.debug "parse(${description}) called"
 }
-
