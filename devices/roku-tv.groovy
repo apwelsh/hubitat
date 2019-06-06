@@ -36,6 +36,8 @@ metadata {
         command "home"
         
         command "reloadApps"
+		
+		attribute "application", "string"
   }
 }
 
@@ -59,21 +61,27 @@ def updated() {
 def parse(String description) {
     def msg = parseLanMessage(description)
     
-    if (msg.body) {
-        def body = new XmlParser().parseText(msg.body)
-        switch (body.name()) {
-            case "device-info":
-                parseMacAddress body
-                parsePowerState body
-                parseState body
-                break;
-            case "apps":
-                parseInstalledApps body
-                break;
-            case "active-app":
-                parseActiveApp body
-                break;
-        }
+    if (msg.status == 200) {
+        if (msg.body) {
+            def body = new XmlParser().parseText(msg.body)
+            switch (body.name()) {
+                case "device-info":
+		    		cleanState()
+                    parseMacAddress body
+                    parsePowerState body
+                    parseState body
+                    break;
+                case "apps":
+                    parseInstalledApps body
+                    break;
+                case "active-app":
+                    parseActiveApp body
+                    break;
+            }
+        } else {
+			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
+			runInMillis(1500, 'queryCurrentApp')
+		}
     }
 }
 
@@ -85,7 +93,7 @@ def appIdForNetworkId(String netId) {
     return netId.replaceAll(~/.*\-/,"")
 }
 
-def parseInstalledApps(Node body) {
+private def parseInstalledApps(Node body) {
     
     childDevices.each{ child ->
         //log.debug "child: ${child.deviceNetworkId} (${child.name})"
@@ -112,42 +120,56 @@ def parseInstalledApps(Node body) {
     }
 }
 
-def parseActiveApp(Node body) {
+private def parseActiveApp(Node body) {
     def app = body.app[0]?.value()
     if (app != null) {
         def currentApp = app[0]
-        if (currentApp != this.state."active-app") {
-            log.debug "set active-app = ${currentApp}"
-            this.state."active-app" = currentApp
-        }
+		sendEvent(name: "application", value: currentApp)
     }
 }
 
-def parseState(Node body) {
+private def parseState(Node body) {
     for (def node : body) {
         def key = node.name()
         if (key == null)
             continue
         
-        switch (key) {
-            case "serial-number":
-            case "vendor-name":
-            case "device-id":
-            case "mode-name":
-            case "screen-size":
-            case "user-device-name":
-                def value = node.value()
-                if (value != null) {
-                    if (value[0] != this.state."${key}") {
-                        this.state."${key}" = value[0]
-                        log.debug "set ${key} = ${value[0]}"
-                    }
+        if (isStateProperty(key)) {
+            def value = node.value()
+            if (value != null) {
+                if (value[0] != this.state."${key}") {
+                    this.state."${key}" = value[0]
+                    log.debug "set ${key} = ${value[0]}"
                 }
+            }
         }
     }
 }
 
-def parseMacAddress(Node body) {
+private def isStateProperty(String key) {
+    switch (key) {
+        case "serial-number":
+        case "vendor-name":
+        case "device-id":
+        case "mode-name":
+        case "screen-size":
+        case "user-device-name":
+			return true
+	}
+	return false
+}
+
+private def cleanState() {
+	def keys = this.state.keySet()
+	for (def key : keys) {
+		if (!isStateProperty(key)) {
+			log.debug("removing ${key}")
+			this.state.remove(key)
+		}
+	}
+}
+
+private def parseMacAddress(Node body) {
     def wifiMac = body."wifi-mac"[0]?.value()
     if (wifiMac != null) {
         def macAddress = wifiMac[0].replaceAll("[^A-f,a-f,0-9]","")
@@ -158,7 +180,7 @@ def parseMacAddress(Node body) {
     }
 }
 
-def parsePowerState(Node body) {
+private def parsePowerState(Node body) {
     def powerMode = body."power-mode"[0]?.value()
     if (powerMode != null) {
         def mode = powerMode[0]
@@ -241,7 +263,7 @@ def poll() {
 def refresh() {
     log.debug "Executing 'refresh'"
     queryDeviceState()
-    queryInstalledApps()
+    queryCurrentApp()
 }
 
 /**
@@ -319,14 +341,6 @@ def launchApp(appId) {
         body: "",
     )
     sendHubCommand(result)
-
-    // Because each Roku behaves differently, with different timings,
-    // and since the launchApp function is asynchronous
-    // we will schedule a few checks for the current app
-    // This will help for future support of changing App devices to on/off switches.
-    runInMillis(3000, 'queryCurrentApp')
-    runInMillis(5000, 'queryCurrentApp')
-    runInMillis(10000, 'queryCurrentApp')
 }
 
 /**
@@ -349,7 +363,7 @@ private def getChildDevice(String netId) {
     return null
 }
 
-def updateChildApp(String netId, String appName) {
+private void updateChildApp(String netId, String appName) {
     def child = getChildDevice(netId)
     if(child != null) {
         //If child exists, do not create it
