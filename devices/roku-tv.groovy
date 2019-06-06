@@ -80,7 +80,7 @@ def parse(String description) {
             }
         } else {
 			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
-			runInMillis(1500, 'queryCurrentApp')
+			runInMillis(1500, 'refresh')
 		}
     }
 }
@@ -212,7 +212,7 @@ private def parsePowerState(Node body) {
  */
 
 def on() {
-    sendEvent(name: "switch", value: "on")
+    sendEvent(name: "switch", value: "turning-on")
 
     sendHubCommand(new hubitat.device.HubAction (
         "wake on lan ${deviceMac}",
@@ -225,7 +225,7 @@ def on() {
 }
 
 def off() {
-    sendEvent(name: "switch", value: "off")
+    sendEvent(name: "switch", value: "turning-off")
     keypress('PowerOff')
 }
 
