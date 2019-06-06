@@ -2,6 +2,7 @@
 
 Presently, this project is host to one solution, my implementation of the **Roku TV + App Control** Device handlers for Hubitat.
 
+NOTICE: This driver is being deprecated, for the new **feature-switch** branch.  The new version being tested implements more pro-active controls over the status of the TV.  With Alexa powered TV Apps, you will be able to see which one is on, and the apps are no longer momentary switches.
 
 ## Getting Started
 
