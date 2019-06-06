@@ -72,7 +72,7 @@ def parse(String description) {
 }
 
 def reloadApps() {
-	parseInstalledApps new XmlParser().parseText("<app/>")
+	// parseInstalledApps new XmlParser().parseText("<app/>")
 	refresh()
 }
 
@@ -86,7 +86,7 @@ def parseInstalledApps(Node body) {
 			nodeExists = true
 		}
 		if (!nodeExists) {
-			log.debug "Deleting missing app: ${child.name}"
+			log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
 			deleteChildDevice(child.deviceNetworkId)
 		}
 	}
@@ -98,7 +98,7 @@ def parseInstalledApps(Node body) {
 		def appId = node.attributes().id
 		def appName = node.value()[0]
 		
-		// log.debug "Detected installed channel app: (${appId}) ${appName}"
+		//log.debug "Detected installed channel app: ${appName} (${device.deviceNetworkId}-${appId})"
 		
 		updateChild(appId, appName)
 	}
@@ -339,7 +339,7 @@ private void createChildDevice(String appId, String appName) {
         addChildDevice("Roku App", "${netId}",
             [label: "${device.displayName}-${appName}", 
              isComponent: false, name: "${appName}"])
-        log.trace "Created child device with network id: ${netId}"
+		log.trace "Created child device: ${appName} (${netId})"
     } catch(e) {
         log.error "Failed to create child device with exception: ${e}"
     }
