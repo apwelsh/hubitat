@@ -27,13 +27,13 @@ metadata {
 }
 
 def on() {
-	sendEvent (name: "switch", value:"on")
+	sendEvent (name: "switch", value:"turning-on")
 	def appId = parent.appIdForNetworkId(device.deviceNetworkId)
 	parent.launchApp(appId)
 }
 
 def off() {
-	sendEvent (name: "switch", value:"off")	
+	sendEvent (name: "switch", value:"turning-off")	
 	parent.home()
 }
 
