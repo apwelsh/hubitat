@@ -125,6 +125,12 @@ private def parseActiveApp(Node body) {
     if (app != null) {
         def currentApp = app[0]
 		sendEvent(name: "application", value: currentApp)
+		
+		childDevices.each { child ->
+			def appName = child.name
+			def value = appName == currentApp ? "on" : "off"
+			child.sendEvent(name: "switch", value: value)
+        }
     }
 }
 
@@ -350,7 +356,7 @@ def launchApp(appId) {
 
 private def getChildDevice(String netId) {
     try {
-    def result = null
+        def result = null
         childDevices.each{ child ->
             if(child.deviceNetworkId == netId) {
                 result = child
