@@ -24,6 +24,10 @@ metadata {
 		capability "Switch"
 		capability "Actuator"
 	}
+
+	preferences {
+		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+	}
 }
 
 def on() {
@@ -45,5 +49,5 @@ def push() {
 }
 
 def parse(String description) {
-    log.debug "parse(${description}) called"
+    if (logEnable) log.debug "parse(${description}) called"
 }
