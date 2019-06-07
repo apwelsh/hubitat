@@ -71,20 +71,20 @@ All the button on the Roku TV device implement the Hubitat standards for control
 
 **Features** 
 
-Command | Description
-- | -
-Volumne Up | Increments the volume by 1 step
-Volume Down | Decrements the volume by 1 step
-Set Volume | _not supported by Roku API_ at this time
-Channel Up | Change channel up
-Channel Down | Change channel down
-Mute | Toggle the audio Mute state on/off
-Unmute | _not support by Roku API_ same behavior as Mute
-On | Turn the TV on
-Off | Turn the TV off
-Poll | Issues a Refresh
-Refresh | Forced refresh of TV state
-Reload Apps | Deletes and reloads all child devices
+| Command | Description |
+| - | - |
+| Volumne Up | Increments the volume by 1 step |
+| Volume Down | Decrements the volume by 1 step |
+| Set Volume | _not supported by Roku API_ at this time |
+| Channel Up | Change channel up |
+| Channel Down | Change channel down |
+| Mute | Toggle the audio Mute state on/off |
+| Unmute | _not support by Roku API_ same behavior as Mute |
+| On | Turn the TV on |
+| Off | Turn the TV off |
+| Poll | Issues a Refresh |
+| Refresh | Forced refresh of TV state |
+| Reload Apps | Deletes and reloads all child devices |
 
 _At present, the `Set Volume` button is ignored_.  
 The Roku API does not report mute state, so mute and unmute is just a toggle, both calling the mute button event.
