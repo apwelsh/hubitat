@@ -35,7 +35,7 @@ def on() {
 }
 
 def off() {
-	if (device.currenValue == "off")
+	if (device.currentValue("switch") == "off")
 		return
 	sendEvent (name: "switch", value:"off")	
 }
