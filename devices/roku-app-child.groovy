@@ -18,6 +18,10 @@
  *  for the specific language governing permissions and limitations under the License.
  *-------------------------------------------------------------------------------------------------------------------
  **/
+preferences {
+	input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+}
+
 metadata {
 	definition (name: "Roku App", namespace: "apwelsh", author: "Armand Welsh") {
 		capability "Momentary"
@@ -25,9 +29,6 @@ metadata {
 		capability "Actuator"
 	}
 
-	preferences {
-		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
-	}
 }
 
 def on() {
