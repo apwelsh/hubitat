@@ -27,15 +27,17 @@ metadata {
 }
 
 def on() {
-	sendEvent (name: "switch", value:"on")
+	sendEvent (name: "switch", value:"turning-on")
 	def appId = parent.appIdForNetworkId(device.deviceNetworkId)
 	parent.launchApp(appId)
-	
-	runInMillis(3000, 'off')
 }
 
 def off() {
-	sendEvent (name: "switch", value:"off")	
+	if (device.currentValue("switch") == "off")
+		return
+
+	sendEvent (name: "switch", value:"turning-off")	
+	parent.home()
 }
 
 def push() {
@@ -45,4 +47,3 @@ def push() {
 def parse(String description) {
     log.debug "parse(${description}) called"
 }
-
