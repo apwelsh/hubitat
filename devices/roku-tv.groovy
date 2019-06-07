@@ -19,6 +19,7 @@
 preferences {
     input "deviceIp", "text", title: "Device IP", required: true
     input "deviceMac", "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
+    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
 }
 
 metadata {
@@ -36,6 +37,7 @@ metadata {
         command "home"
         
         command "reloadApps"
+        command "clearApps"
 		
 		attribute "application", "string"
   }
@@ -49,7 +51,7 @@ def installed() {
 }
 
 def updated() {
-    log.debug "updated"
+    if (logEnable) log.debug "updated"
     poll()
     runEvery5Minutes(poll)
     runEvery1Minute(queryCurrentApp)
@@ -104,7 +106,7 @@ private def parseInstalledApps(Node body) {
                 nodeExists = true
         }
         if (!nodeExists) {
-            log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+            if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
             deleteChildDevice(child.deviceNetworkId)
         }
     }
@@ -121,7 +123,7 @@ private def parseInstalledApps(Node body) {
 }
 
 private def parseActiveApp(Node body) {
-    def app = body.app[0]?.value()
+    def app = body.app[0]?.value() 
     if (app != null) {
         def currentApp = app[0]
 		sendEvent(name: "application", value: currentApp)
@@ -145,7 +147,7 @@ private def parseState(Node body) {
             if (value != null) {
                 if (value[0] != this.state."${key}") {
                     this.state."${key}" = value[0]
-                    log.debug "set ${key} = ${value[0]}"
+                    if (logEnable) log.debug "set ${key} = ${value[0]}"
                 }
             }
         }
@@ -169,7 +171,7 @@ private def cleanState() {
 	def keys = this.state.keySet()
 	for (def key : keys) {
 		if (!isStateProperty(key)) {
-			log.debug("removing ${key}")
+			if (logEnable) log.debug("removing ${key}")
 			this.state.remove(key)
 		}
 	}
@@ -180,7 +182,7 @@ private def parseMacAddress(Node body) {
     if (wifiMac != null) {
         def macAddress = wifiMac[0].replaceAll("[^A-f,a-f,0-9]","")
         if (!deviceMac || deviceMac != macAddress) {
-            log.debug "Update config [MAC Address = ${macAddress}]"
+            if (logEnable) log.debug "Update config [MAC Address = ${macAddress}]"
             device.updateSetting("deviceMac", [value: macAddress, type:"text"])
         }
     }
@@ -262,14 +264,18 @@ def mute() {
 }
 
 def poll() {
-    log.debug "Executing 'poll'"
+    if (logEnable) log.trace "Executing 'poll'"
     refresh()
 }
 
 def refresh() {
-    log.debug "Executing 'refresh'"
+    if (logEnable) log.trace "Executing 'refresh'"
     queryDeviceState()
     queryCurrentApp()
+}
+
+def clearApps() {
+    parseInstalledApps new XmlParser().parseText("<app/>")
 }
 
 /**
@@ -293,8 +299,8 @@ def hdmi4() {
 }
 
 def reloadApps() {
-    // parseInstalledApps new XmlParser().parseText("<app/>")
     refresh()
+    queryInstalledApps()
 }
 
 /**
@@ -364,34 +370,33 @@ private def getChildDevice(String netId) {
         }
         return result
     } catch(e) {
-        log.error "Failed to find child with exception: ${e}";
+        if (logEnable) log.error "Failed to find child with exception: ${e}";
     }
     return null
 }
 
 private void updateChildApp(String netId, String appName) {
     def child = getChildDevice(netId)
-    if(child != null) {
-        //If child exists, do not create it
+    if(child != null) { //If child exists, do not create it
         return
     }
 
     if (appName != null) {
-        //log.debug "Child does not exist: ${appName} (${netId})"
         createChildApp(netId, appName)
     } else {
-        log.error "Cannot create child: (${netId}) due to missing 'appName'"
+        if (logEnable) log.error "Cannot create child: (${netId}) due to missing 'appName'"
     }
 }
 
 private void createChildApp(String netId, String appName) {
     try {
         addChildDevice("Roku App", "${netId}",
-            [label: "${netId}", 
+            [label: "${device.name}-${appName}", 
              isComponent: false, name: "${appName}"])
-        log.trace "Created child device: ${appName} (${netId})"
+        if (logEnable) log.debug "Created child device: ${appName} (${netId})"
     } catch(e) {
-        log.error "Failed to create child device with exception: ${e}"
+        if (logEnable) log.error "Failed to create child device with exception: ${e}"
     }
 }
+
 
