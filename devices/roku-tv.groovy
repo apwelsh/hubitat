@@ -264,6 +264,7 @@ def refresh() {
     log.debug "Executing 'refresh'"
     queryDeviceState()
     queryCurrentApp()
+    queryInstalledApps()
 }
 
 /**
@@ -287,7 +288,7 @@ def hdmi4() {
 }
 
 def reloadApps() {
-    // parseInstalledApps new XmlParser().parseText("<app/>")
+    parseInstalledApps new XmlParser().parseText("<app/>")
     refresh()
 }
 
