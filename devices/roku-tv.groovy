@@ -37,7 +37,6 @@ metadata {
         command "home"
         
         command "reloadApps"
-        command "clearApps"
 		
 		attribute "application", "string"
   }
@@ -82,7 +81,7 @@ def parse(String description) {
             }
         } else {
 			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
-			runInMillis(1500, 'refresh')
+			runInMillis(2000, 'refresh')
 		}
     }
 }
@@ -270,12 +269,9 @@ def poll() {
 
 def refresh() {
     if (logEnable) log.trace "Executing 'refresh'"
-    queryDeviceState()
     queryCurrentApp()
-}
-
-def clearApps() {
-    parseInstalledApps new XmlParser().parseText("<app/>")
+    queryDeviceState()
+    queryInstalledApps()
 }
 
 /**
@@ -299,9 +295,10 @@ def hdmi4() {
 }
 
 def reloadApps() {
-    refresh()
+    parseInstalledApps new XmlParser().parseText("<app/>")
     queryInstalledApps()
 }
+
 
 /**
  * Roku API Section
@@ -390,8 +387,9 @@ private void updateChildApp(String netId, String appName) {
 
 private void createChildApp(String netId, String appName) {
     try {
+        def label = deviceLabel()
         addChildDevice("Roku App", "${netId}",
-            [label: "${device.name}-${appName}", 
+            [label: "${label}-${appName}", 
              isComponent: false, name: "${appName}"])
         if (logEnable) log.debug "Created child device: ${appName} (${netId})"
     } catch(e) {
@@ -399,4 +397,8 @@ private void createChildApp(String netId, String appName) {
     }
 }
 
-
+private def deviceLabel() {
+    if (device.label == null)
+        return device.name
+    return device.label
+}
