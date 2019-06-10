@@ -17,12 +17,17 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    input name: "deviceIp",   type: "text", title: "Device IP", required: true
-    input name: "deviceMac",  type: "text", title: "Device MAC Address", defaultValue: "UNKNOWN", required: true
-	input name: "hdmiPorts",  type: "enum", title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
-	input name: "inputAV",    type: "bool", title: "Enable AV Input", defaultValue: false, required: true
-	input name: "inputTuner", type: "bool", title: "Enable Tuner Input", defaultValue: false, required: true
-    input name: "logEnable",  type: "bool", title: "Enable debug logging", defaultValue: true
+    input name: "deviceIp",        type: "text",   title: "Device IP", required: true
+	input name: "refreshInterval", type: "number", title: "Refresh the status at least every n Minutes.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
+	input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
+	if (autoManage) {
+		input name: "manageApps",      type: "bool",   title: "Enable management of Roku installed Applications", defaultValue: true, required: true
+
+		input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
+		input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
+		input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
+	}
+	input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
 
 metadata {
@@ -54,10 +59,12 @@ def installed() {
 }
 
 def updated() {
-    if (logEnable) log.debug "updated"
-    poll()
-    runEvery5Minutes(poll)
-    runEvery1Minute(queryCurrentApp)
+    if (logEnable) log.debug "Preferences updated"
+	unschedule()
+	if (deviceIp && refreshInterval > 0) {
+		schedule("${new Date().format("s m")}/${refreshInterval} * * * ?", refresh)
+		runIn(1,refresh)
+	}
 }
 
 /**
@@ -83,8 +90,8 @@ def parse(String description) {
                     break;
             }
         } else {
-			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
-			runInMillis(2000, 'refresh')
+			// upon a successful RESTful response with no body, assume a POST and force a refresh
+			runInMillis(1500, refresh)
 		}
     }
 }
@@ -99,12 +106,15 @@ def appIdForNetworkId(String netId) {
 
 private def parseInstalledApps(Node body) {
     
+    if (!autoManage) 
+		return
+	
 	def hdmiCount = hdmiPorts as int
 		
-    childDevices.each{ child ->
+	childDevices.each{ child ->
         //log.debug "child: ${child.deviceNetworkId} (${child.name})"
         def nodeExists = false
-		if (hdmiCount > 0) (1..hdmiCount).each { i -> 
+		if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
 			nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
 		}
 		
@@ -119,18 +129,20 @@ private def parseInstalledApps(Node body) {
 		}
 		
         if (!nodeExists) {
-            if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
-            deleteChildDevice(child.deviceNetworkId)
+			if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
+				if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+				deleteChildDevice(child.deviceNetworkId)
+			}
         }
     }
     
-	if (inputTuner)    updateChildApp(networkIdForApp("AV1"), "AV")
-	if (inputAV)       updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
+	if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
+	if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
 	if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
 		updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}") 
 	}
 
-    body.app.each{ node ->
+    if (manageApps) body.app.each{ node ->
         if (node.attributes().type != "appl") {
             return
         }
@@ -142,7 +154,7 @@ private def parseInstalledApps(Node body) {
 }
 
 private def purgeInstalledApps() {    
-    childDevices.each{ child ->
+    if (manageApps) childDevices.each{ child ->
 		deleteChildDevice(child.deviceNetworkId)
 	}
 }
@@ -290,14 +302,14 @@ def mute() {
 
 def poll() {
     if (logEnable) log.trace "Executing 'poll'"
-    refresh()
+    runInMillis(1500, refresh)
 }
 
 def refresh() {
     if (logEnable) log.trace "Executing 'refresh'"
-    queryCurrentApp()
-    queryDeviceState()
-    queryInstalledApps()
+    runInMillis(500,queryCurrentApp)
+    runInMillis(500,queryDeviceState)
+    if (autoManage) runInMillis(500, queryInstalledApps)
 }
 
 /**
@@ -330,7 +342,7 @@ def input_hdmi4() {
 
 def reloadApps() {
     purgeInstalledApps()
-    queryInstalledApps()
+    runIn(1,queryInstalledApps)
 }
 
 
