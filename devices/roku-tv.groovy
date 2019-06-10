@@ -17,8 +17,9 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    input "deviceIp", "text", title: "Device IP", required: true
-    input "deviceMac", "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
+    input name: "deviceIp",  type: "text", title: "Device IP", required: true
+    input name: "deviceMac", type: "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
+	input name: "hdmiPorts", type: "enum", title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
     input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
 }
 
@@ -30,20 +31,16 @@ metadata {
         capability "Polling"
         capability "Refresh"
 
-        command "hdmi1"
-        command "hdmi2"
-        command "hdmi3"
-        command "hdmi4"
         command "home"
-        command "keyPress", [[name:"Key Press Action", type: "ENUM", description: "Pick a key", constraints: [
-                "Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
-                "Play",      "Rev",        "Fwd",         "InstantReplay", "Info",      "Search",     "Backspace",   "Enter",
-                "VolumeUp",  "VolumeDown", "VolumeMute",  "Power",         "PowerOff",
-                "ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
+		command "keyPress", [[name:"Key Press Action", type: "ENUM", constraints: [
+				"Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
+				"Play",      "Rev",        "Fwd",         "InstantReplay", "Info",      "Search",     "Backspace",   "Enter",
+				"VolumeUp",	 "VolumeDown", "VolumeMute",  "Power",         "PowerOff",
+				"ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
         
         command "reloadApps"
-        
-        attribute "application", "string"
+		
+		attribute "application", "string"
   }
 }
 
@@ -66,13 +63,12 @@ def updated() {
  **/
 def parse(String description) {
     def msg = parseLanMessage(description)
-    
     if (msg.status == 200) {
         if (msg.body) {
             def body = new XmlParser().parseText(msg.body)
             switch (body.name()) {
                 case "device-info":
-                    cleanState()
+		    		cleanState()
                     parseMacAddress body
                     parsePowerState body
                     parseState body
@@ -85,9 +81,9 @@ def parse(String description) {
                     break;
             }
         } else {
-            // upon a successful RESTful response with no body, assume a POST and push and pull of current app
-            runInMillis(2000, 'refresh')
-        }
+			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
+			runInMillis(2000, 'refresh')
+		}
     }
 }
 
@@ -104,17 +100,35 @@ private def parseInstalledApps(Node body) {
     childDevices.each{ child ->
         //log.debug "child: ${child.deviceNetworkId} (${child.name})"
         def nodeExists = false
-        body.app.each{ node ->
-            def netId = networkIdForApp(node.attributes().id)
-            if (netId == child.deviceNetworkId)
-                nodeExists = true
-        }
+		(1..4).each { i ->
+			if (i <= (hdmiPorts as int)) {
+				def netId = networkIdForApp("hdmi${i}")
+				if (netId == child.deviceNetworkId)
+					nodeExists = true
+			}
+		}
+		body.app.each{ node ->
+			def netId = networkIdForApp(node.attributes().id)
+			if (netId == child.deviceNetworkId)
+				nodeExists = true
+		}
+		
+
         if (!nodeExists) {
             if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
             deleteChildDevice(child.deviceNetworkId)
         }
     }
     
+
+	(1..4).each { i ->
+		if (i <= (hdmiPorts as int)) {
+			def netId = networkIdForApp("hdmi${i}")
+			def appName = "HDMI ${i}"
+			updateChildApp(netId, appName)
+		}
+	}
+
     body.app.each{ node ->
         if (node.attributes().type != "appl") {
             return
@@ -126,16 +140,22 @@ private def parseInstalledApps(Node body) {
     }
 }
 
+private def purgeInstalledApps() {    
+    childDevices.each{ child ->
+		deleteChildDevice(child.deviceNetworkId)
+	}
+}
+
 private def parseActiveApp(Node body) {
     def app = body.app[0]?.value() 
     if (app != null) {
-        def currentApp = app[0]
-        sendEvent(name: "application", value: currentApp)
-        
-        childDevices.each { child ->
-            def appName = child.name
-            def value = appName == currentApp ? "on" : "off"
-            child.sendEvent(name: "switch", value: value)
+		def currentApp = "${app[0].replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
+		sendEvent(name: "application", value: currentApp)
+
+		childDevices.each { child ->
+			def appName = "${child.name}"
+			def value = (currentApp.equals(appName)) ? "on" : "off"
+			child.sendEvent(name: "switch", value: value)
         }
     }
 }
@@ -166,19 +186,19 @@ private def isStateProperty(String key) {
         case "mode-name":
         case "screen-size":
         case "user-device-name":
-            return true
-    }
-    return false
+			return true
+	}
+	return false
 }
 
 private def cleanState() {
-    def keys = this.state.keySet()
-    for (def key : keys) {
-        if (!isStateProperty(key)) {
-            if (logEnable) log.debug("removing ${key}")
-            this.state.remove(key)
-        }
-    }
+	def keys = this.state.keySet()
+	for (def key : keys) {
+		if (!isStateProperty(key)) {
+			if (logEnable) log.debug("removing ${key}")
+			this.state.remove(key)
+		}
+	}
 }
 
 private def parseMacAddress(Node body) {
@@ -300,7 +320,7 @@ def hdmi4() {
 }
 
 def reloadApps() {
-    parseInstalledApps new XmlParser().parseText("<app/>")
+    purgeInstalledApps()
     queryInstalledApps()
 }
 
@@ -337,10 +357,10 @@ def queryInstalledApps() {
 
 
 def keyPress(key) {
-    if (!isValidKey(key)) {
-        log.warning("Invalid key press: ${key}")
-        return
-    }
+	if (!isValidKey(key)) {
+		log.warning("Invalid key press: ${key}")
+		return
+	}
     if (logEnable) log.debug "Executing '${key}'"
     def result = new hubitat.device.HubAction(
         method: "POST",
@@ -352,22 +372,25 @@ def keyPress(key) {
 }
 
 private def isValidKey(key) {
-    def keys = [
-        "Home",       "Back",        "FindRemote", "Select",
-        "Up",         "Down",        "Left",       "Right",
-        "Play",       "Rev",         "Fwd",        "InstantReplay",
-        "Info",       "Search",      "Backspace",  "Enter",
-        "VolumeUp",   "VolumeDown",  "VolumeMute",
-        "Power",      "PowerOff",
-        "ChannelUp",  "ChannelDown", "InputTuner", "InputAV1",
-        "InputHDMI1", "InputHDMI2",  "InputHDMI3", "InputHDMI4"
-        ]
-    
-    return keys.contains(key)
+	def keys = [
+		"Home",      "Back",       "FindRemote",  "Select",
+		"Up",        "Down",       "Left",        "Right",
+		"Play",      "Rev",        "Fwd",         "InstantReplay",
+		"Info",      "Search",     "Backspace",   "Enter",
+		"VolumeUp",	 "VolumeDown", "VolumeMute",
+		"Power",     "PowerOff",
+		"ChannelUp", "ChannelDown", "InputTuner", "InputAV1",
+		"InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"
+		]
+	
+	return keys.contains(key)
 }
 
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
+	if (appId =~ /hdmi\d/) {
+		this."$appId"()
+	} else {
     def result = new hubitat.device.HubAction(
         method: "POST",
         path: "/launch/${appId}",
@@ -375,6 +398,7 @@ def launchApp(appId) {
         body: "",
     )
     sendHubCommand(result)
+	}
 }
 
 /**
