@@ -19,6 +19,7 @@
 preferences {
     input "deviceIp", "text", title: "Device IP", required: true
     input "deviceMac", "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
+    input "includeInputChildDevices", "boolean", title: "Include Inputs in App List", required: true, defaultValue: false
 }
 
 metadata {
@@ -36,9 +37,10 @@ metadata {
         command "home"
         
         command "reloadApps"
-		
-		attribute "application", "string"
-  }
+
+        attribute "application", "string"
+        attribute "app_icon_html", "string"
+    }
 }
 
 /**
@@ -110,7 +112,7 @@ private def parseInstalledApps(Node body) {
     }
     
     body.app.each{ node ->
-        if (node.attributes().type != "appl") {
+        if (node.attributes().type != "appl" && (!includeInputChildDevices || node.attributes().type != "tvin")) {
             return
         }
 
@@ -124,7 +126,9 @@ private def parseActiveApp(Node body) {
     def app = body.app[0]?.value()
     if (app != null) {
         def currentApp = app[0]
-		sendEvent(name: "application", value: currentApp)
+        def appId = body.app[0].attributes().id
+        sendEvent(name: "application", value: currentApp)
+        sendEvent(name: "app_icon_html", value: "<img src=\"http://${deviceIp}:8060/query/icon/${appId}\"/>")
     }
 }
 
@@ -382,7 +386,7 @@ private void updateChildApp(String netId, String appName) {
 private void createChildApp(String netId, String appName) {
     try {
         addChildDevice("Roku App", "${netId}",
-            [label: "${netId}", 
+            [label: "${netId}",
              isComponent: false, name: "${appName}"])
         log.trace "Created child device: ${appName} (${netId})"
     } catch(e) {
