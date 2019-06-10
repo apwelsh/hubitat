@@ -23,12 +23,15 @@ preferences {
 }
 
 metadata {
-	definition (name: "Roku App", namespace: "apwelsh", author: "Armand Welsh") {
+	definition (name:      "Roku App", 
+                    namespace: "apwelsh", 
+		    author:    "Armand Welsh", 
+		    importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-app-child.groovy") {
+		
 		capability "Momentary"
 		capability "Switch"
 		capability "Actuator"
 	}
-
 }
 
 def on() {
@@ -40,6 +43,7 @@ def on() {
 def off() {
 	if (device.currentValue("switch") == "off")
 		return
+
 	sendEvent (name: "switch", value:"turning-off")	
 	parent.home()
 }
