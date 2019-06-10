@@ -40,7 +40,6 @@ def on() {
 def off() {
 	if (device.currentValue("switch") == "off")
 		return
-
 	sendEvent (name: "switch", value:"turning-off")	
 	parent.home()
 }
