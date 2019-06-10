@@ -31,7 +31,11 @@ preferences {
 }
 
 metadata {
-    definition (name: "Roku TV", namespace: "apwelsh", author: "Armand Welsh") {
+    definition (name:      "Roku TV", 
+		namespace: "apwelsh", 
+		author:    "Armand Welsh", 
+		importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-tv.groovy") {
+		
         capability "TV"
         capability "AudioVolume"
         capability "Switch"
