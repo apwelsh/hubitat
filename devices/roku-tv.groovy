@@ -17,10 +17,12 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    input name: "deviceIp",  type: "text", title: "Device IP", required: true
-    input name: "deviceMac", type: "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
-	input name: "hdmiPorts", type: "enum", title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
-    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+    input name: "deviceIp",   type: "text", title: "Device IP", required: true
+    input name: "deviceMac",  type: "text", title: "Device MAC Address", defaultValue: "UNKNOWN", required: true
+	input name: "hdmiPorts",  type: "enum", title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
+	input name: "inputAV",    type: "bool", title: "Enable AV Input", defaultValue: false, required: true
+	input name: "inputTuner", type: "bool", title: "Enable Tuner Input", defaultValue: false, required: true
+    input name: "logEnable",  type: "bool", title: "Enable debug logging", defaultValue: true
 }
 
 metadata {
@@ -97,36 +99,35 @@ def appIdForNetworkId(String netId) {
 
 private def parseInstalledApps(Node body) {
     
+	def hdmiCount = hdmiPorts as int
+		
     childDevices.each{ child ->
         //log.debug "child: ${child.deviceNetworkId} (${child.name})"
         def nodeExists = false
-		(1..4).each { i ->
-			if (i <= (hdmiPorts as int)) {
-				def netId = networkIdForApp("hdmi${i}")
-				if (netId == child.deviceNetworkId)
-					nodeExists = true
-			}
-		}
-		body.app.each{ node ->
-			def netId = networkIdForApp(node.attributes().id)
-			if (netId == child.deviceNetworkId)
-				nodeExists = true
+		if (hdmiCount > 0) (1..hdmiCount).each { i -> 
+			nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
 		}
 		
+		if (inputAV)
+			nodeExists = nodeExists || networkIdForApp("AV1") == child.deviceNetworkId
 
+		if (inputTuner)
+			nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
+		
+		body.app.each{ node ->
+			nodeExists = nodeExists || networkIdForApp(node.attributes().id) == child.deviceNetworkId
+		}
+		
         if (!nodeExists) {
             if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
             deleteChildDevice(child.deviceNetworkId)
         }
     }
     
-
-	(1..4).each { i ->
-		if (i <= (hdmiPorts as int)) {
-			def netId = networkIdForApp("hdmi${i}")
-			def appName = "HDMI ${i}"
-			updateChildApp(netId, appName)
-		}
+	if (inputTuner)    updateChildApp(networkIdForApp("AV1"), "AV")
+	if (inputAV)       updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
+	if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+		updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}") 
 	}
 
     body.app.each{ node ->
@@ -303,19 +304,27 @@ def refresh() {
  * Custom DTH Command interface functions
  **/
 
-def hdmi1() {
+def input_AV1() {
+    keyPress('InputAV1')
+}
+
+def input_Tuner() {
+    keyPress('InputTuner')
+}
+
+def input_hdmi1() {
     keyPress('InputHDMI1')
 }
 
-def hdmi2() {
+def input_hdmi2() {
     keyPress('InputHDMI2')
 }
 
-def hdmi3() {
+def input_hdmi3() {
     keyPress('InputHDMI3')
 }
 
-def hdmi4() {
+def input_hdmi4() {
     keyPress('InputHDMI4')
 }
 
@@ -388,10 +397,10 @@ private def isValidKey(key) {
 
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
-	if (appId =~ /hdmi\d/) {
-		this."$appId"()
+	if (appId =~ /(hdmi\d)|AV1|Tuner/) {
+		this."input_$appId"()
 	} else {
-    def result = new hubitat.device.HubAction(
+        def result = new hubitat.device.HubAction(
         method: "POST",
         path: "/launch/${appId}",
         headers: [ HOST: "${deviceIp}:8060" ],
