@@ -35,10 +35,15 @@ metadata {
         command "hdmi3"
         command "hdmi4"
         command "home"
+        command "keyPress", [[name:"Key Press Action", type: "ENUM", description: "Pick a key", constraints: [
+                "Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
+                "Play",      "Rev",        "Fwd",         "InstantReplay", "Info",      "Search",     "Backspace",   "Enter",
+                "VolumeUp",  "VolumeDown", "VolumeMute",  "Power",         "PowerOff",
+                "ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
         
         command "reloadApps"
-		
-		attribute "application", "string"
+        
+        attribute "application", "string"
   }
 }
 
@@ -67,7 +72,7 @@ def parse(String description) {
             def body = new XmlParser().parseText(msg.body)
             switch (body.name()) {
                 case "device-info":
-		    		cleanState()
+                    cleanState()
                     parseMacAddress body
                     parsePowerState body
                     parseState body
@@ -80,9 +85,9 @@ def parse(String description) {
                     break;
             }
         } else {
-			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
-			runInMillis(2000, 'refresh')
-		}
+            // upon a successful RESTful response with no body, assume a POST and push and pull of current app
+            runInMillis(2000, 'refresh')
+        }
     }
 }
 
@@ -125,12 +130,12 @@ private def parseActiveApp(Node body) {
     def app = body.app[0]?.value() 
     if (app != null) {
         def currentApp = app[0]
-		sendEvent(name: "application", value: currentApp)
-		
-		childDevices.each { child ->
-			def appName = child.name
-			def value = appName == currentApp ? "on" : "off"
-			child.sendEvent(name: "switch", value: value)
+        sendEvent(name: "application", value: currentApp)
+        
+        childDevices.each { child ->
+            def appName = child.name
+            def value = appName == currentApp ? "on" : "off"
+            child.sendEvent(name: "switch", value: value)
         }
     }
 }
@@ -161,19 +166,19 @@ private def isStateProperty(String key) {
         case "mode-name":
         case "screen-size":
         case "user-device-name":
-			return true
-	}
-	return false
+            return true
+    }
+    return false
 }
 
 private def cleanState() {
-	def keys = this.state.keySet()
-	for (def key : keys) {
-		if (!isStateProperty(key)) {
-			if (logEnable) log.debug("removing ${key}")
-			this.state.remove(key)
-		}
-	}
+    def keys = this.state.keySet()
+    for (def key : keys) {
+        if (!isStateProperty(key)) {
+            if (logEnable) log.debug("removing ${key}")
+            this.state.remove(key)
+        }
+    }
 }
 
 private def parseMacAddress(Node body) {
@@ -222,32 +227,32 @@ def on() {
         [:]
     ))
 
-    keypress('Power')
+    keyPress('Power')
 }
 
 def off() {
     sendEvent(name: "switch", value: "turning-off")
-    keypress('PowerOff')
+    keyPress('PowerOff')
 }
 
 def home() {
-    keypress('Home')
+    keyPress('Home')
 }
 
 def channelUp() {
-    keypress('ChannelUp')
+    keyPress('ChannelUp')
 }
 
 def channelDown() {
-    keypress('ChannelDown')
+    keyPress('ChannelDown')
 }
 
 def volumeUp() {
-    keypress('VolumeUp')
+    keyPress('VolumeUp')
 }
 
 def volumeDown() {
-    keypress('VolumeDown')
+    keyPress('VolumeDown')
 }
 
 def setVolume() {
@@ -255,11 +260,11 @@ def setVolume() {
 }
 
 def unmute() {
-    keypress('VolumeMute')
+    keyPress('VolumeMute')
 }
 
 def mute() {
-    keypress('VolumeMute')
+    keyPress('VolumeMute')
 }
 
 def poll() {
@@ -279,19 +284,19 @@ def refresh() {
  **/
 
 def hdmi1() {
-    keypress('InputHDMI1')
+    keyPress('InputHDMI1')
 }
 
 def hdmi2() {
-    keypress('InputHDMI2')
+    keyPress('InputHDMI2')
 }
 
 def hdmi3() {
-    keypress('InputHDMI3')
+    keyPress('InputHDMI3')
 }
 
 def hdmi4() {
-    keypress('InputHDMI4')
+    keyPress('InputHDMI4')
 }
 
 def reloadApps() {
@@ -330,8 +335,13 @@ def queryInstalledApps() {
     ))
 }
 
-def keypress(key) {
-    log.debug "Executing '${key}'"
+
+def keyPress(key) {
+    if (!isValidKey(key)) {
+        log.warning("Invalid key press: ${key}")
+        return
+    }
+    if (logEnable) log.debug "Executing '${key}'"
     def result = new hubitat.device.HubAction(
         method: "POST",
         path: "/keypress/${key}",
@@ -341,8 +351,23 @@ def keypress(key) {
     )
 }
 
+private def isValidKey(key) {
+    def keys = [
+        "Home",       "Back",        "FindRemote", "Select",
+        "Up",         "Down",        "Left",       "Right",
+        "Play",       "Rev",         "Fwd",        "InstantReplay",
+        "Info",       "Search",      "Backspace",  "Enter",
+        "VolumeUp",   "VolumeDown",  "VolumeMute",
+        "Power",      "PowerOff",
+        "ChannelUp",  "ChannelDown", "InputTuner", "InputAV1",
+        "InputHDMI1", "InputHDMI2",  "InputHDMI3", "InputHDMI4"
+        ]
+    
+    return keys.contains(key)
+}
+
 def launchApp(appId) {
-    log.debug "Executing 'launchApp ${appId}'"
+    if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     def result = new hubitat.device.HubAction(
         method: "POST",
         path: "/launch/${appId}",
