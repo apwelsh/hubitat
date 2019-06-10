@@ -95,7 +95,7 @@ Note: The TV Device does not keep an active link with the Roku, and there is not
 
 ### Roku App (Child Device)
 
-The Roku App child device handler is just a simple push button with momentary on switch.  The momentary on switch allows the buttons to appear in Aleka as devices.  More work is pending on the device, to make the device more aware of the TV state.
+The Roku App child device handler is just a child switch.  The switch allows the buttons to appear in Alexa as devices.  The status of the switch will automatically change to on or off based on the currently running application.  If the switch is commanded on or off, then the switch status will change to turning-on or turning-off until the actual state is confirmed.
 
 ## License
 

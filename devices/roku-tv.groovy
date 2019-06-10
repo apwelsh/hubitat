@@ -17,8 +17,17 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    input "deviceIp", "text", title: "Device IP", required: true
-    input "deviceMac", "text", title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
+    input name: "deviceIp",        type: "text",   title: "Device IP", required: true
+	input name: "refreshInterval", type: "number", title: "Refresh the status at least every n Minutes.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
+	input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
+	if (autoManage) {
+		input name: "manageApps",      type: "bool",   title: "Enable management of Roku installed Applications", defaultValue: true, required: true
+
+		input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
+		input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
+		input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
+	}
+	input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
 
 metadata {
@@ -29,11 +38,12 @@ metadata {
         capability "Polling"
         capability "Refresh"
 
-        command "hdmi1"
-        command "hdmi2"
-        command "hdmi3"
-        command "hdmi4"
         command "home"
+		command "keyPress", [[name:"Key Press Action", type: "ENUM", constraints: [
+				"Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
+				"Play",      "Rev",        "Fwd",         "InstantReplay", "Info",      "Search",     "Backspace",   "Enter",
+				"VolumeUp",	 "VolumeDown", "VolumeMute",  "Power",         "PowerOff",
+				"ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
         
         command "reloadApps"
 		
@@ -49,10 +59,12 @@ def installed() {
 }
 
 def updated() {
-    log.debug "updated"
-    poll()
-    runEvery5Minutes(poll)
-    runEvery1Minute(queryCurrentApp)
+    if (logEnable) log.debug "Preferences updated"
+	unschedule()
+	if (deviceIp && refreshInterval > 0) {
+		schedule("${new Date().format("s m")}/${refreshInterval} * * * ?", refresh)
+		runIn(1,refresh)
+	}
 }
 
 /**
@@ -60,7 +72,6 @@ def updated() {
  **/
 def parse(String description) {
     def msg = parseLanMessage(description)
-    
     if (msg.status == 200) {
         if (msg.body) {
             def body = new XmlParser().parseText(msg.body)
@@ -79,8 +90,8 @@ def parse(String description) {
                     break;
             }
         } else {
-			// upon a successful RESTful response with no body, assume a POST and push and pull of current app
-			runInMillis(1500, 'queryCurrentApp')
+			// upon a successful RESTful response with no body, assume a POST and force a refresh
+			runInMillis(1500, refresh)
 		}
     }
 }
@@ -95,21 +106,43 @@ def appIdForNetworkId(String netId) {
 
 private def parseInstalledApps(Node body) {
     
-    childDevices.each{ child ->
+    if (!autoManage) 
+		return
+	
+	def hdmiCount = hdmiPorts as int
+		
+	childDevices.each{ child ->
         //log.debug "child: ${child.deviceNetworkId} (${child.name})"
         def nodeExists = false
-        body.app.each{ node ->
-            def netId = networkIdForApp(node.attributes().id)
-            if (netId == child.deviceNetworkId)
-                nodeExists = true
-        }
+		if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
+			nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
+		}
+		
+		if (inputAV)
+			nodeExists = nodeExists || networkIdForApp("AV1") == child.deviceNetworkId
+
+		if (inputTuner)
+			nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
+		
+		body.app.each{ node ->
+			nodeExists = nodeExists || networkIdForApp(node.attributes().id) == child.deviceNetworkId
+		}
+		
         if (!nodeExists) {
-            log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
-            deleteChildDevice(child.deviceNetworkId)
+			if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
+				if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+				deleteChildDevice(child.deviceNetworkId)
+			}
         }
     }
     
-    body.app.each{ node ->
+	if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
+	if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
+	if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+		updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}") 
+	}
+
+    if (manageApps) body.app.each{ node ->
         if (node.attributes().type != "appl") {
             return
         }
@@ -120,11 +153,23 @@ private def parseInstalledApps(Node body) {
     }
 }
 
+private def purgeInstalledApps() {    
+    if (manageApps) childDevices.each{ child ->
+		deleteChildDevice(child.deviceNetworkId)
+	}
+}
+
 private def parseActiveApp(Node body) {
-    def app = body.app[0]?.value()
+    def app = body.app[0]?.value() 
     if (app != null) {
-        def currentApp = app[0]
+		def currentApp = "${app[0].replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
 		sendEvent(name: "application", value: currentApp)
+
+		childDevices.each { child ->
+			def appName = "${child.name}"
+			def value = (currentApp.equals(appName)) ? "on" : "off"
+			child.sendEvent(name: "switch", value: value)
+        }
     }
 }
 
@@ -139,7 +184,7 @@ private def parseState(Node body) {
             if (value != null) {
                 if (value[0] != this.state."${key}") {
                     this.state."${key}" = value[0]
-                    log.debug "set ${key} = ${value[0]}"
+                    if (logEnable) log.debug "set ${key} = ${value[0]}"
                 }
             }
         }
@@ -163,7 +208,7 @@ private def cleanState() {
 	def keys = this.state.keySet()
 	for (def key : keys) {
 		if (!isStateProperty(key)) {
-			log.debug("removing ${key}")
+			if (logEnable) log.debug("removing ${key}")
 			this.state.remove(key)
 		}
 	}
@@ -174,7 +219,7 @@ private def parseMacAddress(Node body) {
     if (wifiMac != null) {
         def macAddress = wifiMac[0].replaceAll("[^A-f,a-f,0-9]","")
         if (!deviceMac || deviceMac != macAddress) {
-            log.debug "Update config [MAC Address = ${macAddress}]"
+            if (logEnable) log.debug "Update config [MAC Address = ${macAddress}]"
             device.updateSetting("deviceMac", [value: macAddress, type:"text"])
         }
     }
@@ -206,7 +251,7 @@ private def parsePowerState(Node body) {
  */
 
 def on() {
-    sendEvent(name: "switch", value: "on")
+    sendEvent(name: "switch", value: "turning-on")
 
     sendHubCommand(new hubitat.device.HubAction (
         "wake on lan ${deviceMac}",
@@ -215,32 +260,32 @@ def on() {
         [:]
     ))
 
-    keypress('Power')
+    keyPress('Power')
 }
 
 def off() {
-    sendEvent(name: "switch", value: "off")
-    keypress('PowerOff')
+    sendEvent(name: "switch", value: "turning-off")
+    keyPress('PowerOff')
 }
 
 def home() {
-    keypress('Home')
+    keyPress('Home')
 }
 
 def channelUp() {
-    keypress('ChannelUp')
+    keyPress('ChannelUp')
 }
 
 def channelDown() {
-    keypress('ChannelDown')
+    keyPress('ChannelDown')
 }
 
 def volumeUp() {
-    keypress('VolumeUp')
+    keyPress('VolumeUp')
 }
 
 def volumeDown() {
-    keypress('VolumeDown')
+    keyPress('VolumeDown')
 }
 
 def setVolume() {
@@ -248,49 +293,58 @@ def setVolume() {
 }
 
 def unmute() {
-    keypress('VolumeMute')
+    keyPress('VolumeMute')
 }
 
 def mute() {
-    keypress('VolumeMute')
+    keyPress('VolumeMute')
 }
 
 def poll() {
-    log.debug "Executing 'poll'"
-    refresh()
+    if (logEnable) log.trace "Executing 'poll'"
+    runInMillis(1500, refresh)
 }
 
 def refresh() {
-    log.debug "Executing 'refresh'"
-    queryDeviceState()
-    queryCurrentApp()
-    queryInstalledApps()
+    if (logEnable) log.trace "Executing 'refresh'"
+    runInMillis(500,queryCurrentApp)
+    runInMillis(500,queryDeviceState)
+    if (autoManage) runInMillis(500, queryInstalledApps)
 }
 
 /**
  * Custom DTH Command interface functions
  **/
 
-def hdmi1() {
-    keypress('InputHDMI1')
+def input_AV1() {
+    keyPress('InputAV1')
 }
 
-def hdmi2() {
-    keypress('InputHDMI2')
+def input_Tuner() {
+    keyPress('InputTuner')
 }
 
-def hdmi3() {
-    keypress('InputHDMI3')
+def input_hdmi1() {
+    keyPress('InputHDMI1')
 }
 
-def hdmi4() {
-    keypress('InputHDMI4')
+def input_hdmi2() {
+    keyPress('InputHDMI2')
+}
+
+def input_hdmi3() {
+    keyPress('InputHDMI3')
+}
+
+def input_hdmi4() {
+    keyPress('InputHDMI4')
 }
 
 def reloadApps() {
-    parseInstalledApps new XmlParser().parseText("<app/>")
-    refresh()
+    purgeInstalledApps()
+    runIn(1,queryInstalledApps)
 }
+
 
 /**
  * Roku API Section
@@ -322,8 +376,13 @@ def queryInstalledApps() {
     ))
 }
 
-def keypress(key) {
-    log.debug "Executing '${key}'"
+
+def keyPress(key) {
+	if (!isValidKey(key)) {
+		log.warning("Invalid key press: ${key}")
+		return
+	}
+    if (logEnable) log.debug "Executing '${key}'"
     def result = new hubitat.device.HubAction(
         method: "POST",
         path: "/keypress/${key}",
@@ -333,15 +392,34 @@ def keypress(key) {
     )
 }
 
+private def isValidKey(key) {
+	def keys = [
+		"Home",      "Back",       "FindRemote",  "Select",
+		"Up",        "Down",       "Left",        "Right",
+		"Play",      "Rev",        "Fwd",         "InstantReplay",
+		"Info",      "Search",     "Backspace",   "Enter",
+		"VolumeUp",	 "VolumeDown", "VolumeMute",
+		"Power",     "PowerOff",
+		"ChannelUp", "ChannelDown", "InputTuner", "InputAV1",
+		"InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"
+		]
+	
+	return keys.contains(key)
+}
+
 def launchApp(appId) {
-    log.debug "Executing 'launchApp ${appId}'"
-    def result = new hubitat.device.HubAction(
+    if (logEnable) log.debug "Executing 'launchApp ${appId}'"
+	if (appId =~ /(hdmi\d)|AV1|Tuner/) {
+		this."input_$appId"()
+	} else {
+        def result = new hubitat.device.HubAction(
         method: "POST",
         path: "/launch/${appId}",
         headers: [ HOST: "${deviceIp}:8060" ],
         body: "",
     )
     sendHubCommand(result)
+	}
 }
 
 /**
@@ -351,7 +429,7 @@ def launchApp(appId) {
 
 private def getChildDevice(String netId) {
     try {
-    def result = null
+        def result = null
         childDevices.each{ child ->
             if(child.deviceNetworkId == netId) {
                 result = child
@@ -359,34 +437,38 @@ private def getChildDevice(String netId) {
         }
         return result
     } catch(e) {
-        log.error "Failed to find child with exception: ${e}";
+        if (logEnable) log.error "Failed to find child with exception: ${e}";
     }
     return null
 }
 
 private void updateChildApp(String netId, String appName) {
     def child = getChildDevice(netId)
-    if(child != null) {
-        //If child exists, do not create it
+    if(child != null) { //If child exists, do not create it
         return
     }
 
     if (appName != null) {
-        //log.debug "Child does not exist: ${appName} (${netId})"
         createChildApp(netId, appName)
     } else {
-        log.error "Cannot create child: (${netId}) due to missing 'appName'"
+        if (logEnable) log.error "Cannot create child: (${netId}) due to missing 'appName'"
     }
 }
 
 private void createChildApp(String netId, String appName) {
     try {
+        def label = deviceLabel()
         addChildDevice("Roku App", "${netId}",
-            [label: "${netId}", 
+            [label: "${label}-${appName}", 
              isComponent: false, name: "${appName}"])
-        log.trace "Created child device: ${appName} (${netId})"
+        if (logEnable) log.debug "Created child device: ${appName} (${netId})"
     } catch(e) {
-        log.error "Failed to create child device with exception: ${e}"
+        if (logEnable) log.error "Failed to create child device with exception: ${e}"
     }
 }
 
+private def deviceLabel() {
+    if (device.label == null)
+        return device.name
+    return device.label
+}

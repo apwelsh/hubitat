@@ -18,26 +18,30 @@
  *  for the specific language governing permissions and limitations under the License.
  *-------------------------------------------------------------------------------------------------------------------
  **/
+preferences {
+	input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+}
+
 metadata {
 	definition (name: "Roku App", namespace: "apwelsh", author: "Armand Welsh") {
 		capability "Momentary"
 		capability "Switch"
 		capability "Actuator"
 	}
+
 }
 
 def on() {
-	sendEvent (name: "switch", value:"on")
+	sendEvent (name: "switch", value:"turning-on")
 	def appId = parent.appIdForNetworkId(device.deviceNetworkId)
 	parent.launchApp(appId)
-	
-	runInMillis(3000, 'off')
 }
 
 def off() {
 	if (device.currentValue("switch") == "off")
 		return
-	sendEvent (name: "switch", value:"off")	
+	sendEvent (name: "switch", value:"turning-off")	
+	parent.home()
 }
 
 def push() {
@@ -45,5 +49,5 @@ def push() {
 }
 
 def parse(String description) {
-    log.debug "parse(${description}) called"
+    if (logEnable) log.debug "parse(${description}) called"
 }
