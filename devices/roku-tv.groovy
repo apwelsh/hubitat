@@ -18,6 +18,7 @@
  **/
 preferences {
     input name: "deviceIp",        type: "text",   title: "Device IP", required: true
+	input name: "deviceMac",       type: "text",   title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
 	input name: "refreshInterval", type: "number", title: "Refresh the status at least every n Minutes.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
 	input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
 	if (autoManage) {
@@ -108,6 +109,10 @@ def appIdForNetworkId(String netId) {
     return netId.replaceAll(~/.*\-/,"")
 }
 
+def iconPathForApp(String netId) {
+	return "http://${deviceIp}:8060/query/icon/${appIdForNetworkId(netId)}"	
+}
+	
 private def parseInstalledApps(Node body) {
     
     if (!autoManage) 
@@ -173,6 +178,9 @@ private def parseActiveApp(Node body) {
 			def appName = "${child.name}"
 			def value = (currentApp.equals(appName)) ? "on" : "off"
 			child.sendEvent(name: "switch", value: value)
+//			if (value == "on") 	sendEvent(name: "current_app_icon_html", value:"<img src=\"${iconPathForApp(child.deviceNetworkId)}\"/>")
+
+
         }
     }
 }
@@ -219,12 +227,14 @@ private def cleanState() {
 }
 
 private def parseMacAddress(Node body) {
-    def wifiMac = body."wifi-mac"[0]?.value()
+	def type = body."network-type"[0]?.value()[0]
+	def wifiMac = body."${type}-mac"[0]?.value()
     if (wifiMac != null) {
         def macAddress = wifiMac[0].replaceAll("[^A-f,a-f,0-9]","")
         if (!deviceMac || deviceMac != macAddress) {
             if (logEnable) log.debug "Update config [MAC Address = ${macAddress}]"
             device.updateSetting("deviceMac", [value: macAddress, type:"text"])
+
         }
     }
 }
@@ -476,3 +486,4 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
+
