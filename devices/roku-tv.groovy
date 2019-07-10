@@ -53,6 +53,7 @@ metadata {
         command "reloadApps"
 		
 		attribute "application", "string"
+//		attribute "current_app_icon_html", "string"
   }
 }
 
@@ -476,7 +477,13 @@ private void createChildApp(String netId, String appName) {
             [label: "${label}-${appName}", 
              isComponent: false, name: "${appName}"])
         if (logEnable) log.debug "Created child device: ${appName} (${netId})"
-    } catch(e) {
+    } catch(IllegalArgumentException e) {
+        if (getChildDevice(netId)) {
+            if (logEnabled) log.warn "Attempted to create duplicate child device for ${appName} (${netId}); Skipped"
+        } else {
+            if (logEnable) log.error "Failed to create child device with exception: ${e}"
+        }
+    } catch(Exception e) {
         if (logEnable) log.error "Failed to create child device with exception: ${e}"
     }
 }
