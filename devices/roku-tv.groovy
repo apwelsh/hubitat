@@ -18,17 +18,17 @@
  **/
 preferences {
     input name: "deviceIp",        type: "text",   title: "Device IP", required: true
-	input name: "deviceMac",       type: "text",   title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
-	input name: "refreshInterval", type: "number", title: "Refresh the status at least every n Minutes.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
-	input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
-	if (autoManage) {
-		input name: "manageApps",      type: "bool",   title: "Enable management of Roku installed Applications", defaultValue: true, required: true
-
-		input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
-		input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
-		input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
-	}
-	input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
+    input name: "deviceMac",       type: "text",   title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
+    input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
+    input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
+    input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
+    if (autoManage) {
+        input name: "manageApps",      type: "bool",   title: "Enable management of Roku installed Applications", defaultValue: true, required: true
+        input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
+        input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
+        input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
+    }
+    input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
 
 metadata {
@@ -52,9 +52,9 @@ metadata {
         
         command "reloadApps"
 		
-		attribute "application", "string"
+        attribute "application", "string"
 //		attribute "current_app_icon_html", "string"
-  }
+    }
 }
 
 /**
@@ -68,7 +68,11 @@ def updated() {
     if (logEnable) log.debug "Preferences updated"
 	unschedule()
 	if (deviceIp && refreshInterval > 0) {
-		schedule("${new Date().format("s m")}/${refreshInterval} * * * ?", refresh)
+        if (refreshUnits == "Seconds") {
+            schedule("${new Date().format("s")}/${refreshInterval} * * * * ?", refresh)
+        } else {
+    		schedule("${new Date().format("s m")}/${refreshInterval} * * * ?", refresh)
+        }
 		runIn(1,refresh)
 	}
 }
@@ -493,4 +497,5 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
+
 
