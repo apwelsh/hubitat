@@ -21,6 +21,10 @@ preferences {
     input name: "deviceMac",       type: "text",   title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
     input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
     input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
+    input name: "appRefresh",      type: "bool",   title: "Refresh current application status seperate from TV status.", defaultValue: false, required: true
+    if (appRefresh) {
+        input name: "appInterval",     type: "number", title: "Refresh the current application at least every n seconds.", range: 1..120, defaultValue: 60, required: true        
+    }
     input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
     if (autoManage) {
         input name: "manageApps",      type: "bool",   title: "Enable management of Roku installed Applications", defaultValue: true, required: true
@@ -68,13 +72,15 @@ def updated() {
     if (logEnable) log.debug "Preferences updated"
 	unschedule()
 	if (deviceIp && refreshInterval > 0) {
-        if (refreshUnits == "Seconds") {
+        if (refreshUnits == "Seconds") {            
             schedule("${new Date().format("s")}/${refreshInterval} * * * * ?", refresh)
         } else {
-    		schedule("${new Date().format("s m")}/${refreshInterval} * * * ?", refresh)
+    		schedule("${new Date().format("s")} 0/${refreshInterval} * * * ?", refresh)
         }
-		runIn(1,refresh)
 	}
+    if (appRefresh && appInterval > 0) schedule("0/${appInterval} * * * * ?", queryCurrentApp)
+
+
 }
 
 /**
@@ -101,7 +107,7 @@ def parse(String description) {
             }
         } else {
 			// upon a successful RESTful response with no body, assume a POST and force a refresh
-			runInMillis(1500, refresh)
+			runInMillis(1500, poll)
 		}
     }
 }
@@ -252,6 +258,10 @@ private def parsePowerState(Node body) {
             case "PowerOn":
                 if (this.state!="on") {
                     sendEvent(name: "switch", value: "on")
+                    if (appRefresh && appInterval > 0) {
+                        runInMillis(100, queryCurrentApp)
+                        schedule("0/${appInterval} * * * * ?", queryCurrentApp)
+                    }
                 } 
                 break;
             case "PowerOff":
@@ -259,6 +269,7 @@ private def parsePowerState(Node body) {
             case "Headless":
                 if (this.state!="off") {
                     sendEvent(name: "switch", value: "off")
+                    unschedule(queryCurrentApp)
                 }
                 break;
         }
@@ -320,15 +331,16 @@ def mute() {
 }
 
 def poll() {
-    if (logEnable) log.trace "Executing 'poll'"
-    runInMillis(1500, refresh)
+    if (logEnable)  log.trace "Executing 'poll'"
+    if (appRefresh) runInMillis(100, queryCurrentApp)
+    runInMillis(200, refresh)
 }
 
 def refresh() {
     if (logEnable) log.trace "Executing 'refresh'"
-    runInMillis(500,queryCurrentApp)
-    runInMillis(500,queryDeviceState)
-    if (autoManage) runInMillis(500, queryInstalledApps)
+    runInMillis(500, queryDeviceState)
+    if (!appRefresh) runInMillis(500, queryCurrentApp)
+    if (autoManage)  runInMillis(500, queryInstalledApps)
 }
 
 /**
@@ -497,5 +509,6 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
+
 
 
