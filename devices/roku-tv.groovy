@@ -318,8 +318,8 @@ def volumeDown() {
     keyPress('VolumeDown')
 }
 
-def setVolume() {
-    
+def setVolume(level) {
+    log.trace "set volume not supported by Roku"
 }
 
 def unmute() {
