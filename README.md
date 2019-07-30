@@ -21,10 +21,12 @@ Next, click the **"(+) New Driver"** button
 
 ![](images/NewDriverButton.png)
 
+### Roku TV Child App
 Select the import button, and put in the URL to the [roku-app-child.groovy](devices/roku-app-child.groovy), Click the import button, and the new driver is ready.  
 Click **Save**. 
 ![save button](images/NewDriverExample.png)
 
+### Roku TV App
 Next, navigate to **"Drivers Code"**
 and repeat the process for the [roku-tv.groovy](/devices/roku-tv.groovy) driver.
 
