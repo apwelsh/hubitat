@@ -50,7 +50,7 @@ def installed() {
 }
 
 /**
- ** TimeSession Methods
+ ** TimedSession Methods
  **/
 
 def cancel() {
