@@ -37,6 +37,10 @@ metadata {
 	}
 }
 
+/**
+ ** Lifecycle Methods
+ **/
+
 def updated() {
     installed()
 }
@@ -44,6 +48,10 @@ def updated() {
 def installed() {
     sendEvent(name: "numberOfButtons", value: 1)
 }
+
+/**
+ ** TimeSession Methods
+ **/
 
 def cancel() {
     unschedule()
@@ -76,10 +84,18 @@ def stop() {
     push()
 }
 
+/**
+ ** PushableButton Method
+ **/
+
 def push() {
     sendEvent(name: "pushed", value: 1)
     runInMillis(250, release)
 }
+
+/**
+ ** Support Methods
+ **/
 
 def release() {
     sendEvent(name: "pushed", value: 0)
@@ -96,6 +112,7 @@ def timerEvent() {
         setTimeRemaining(timeRemaining)
     } else {
         stop()
+	sendEvent(name: "display", value: "idle")
     }
 }
 
