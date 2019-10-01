@@ -20,6 +20,7 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
+    input name: "idleText", type: "bool", title: "Show Idle message when timer is done", defaultValue: false
 	input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
 }
 
@@ -55,8 +56,8 @@ def installed() {
 
 def cancel() {
     unschedule()
-    
     setStatus("canceled")
+    timerDone()
 }
 
 def pause() {
@@ -81,6 +82,7 @@ def start() {
 def stop() {
     unschedule()
     setStatus("stopped")
+    timerDone()
     push()
 }
 
@@ -105,6 +107,11 @@ def setStatus(status) {
     sendEvent(name: "sessionStatus", value: status)
 }
 
+def timerDone() {
+    sendEvent(name: "display", value: idleText ? "idle" :"--:--")
+    sendEvent(name: "timeRemaining", value: 0)
+}
+
 def timerEvent() {
     def timeRemaining = device.currentValue('timeRemaining')
     if (timeRemaining) {
@@ -112,7 +119,7 @@ def timerEvent() {
         setTimeRemaining(timeRemaining)
     } else {
         stop()
-	sendEvent(name: "display", value: "idle")
     }
 }
+
 
