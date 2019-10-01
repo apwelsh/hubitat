@@ -49,7 +49,6 @@ def cancel() {
     unschedule()
     
     setStatus("canceled")
-    runIn(1, stop)
 }
 
 def pause() {
