@@ -92,7 +92,7 @@ def setTimeRemaining(seconds) {
 def start() {
     setStatus("running")
     def refreshInterval = 1
-    schedule("0/${refreshInterval} * * * * ?", timerEvent)
+    schedule("0/${refreshInterval} * * * * ?", timerEvent, [mifire: true])
 }
 
 def stop() {
