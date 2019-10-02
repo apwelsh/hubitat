@@ -35,7 +35,7 @@ metadata {
         capability "PushableButton"
         
         attribute  "display", "string"
-	}
+    }
 }
 
 /**
@@ -48,6 +48,7 @@ def updated() {
 
 def installed() {
     sendEvent(name: "numberOfButtons", value: 1)
+    setTimeRemaining(0)
 }
 
 /**
@@ -55,9 +56,8 @@ def installed() {
  **/
 
 def cancel() {
-    unschedule()
     setStatus("canceled")
-    timerDone()
+    setTimeRemaining(0)
 }
 
 def pause() {
@@ -67,23 +67,35 @@ def pause() {
 
 def setTimeRemaining(seconds) {
     sendEvent(name: "timeRemaining", value: seconds)
-    def mins = seconds / 60
-    def secs = seconds.intValue() % 60
-    def remaining = String.format("%02d:%02d", mins.intValue(), secs.intValue())
+    def remaining
+    if (seconds == 0) {
+        unschedule()
+        if (device.currentValue('sessionStatus') != "canceled")
+            setStatus("stopped")
+        runIn(1, resetDisplay)
+        push()
+    }
+    def hours = (seconds / 3600) as int
+    if (hours > 0)
+        seconds = seconds.intValue() % 3600 // remove the hours component
+    def mins = (seconds / 60) as int
+    def secs = (seconds.intValue() % 60) as int
+    if (hours > 0) {
+        remaining = String.format("%d:%02d:%02d", hours, mins, secs)
+    } else {
+        remaining = String.format("%02d:%02d", mins, secs)
+    }
     sendEvent(name: "display", value: remaining)
 }
 
 def start() {
-    def refreshInterval = 1
     setStatus("running")
+    def refreshInterval = 1
     schedule("0/${refreshInterval} * * * * ?", timerEvent)
 }
 
 def stop() {
-    unschedule()
-    setStatus("stopped")
-    timerDone()
-    push()
+    setTimeRemaining(0)
 }
 
 /**
@@ -91,25 +103,20 @@ def stop() {
  **/
 
 def push() {
-    sendEvent(name: "pushed", value: 1)
-    runInMillis(250, release)
+    sendEvent(name: "pushed", value: 1, isStateChange: true)
 }
 
 /**
  ** Support Methods
  **/
 
-def release() {
-    sendEvent(name: "pushed", value: 0)
-}
-
 def setStatus(status) {
-    sendEvent(name: "sessionStatus", value: status)
+    sendEvent(name: "sessionStatus", value: status, isStateChange: true)
 }
 
-def timerDone() {
-    sendEvent(name: "display", value: idleText ? "idle" :"--:--")
-    sendEvent(name: "timeRemaining", value: 0)
+
+def resetDisplay() {
+    sendEvent(name: "display", value: idleText ? "idle" : "--:--")
 }
 
 def timerEvent() {
