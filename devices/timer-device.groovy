@@ -43,7 +43,8 @@ metadata {
  **/
 
 def updated() {
-    installed()
+    def timeRemaining = device.currentValue('timeRemaining')
+    setTimeRemaining(timeRemaining?:0)
 }
 
 def installed() {
