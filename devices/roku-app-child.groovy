@@ -19,37 +19,37 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-	input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
 }
 
 metadata {
-	definition (name:      "Roku App", 
-                    namespace: "apwelsh", 
-		    author:    "Armand Welsh", 
-		    importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-app-child.groovy") {
-		
-		capability "Momentary"
-		capability "Switch"
-		capability "Actuator"
-	}
+    definition (name:      "Roku App", 
+                namespace: "apwelsh", 
+                author:    "Armand Welsh", 
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-app-child.groovy") {
+        
+        capability "Momentary"
+        capability "Switch"
+        capability "Actuator"
+    }
 }
 
 def on() {
-	sendEvent (name: "switch", value:"turning-on")
-	def appId = parent.appIdForNetworkId(device.deviceNetworkId)
-	parent.launchApp(appId)
+    sendEvent(name: "switch", value:"turning-on")
+    def appId = parent.appIdForNetworkId(device.deviceNetworkId)
+    parent.launchApp(appId)
 }
 
 def off() {
-	if (device.currentValue("switch") == "off")
-		return
+    if (device.currentValue("switch") == "off")
+        return
 
-	sendEvent (name: "switch", value:"turning-off")	
-	parent.home()
+    sendEvent(name: "switch", value:"turning-off")    
+    parent.home()
 }
 
 def push() {
-	on()
+    on()
 }
 
 def parse(String description) {
