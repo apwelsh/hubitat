@@ -40,7 +40,7 @@ preferences {
         input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
         input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
     }
-    input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for", options:keys, required: false
+    //input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for", options:keys, required: false
     input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
 
