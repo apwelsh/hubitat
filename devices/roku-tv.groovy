@@ -17,8 +17,16 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
+    def keys=[
+        "Home",      "Back",       "FindRemote",  "Select",
+        "Up",        "Down",       "Left",        "Right",
+        "Play",      "Rev",        "Fwd",         "InstantReplay",
+        "Info",      "Search",     "Backspace",   "Enter",
+        "VolumeUp",     "VolumeDown", "VolumeMute",
+        "Power",     "PowerOff",
+        "ChannelUp", "ChannelDown"
+        ]
     input name: "deviceIp",        type: "text",   title: "Device IP", required: true
-    input name: "deviceMac",       type: "text",   title: "Device MAC Address", required: true, defaultValue: "UNKNOWN"
     input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
     input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
     input name: "appRefresh",      type: "bool",   title: "Refresh current application status seperate from TV status.", defaultValue: false, required: true
@@ -32,15 +40,17 @@ preferences {
         input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
         input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
     }
+    input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for", options:keys, required: false
     input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
 
 metadata {
-    definition (name:      "Roku TV", 
-		namespace: "apwelsh", 
-		author:    "Armand Welsh", 
-		importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-tv.groovy") {
-		
+    definition (
+        name:      "Roku TV", 
+        namespace: "apwelsh", 
+        author:    "Armand Welsh", 
+        importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-tv.groovy") {
+        
         capability "TV"
         capability "AudioVolume"
         capability "Switch"
@@ -48,16 +58,16 @@ metadata {
         capability "Refresh"
 
         command "home"
-		command "keyPress", [[name:"Key Press Action", type: "ENUM", constraints: [
-				"Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
-				"Play",      "Rev",        "Fwd",         "InstantReplay", "Info",      "Search",     "Backspace",   "Enter",
-				"VolumeUp",	 "VolumeDown", "VolumeMute",  "Power",         "PowerOff",
-				"ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
+        command "keyPress", [[name:"Key Press Action", type: "ENUM", constraints: [
+                "Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
+                "Play",      "Rev",        "Fwd",         "InstantReplay", "Info",      "Search",     "Backspace",   "Enter",
+                "VolumeUp",     "VolumeDown", "VolumeMute",  "Power",         "PowerOff",
+                "ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
         
         command "reloadApps"
-		
+        
         attribute "application", "string"
-//		attribute "current_app_icon_html", "string"
+//        attribute "current_app_icon_html", "string"
     }
 }
 
@@ -70,14 +80,21 @@ def installed() {
 
 def updated() {
     if (logEnable) log.debug "Preferences updated"
-	unschedule()
-	if (deviceIp && refreshInterval > 0) {
-        if (refreshUnits == "Seconds") {            
-            schedule("${new Date().format("s")}/${refreshInterval} * * * * ?", refresh)
-        } else {
-    		schedule("${new Date().format("s")} 0/${refreshInterval} * * * ?", refresh)
+    if (deviceIp) {
+        def mac = getMACFromIP(deviceIp)
+        if (state.deviceMac != mac) {
+            log.debug "Updating Mac from IP: ${mac}"
+            state.deviceMac = mac
         }
-	}
+    }
+    unschedule()
+    if (deviceIp && refreshInterval > 0) {
+        if (refreshUnits == "Seconds") {            
+            schedule("0/${refreshInterval} * * * * ?", refresh)
+        } else {
+            schedule("${new Date().format("s")} 0/${refreshInterval} * * * ?", refresh)
+        }
+    }
     if (appRefresh && appInterval > 0) schedule("0/${appInterval} * * * * ?", queryCurrentApp)
 
 
@@ -87,29 +104,6 @@ def updated() {
  * Event Parsers
  **/
 def parse(String description) {
-    def msg = parseLanMessage(description)
-    if (msg.status == 200) {
-        if (msg.body) {
-            def body = new XmlParser().parseText(msg.body)
-            switch (body.name()) {
-                case "device-info":
-		    		cleanState()
-                    parseMacAddress body
-                    parsePowerState body
-                    parseState body
-                    break;
-                case "apps":
-                    parseInstalledApps body
-                    break;
-                case "active-app":
-                    parseActiveApp body
-                    break;
-            }
-        } else {
-			// upon a successful RESTful response with no body, assume a POST and force a refresh
-			runInMillis(1500, poll)
-		}
-    }
 }
 
 def networkIdForApp(String appId) {
@@ -121,175 +115,16 @@ def appIdForNetworkId(String netId) {
 }
 
 def iconPathForApp(String netId) {
-	return "http://${deviceIp}:8060/query/icon/${appIdForNetworkId(netId)}"	
+    return "http://${deviceIp}:8060/query/icon/${appIdForNetworkId(netId)}"    
 }
-	
-private def parseInstalledApps(Node body) {
     
-    if (!autoManage) 
-		return
-	
-	def hdmiCount = hdmiPorts as int
-		
-	childDevices.each{ child ->
-        //log.debug "child: ${child.deviceNetworkId} (${child.name})"
-        def nodeExists = false
-		if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
-			nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
-		}
-		
-		if (inputAV)
-			nodeExists = nodeExists || networkIdForApp("AV1") == child.deviceNetworkId
-
-		if (inputTuner)
-			nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
-		
-		body.app.each{ node ->
-			nodeExists = nodeExists || networkIdForApp(node.attributes().id) == child.deviceNetworkId
-		}
-		
-        if (!nodeExists) {
-			if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
-				if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
-				deleteChildDevice(child.deviceNetworkId)
-			}
-        }
-    }
-    
-	if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
-	if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
-	if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
-		updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}") 
-	}
-
-    if (manageApps) body.app.each{ node ->
-        if (node.attributes().type != "appl") {
-            return
-        }
-
-        def netId = networkIdForApp(node.attributes().id)
-        def appName = node.value()[0]
-        updateChildApp(netId, appName)
-    }
-}
-
-private def purgeInstalledApps() {    
-    if (manageApps) childDevices.each{ child ->
-		deleteChildDevice(child.deviceNetworkId)
-	}
-}
-
-private def parseActiveApp(Node body) {
-    def app = body.app[0]?.value() 
-    if (app != null) {
-		def currentApp = "${app[0].replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
-		sendEvent(name: "application", value: currentApp)
-
-		childDevices.each { child ->
-			def appName = "${child.name}"
-			def value = (currentApp.equals(appName)) ? "on" : "off"
-			child.sendEvent(name: "switch", value: value)
-//			if (value == "on") 	sendEvent(name: "current_app_icon_html", value:"<img src=\"${iconPathForApp(child.deviceNetworkId)}\"/>")
-
-
-        }
-    }
-}
-
-private def parseState(Node body) {
-    for (def node : body) {
-        def key = node.name()
-        if (key == null)
-            continue
-        
-        if (isStateProperty(key)) {
-            def value = node.value()
-            if (value != null) {
-                if (value[0] != this.state."${key}") {
-                    this.state."${key}" = value[0]
-                    if (logEnable) log.debug "set ${key} = ${value[0]}"
-                }
-            }
-        }
-    }
-}
-
-private def isStateProperty(String key) {
-    switch (key) {
-        case "serial-number":
-        case "vendor-name":
-        case "device-id":
-        case "mode-name":
-        case "screen-size":
-        case "user-device-name":
-			return true
-	}
-	return false
-}
-
-private def cleanState() {
-	def keys = this.state.keySet()
-	for (def key : keys) {
-		if (!isStateProperty(key)) {
-			if (logEnable) log.debug("removing ${key}")
-			this.state.remove(key)
-		}
-	}
-}
-
-private def parseMacAddress(Node body) {
-	def type = body."network-type"[0]?.value()[0]
-	def wifiMac = body."${type}-mac"[0]?.value()
-    if (wifiMac != null) {
-        def macAddress = wifiMac[0].replaceAll("[^A-f,a-f,0-9]","")
-        if (!deviceMac || deviceMac != macAddress) {
-            if (logEnable) log.debug "Update config [MAC Address = ${macAddress}]"
-            device.updateSetting("deviceMac", [value: macAddress, type:"text"])
-
-        }
-    }
-}
-
-private def parsePowerState(Node body) {
-    def powerMode = body."power-mode"[0]?.value()
-    if (powerMode != null) {
-        def mode = powerMode[0]
-        switch (mode) {
-            case "PowerOn":
-                if (this.state!="on") {
-                    sendEvent(name: "switch", value: "on")
-                    if (appRefresh && appInterval > 0) {
-                        runInMillis(100, queryCurrentApp)
-                        schedule("0/${appInterval} * * * * ?", queryCurrentApp)
-                    }
-                } 
-                break;
-            case "PowerOff":
-            case "DisplayOff":
-            case "Headless":
-                if (this.state!="off") {
-                    sendEvent(name: "switch", value: "off")
-                    unschedule(queryCurrentApp)
-                }
-                break;
-        }
-    }    
-}
-
 /*
  * Device Capability Interface Functions
  */
 
 def on() {
     sendEvent(name: "switch", value: "turning-on")
-
-    sendHubCommand(new hubitat.device.HubAction (
-        "wake on lan ${deviceMac}",
-        hubitat.device.Protocol.LAN,
-        null,
-        [:]
-    ))
-
+    sendWakeUp()
     keyPress('Power')
 }
 
@@ -332,15 +167,15 @@ def mute() {
 
 def poll() {
     if (logEnable)  log.trace "Executing 'poll'"
-    if (appRefresh) runInMillis(100, queryCurrentApp)
-    runInMillis(200, refresh)
+    if (appRefresh) queryCurrentApp
+    refresh()
 }
 
 def refresh() {
     if (logEnable) log.trace "Executing 'refresh'"
-    runInMillis(500, queryDeviceState)
-    if (!appRefresh) runInMillis(500, queryCurrentApp)
-    if (autoManage)  runInMillis(500, queryInstalledApps)
+    queryDeviceState()
+    if (!appRefresh) queryCurrentApp()
+    if (autoManage)  queryInstalledApps()
 }
 
 /**
@@ -373,7 +208,7 @@ def input_hdmi4() {
 
 def reloadApps() {
     purgeInstalledApps()
-    runIn(1,queryInstalledApps)
+    queryInstalledApps()
 }
 
 
@@ -382,75 +217,232 @@ def reloadApps() {
  * The following functions are used to communicate with the Roku RESTful API
  **/
 
-def queryDeviceState() {
-    sendHubCommand(new hubitat.device.HubAction(
-        method: "GET",
-        path: "/query/device-info",
-        headers: [ HOST: "${deviceIp}:8060" ]
+def sendWakeUp() {
+    sendHubCommand(new hubitat.device.HubAction (
+        "wake on lan ${state.deviceMac}",
+        hubitat.device.Protocol.LAN,
+        null,
+        [:]
     ))
 }
 
-def queryCurrentApp() {
-    sendHubCommand(new hubitat.device.HubAction(
-        method: "GET",
-        path: "/query/active-app",
-        headers: [ HOST: "${deviceIp}:8060" ]
-    ))
+def queryDeviceState() {
+    asynchttpGet(parseDeviceState, [uri: "http://${deviceIp}:8060/query/device-info"])
+}
+
+def parseDeviceState(response, data) {
+    def status = response.getStatus();
+    if (status < 200 || status >= 300)
+        return
     
+    def body = response.getXml()
+    parsePowerState(body)
+    parseState(body)
+}
+
+private def parseState(body) {
+    for (def node : body.childNodes()) {
+        def key = node.name()
+        if (key == null)
+            continue
+        
+        if (isStateProperty(key)) {
+            def value = node.text()
+            if (value != null) {
+                if (value != this.state."${key}") {
+                    this.state."${key}" = value
+                    if (logEnable) log.debug "set ${key} = ${value}"
+                }
+            }
+        }
+    }
+}
+
+private def isStateProperty(String key) {
+    switch (key) {
+        case "serial-number":
+        case "vendor-name":
+        case "device-id":
+        case "mode-name":
+        case "screen-size":
+        case "user-device-name":
+        case "deviceMac":
+            return true
+    }
+    return false
+}
+
+private def cleanState() {
+    def keys = this.state.keySet()
+    for (def key : keys) {
+        if (!isStateProperty(key)) {
+            if (logEnable) log.debug("removing ${key}")
+            this.state.remove(key)
+        }
+    }
+}
+
+private def parsePowerState(body) {
+    def powerMode = body."power-mode"?.text()
+    if (powerMode != null) {
+        def mode = powerMode
+        switch (mode) {
+            case "PowerOn":
+                if (this.state!="on") {
+                    sendEvent(name: "switch", value: "on")
+                    if (appRefresh && appInterval > 0) {
+                        runInMillis(100, queryCurrentApp)
+                        schedule("0/${appInterval} * * * * ?", queryCurrentApp)
+                    }
+                } 
+                break;
+            case "PowerOff":
+            case "DisplayOff":
+            case "Headless":
+                if (this.state!="off") {
+                    sendEvent(name: "switch", value: "off")
+                    unschedule(queryCurrentApp)
+                }
+                break;
+        }
+    }    
+}
+
+
+def queryCurrentApp() {
+    asynchttpGet(parseCurrentApp, [uri: "http://${deviceIp}:8060/query/active-app"])
+}
+
+def parseCurrentApp(response, data) {
+    def status = response.getStatus();
+    if (status < 200 || status >= 300)
+        return
+    
+    def body = response.getXml()
+    def app = body.app.text()
+    if (app != null) {
+        def currentApp = "${app.replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
+        sendEvent(name: "application", value: currentApp, isStateChange: true)
+
+        childDevices.each { child ->
+            def appName = "${child.name}"
+            def value = (currentApp.equals(appName)) ? "on" : "off"
+            child.sendEvent(name: "switch", value: value)
+//            if (value == "on")     sendEvent(name: "current_app_icon_html", value:"<img src=\"${iconPathForApp(child.deviceNetworkId)}\"/>")
+        }
+    }
+}
+
+private def purgeInstalledApps() {    
+    if (manageApps) childDevices.each{ child ->
+        deleteChildDevice(child.deviceNetworkId)
+    }
 }
 
 def queryInstalledApps() {
-    sendHubCommand(new hubitat.device.HubAction(
-        method: "GET",
-        path: "/query/apps",
-        headers: [ HOST: "${deviceIp}:8060" ]
-    ))
+    if (!autoManage) 
+        return
+    asynchttpGet(parseInstalledApps, [uri: "http://${deviceIp}:8060/query/apps"])
 }
 
+def parseInstalledApps(response, data) {
+
+    def status = response.getStatus();
+    if (status < 200 || status >= 300)
+        return
+
+    def body = response.getXml()
+    def hdmiCount = hdmiPorts as int
+        
+    childDevices.each{ child ->
+        //log.debug "child: ${child.deviceNetworkId} (${child.name})"
+        def nodeExists = false
+        if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
+            nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
+        }
+        
+        if (inputAV)
+            nodeExists = nodeExists || networkIdForApp("AV1") == child.deviceNetworkId
+
+        if (inputTuner)
+            nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
+        
+        body.app.each{ node ->
+            nodeExists = nodeExists || networkIdForApp(node.attributes().id) == child.deviceNetworkId
+        }
+        
+        if (!nodeExists) {
+            if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
+                if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+                deleteChildDevice(child.deviceNetworkId)
+            }
+        }
+    }
+    
+    if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
+    if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
+    if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+        updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}") 
+    }
+
+    if (manageApps) body.app.each{ node ->
+        if (node.attributes().type != "appl") {
+            return
+        }
+
+        def netId = networkIdForApp(node.attributes().id)
+        def appName = node.text()
+        updateChildApp(netId, appName)
+    }
+}
 
 def keyPress(key) {
-	if (!isValidKey(key)) {
-		log.warning("Invalid key press: ${key}")
-		return
-	}
+    if (!isValidKey(key)) {
+        log.warning("Invalid key press: ${key}")
+        return
+    }
     if (logEnable) log.debug "Executing '${key}'"
-    def result = new hubitat.device.HubAction(
-        method: "POST",
-        path: "/keypress/${key}",
-        headers: [ HOST: "${deviceIp}:8060" ],
-        body: "",
+    asynchttpPost(keyPressHandler, [uri: "http://${deviceIp}:8060/keypress/${key}"], [key: key])
+}
 
-    )
+def keyPressHandler(response, data) {
+    def status = response.getStatus();
+    if (200 <= status && status < 300)
+        poll()
+    else
+        log.error "Failed to send key press event for ${data.key}"
 }
 
 private def isValidKey(key) {
-	def keys = [
-		"Home",      "Back",       "FindRemote",  "Select",
-		"Up",        "Down",       "Left",        "Right",
-		"Play",      "Rev",        "Fwd",         "InstantReplay",
-		"Info",      "Search",     "Backspace",   "Enter",
-		"VolumeUp",	 "VolumeDown", "VolumeMute",
-		"Power",     "PowerOff",
-		"ChannelUp", "ChannelDown", "InputTuner", "InputAV1",
-		"InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"
-		]
-	
-	return keys.contains(key)
+    def keys = [
+        "Home",      "Back",       "FindRemote",  "Select",
+        "Up",        "Down",       "Left",        "Right",
+        "Play",      "Rev",        "Fwd",         "InstantReplay",
+        "Info",      "Search",     "Backspace",   "Enter",
+        "VolumeUp",     "VolumeDown", "VolumeMute",
+        "Power",     "PowerOff",
+        "ChannelUp", "ChannelDown", "InputTuner", "InputAV1",
+        "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"
+        ]
+    
+    return keys.contains(key)
 }
 
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
-	if (appId =~ /(hdmi\d)|AV1|Tuner/) {
-		this."input_$appId"()
-	} else {
-        def result = new hubitat.device.HubAction(
-        method: "POST",
-        path: "/launch/${appId}",
-        headers: [ HOST: "${deviceIp}:8060" ],
-        body: "",
-    )
-    sendHubCommand(result)
-	}
+    if (appId =~ /(hdmi\d)|AV1|Tuner/) {
+        this."input_$appId"()
+    } else {
+        asynchttpPost(launchAppHandler, [uri: "http://${deviceIp}:8060/launch/${appId}"], [appId: appId])
+    }
+}
+
+def launchAppHandler(response, data) {
+    def status = response.getStatus()
+    if (200 <= status && status < 300)
+        queryCurrentApp()
+    else
+        log.error "Failed to launch appId: ${data.appId}"
 }
 
 /**
