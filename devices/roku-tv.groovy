@@ -22,9 +22,8 @@ preferences {
         "Up",        "Down",       "Left",        "Right",
         "Play",      "Rev",        "Fwd",         "InstantReplay",
         "Info",      "Search",     "Backspace",   "Enter",
-        "VolumeUp",     "VolumeDown", "VolumeMute",
-        "Power",     "PowerOff",
-        "ChannelUp", "ChannelDown"
+        "VolumeUp",  "VolumeDown", "VolumeMute",
+        "Power",     "PowerOff",   "ChannelUp",   "ChannelDown"
         ]
     input name: "deviceIp",        type: "text",   title: "Device IP", required: true
     input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
@@ -39,8 +38,8 @@ preferences {
         input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
         input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
         input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
+        input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
     }
-    //input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for", options:keys, required: false
     input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
 
@@ -96,7 +95,12 @@ def updated() {
         }
     }
     if (appRefresh && appInterval > 0) schedule("0/${appInterval} * * * * ?", queryCurrentApp)
-
+    if (createChildKey) {
+        def key=createChildKey
+        def text=createChildKey.replaceAll( ~ /([A-Z])/, ' $1').trim()
+        device.updateSetting("createChildKey", [value: "", type:"enum"])
+        updateChildApp(networkIdForApp(key), text)
+    }
 
 }
 
@@ -123,7 +127,8 @@ def iconPathForApp(String netId) {
  */
 
 def on() {
-    sendWakeUp()
+    if (device.currentValue('switch') == "off")
+        sendWakeUp()
     keyPress('Power')
 }
 
@@ -216,12 +221,14 @@ def reloadApps() {
  **/
 
 def sendWakeUp() {
-    sendHubCommand(new hubitat.device.HubAction (
-        "wake on lan ${state.deviceMac}",
-        hubitat.device.Protocol.LAN,
-        null,
-        [:]
-    ))
+    if (state."wake-on-lan" == true) {
+        sendHubCommand(new hubitat.device.HubAction (
+            "wake on lan ${state.deviceMac}",
+            hubitat.device.Protocol.LAN,
+            null,
+            [:]
+        ))
+    }
 }
 
 def queryDeviceState() {
@@ -239,20 +246,22 @@ def parseDeviceState(response, data) {
 }
 
 private def parseState(body) {
-    for (def node : body.childNodes()) {
-        def key = node.name()
-        if (key == null)
-            continue
-        
-        if (isStateProperty(key)) {
-            def value = node.text()
-            if (value != null) {
-                if (value != this.state."${key}") {
-                    this.state."${key}" = value
-                    if (logEnable) log.debug "set ${key} = ${value}"
-                }
-            }
-        }
+    
+    if (body["supports-wake-on-wlan"] == "true" || !(body["network-type"] == "wifi")) 
+        setState("wake-on-lan", true)
+    
+    if (body["supports-find-remote"] == "true" && body["find-remote-is-possible"] == "true")
+        setState("supports-find-remote", true)
+    
+    ["serial-number", "vendor-name", "device-id", "model-name", "screen-size", "user-device-name"].each { nodeName ->
+        setState(nodeName, "${body[nodeName]}")
+    }
+}
+
+private def setState(key, value) {
+    if (value != "" && value != state."${key}") {
+        state."${key}" = value
+        if (logEnabled) log.debug "Set ${key} = ${value}"
     }
 }
 
@@ -261,10 +270,12 @@ private def isStateProperty(String key) {
         case "serial-number":
         case "vendor-name":
         case "device-id":
-        case "mode-name":
+        case "model-name":
         case "screen-size":
         case "user-device-name":
         case "deviceMac":
+        case "supports-find-remote":
+        case "wake-on-lan":
             return true
     }
     return false
@@ -289,7 +300,7 @@ private def parsePowerState(body) {
                 if (this.state!="on") {
                     sendEvent(name: "switch", value: "on")
                     if (appRefresh && appInterval > 0) {
-                        runInMillis(100, queryCurrentApp)
+                        queryCurrentApp()
                         schedule("0/${appInterval} * * * * ?", queryCurrentApp)
                     }
                 } 
@@ -380,7 +391,7 @@ def parseInstalledApps(response, data) {
     if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
     if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
     if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
-        updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}") 
+        updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
     }
 
     if (manageApps) body.app.each{ node ->
@@ -413,25 +424,29 @@ def keyPressHandler(response, data) {
 
 private def isValidKey(key) {
     def keys = [
-        "Home",      "Back",       "FindRemote",  "Select",
+        "Home",      "Back",       "Select",
         "Up",        "Down",       "Left",        "Right",
         "Play",      "Rev",        "Fwd",         "InstantReplay",
         "Info",      "Search",     "Backspace",   "Enter",
-        "VolumeUp",     "VolumeDown", "VolumeMute",
+        "VolumeUp",  "VolumeDown", "VolumeMute",
         "Power",     "PowerOff",
-        "ChannelUp", "ChannelDown", "InputTuner", "InputAV1",
-        "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"
+        "ChannelUp", "ChannelDown","InputTuner", "InputAV1",
+        "InputHDMI1","InputHDMI2", "InputHDMI3", "InputHDMI4" 
         ]
+    if (state."supports-find-remote" == true)
+        keys << "FindRemote"
     
     return keys.contains(key)
 }
 
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
-    if (appId =~ /(hdmi\d)|AV1|Tuner/) {
+    if (appId =~ /\d+/) {
+        asynchttpPost(launchAppHandler, [uri: "http://${deviceIp}:8060/launch/${appId}"], [appId: appId])
+    } else if (appId =~ /(hdmi\d)|AV1|Tuner/) {
         this."input_$appId"()
     } else {
-        asynchttpPost(launchAppHandler, [uri: "http://${deviceIp}:8060/launch/${appId}"], [appId: appId])
+        this.keyPress(appId)
     }
 }
 
@@ -499,6 +514,3 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
-
-
-
