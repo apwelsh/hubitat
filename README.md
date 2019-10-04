@@ -108,4 +108,4 @@ This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md
 ## Acknowledgments
 This software would not be possible without the efforts and free sharing of information provided by the original authoris of the [TCL Smartthings Roky TV](https://github.com/ericboehs/smartthings-roku-tv) created by [Eric Boehs](https://github.com/ericboehs).
 
-Additional thanks go to Roku for freely publishing the [External Control API](https://sdkdocs.roku.com/display/sdkdoc/External+Control+API) documentation.
+Additional thanks go to Roku for freely publishing the [External Control API](https://developer.roku.com/docs/developer-program/debugging/external-control-api.md) documentation.
