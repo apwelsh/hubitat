@@ -123,13 +123,11 @@ def iconPathForApp(String netId) {
  */
 
 def on() {
-    sendEvent(name: "switch", value: "turning-on")
     sendWakeUp()
     keyPress('Power')
 }
 
 def off() {
-    sendEvent(name: "switch", value: "turning-off")
     keyPress('PowerOff')
 }
 
