@@ -40,6 +40,8 @@ metadata {
         capability "Sensor"
         capability "PushableButton"
         
+        
+        
         attribute  "display", "string"
         attribute  "switch",  "string"
     }
@@ -73,16 +75,53 @@ def pause() {
     setStatus("paused")
 }
 
+private def shouldUpdate() {
+    def seconds = state.seconds as int
+    if (seconds <= 10) // if 10 seconds remaining
+        return true // every 1 second
+    if (seconds <= 30) // if 30 seconds remaining
+        if (seconds % 5 == 0) // every 5 seconds
+            return true
+    if (seconds <= 60) // if 60 seconds remaining
+        if (seconds % 15 == 0) // every 15 seconds
+            return true
+    if (seconds <= 300) // if 5 minutes remaining
+        if (seconds % 30 == 0) // every 30 seconds
+            return true
+    if (seconds <= 1200) // if 20 minutes remaining
+        if (seconds % 60 == 0) // every 1 minute
+            return true
+    if (seconds <= 1800) // if 30 minutes remaining
+        if (seconds % 120 == 0) // every 2 minutes
+            return true
+    if (seconds <= 3600) // if 1 hour remaining
+        if (seconds % 300 == 0) // every 5 minutes
+            return true
+    if (seconds <= 14400) // if 4 hours remaining
+        if (seconds % 600 == 0) // every 10 minutes
+            return true
+    if (seconds % 1800 == 0) // every 30 minutes
+        return true
+    
+    return false
+}
+
 def setTimeRemaining(seconds) {
-    sendEvent(name: "timeRemaining", value: seconds)
-    def remaining
+    
+    state.seconds = seconds
+    
+    if (!shouldUpdate())
+        return
+    
     if (seconds == 0) {
         unschedule()
         if (device.currentValue('sessionStatus') != "canceled")
+            sendEvent(name: "timeRemaining", value: seconds)
             setStatus("stopped")
         runIn(1, resetDisplay)
         push()
     }
+    
     def hours = (seconds / 3600) as int
     if (hours > 0)
         seconds = seconds.intValue() % 3600 // remove the hours component
@@ -93,6 +132,8 @@ def setTimeRemaining(seconds) {
     } else {
         remaining = String.format("%02d:%02d", mins, secs)
     }
+    
+    sendEvent(name: "timeRemaining", value: seconds)
     sendEvent(name: "display", value: remaining)
 }
 
@@ -136,7 +177,7 @@ def resetDisplay() {
 }
 
 def timerEvent() {
-    def timeRemaining = device.currentValue('timeRemaining')
+    def timeRemaining = state.seconds
     if (timeRemaining) {
         timeRemaining = timeRemaining - 1
         setTimeRemaining(timeRemaining)
