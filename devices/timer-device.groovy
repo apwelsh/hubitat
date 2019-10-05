@@ -20,8 +20,14 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    input name: "idleText", type: "bool", title: "Show Idle message when timer is done", defaultValue: false
-	input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+    input name: "idleText",     
+          type: "bool", title: "Idle Message",   
+          description: "Show Idle message when timer is done", 
+          defaultValue: false
+	input name: "logEnable",    
+          type: "bool", title: "Logging",        
+          description: "Enable debug logging", 
+          defaultValue: false
 }
 
 metadata {
@@ -35,6 +41,7 @@ metadata {
         capability "PushableButton"
         
         attribute  "display", "string"
+        attribute  "switch",  "string"
     }
 }
 
@@ -113,6 +120,14 @@ def push() {
 
 def setStatus(status) {
     sendEvent(name: "sessionStatus", value: status, isStateChange: true)
+    switch (status) {
+        case "running":
+        case "paused":
+            sendEvent(name: "switch", value: "on")
+            break;
+        default:
+            sendEvent(name: "switch", value: "off")
+    }
 }
 
 
@@ -129,5 +144,3 @@ def timerEvent() {
         stop()
     }
 }
-
-
