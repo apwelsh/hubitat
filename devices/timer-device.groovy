@@ -54,11 +54,13 @@ metadata {
 def updated() {
     def timeRemaining = device.currentValue('timeRemaining')
     setTimeRemaining(timeRemaining?:0)
+    sendEvent(name: "switch", value: "off")
 }
 
 def installed() {
     sendEvent(name: "numberOfButtons", value: 1)
     setTimeRemaining(0)
+    sendEvent(name: "switch", value: "off")
 }
 
 /**
