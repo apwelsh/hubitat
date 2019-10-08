@@ -54,13 +54,11 @@ metadata {
 def updated() {
     def timeRemaining = device.currentValue('timeRemaining')
     setTimeRemaining(timeRemaining?:0)
-    sendEvent(name: "switch", value: "off")
 }
 
 def installed() {
     sendEvent(name: "numberOfButtons", value: 1)
     setTimeRemaining(0)
-    sendEvent(name: "switch", value: "off")
 }
 
 /**
@@ -78,7 +76,7 @@ def pause() {
 }
 
 private def shouldUpdate() {
-    def seconds = state.seconds as int
+    def seconds = state.seconds?:0 as int
     if (seconds <= 10) // if 10 seconds remaining
         return true // every 1 second
     if (seconds <= 30) // if 30 seconds remaining
@@ -109,17 +107,20 @@ private def shouldUpdate() {
 }
 
 def setTimeRemaining(seconds) {
-    
-    state.seconds = seconds
+    if (seconds == 0)
+        state.remove("seconds")
+    else
+        state.seconds = seconds
     
     if (!shouldUpdate())
         return
     
     if (seconds == 0) {
         unschedule()
-        if (device.currentValue('sessionStatus') != "canceled")
+        if (device.currentValue('sessionStatus') != "canceled") {
             sendEvent(name: "timeRemaining", value: seconds)
             setStatus("stopped")
+        }
         runIn(1, resetDisplay)
         push()
     }
