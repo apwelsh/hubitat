@@ -9,7 +9,8 @@ Welcome to my Hubitat Github repo.  All drivers and applications in this repo ar
    - A set of drivers for controlling a Roku TV or Media Player.
  - [Timer Device](Timer.md)
    - This is a simple count-down timer tile.  This tile is still in development. Use this device when you want a timer that shows you the amount of time remaining and that is SharpTools.io HERO tile friendly.
-
+ - [Advanced Hue Hub Integration](hue/README.md)
+   - This project's goal is to bridge the gap that currently exists between Hubitat and Hue Bridge.  The hubitat native support should be used whenever possible -- however, there are some things in the native hue integration that drive an unpleasent user experience.  Hue Scenes are not supported in hubitat.  This *experimental*, and **in development** project's goal is to bring Hue scenes to hubitat as child devices of the hue groups.  
 
 ## License
 
