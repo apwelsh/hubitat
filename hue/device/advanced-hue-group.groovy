@@ -28,7 +28,7 @@ metadata {
     definition (name:      "AdvancedHueGroup", 
                 namespace: "apwelsh", 
                 author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/hue/advanced-hue-group.groovy") {
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy") {
         
         capability "Light"
         capability "SwitchLevel"

@@ -21,7 +21,7 @@ definition(
     author: "Armand Welsh",
     description: "Find and install your Philips Hue Bridge systems",
     category: "Convenience",
-    //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/apps/hue/hue-bridge-integration.groovy",
+    //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
     iconUrl: "",
     iconX2Url: "",
     iconX3Url: ""

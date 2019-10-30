@@ -29,7 +29,7 @@ metadata {
         name:      "AdvancedHueBridge", 
 		namespace: "apwelsh", 
 		author:    "Armand Welsh", 
-		importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/hue/advanced-hue-bridge.groovy") {
+		importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy") {
 		
         capability "Refresh"
 
