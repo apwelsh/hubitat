@@ -101,16 +101,19 @@ def bridgeDiscovery(params=[:]) {
 	def options = hubs ?: []
 	def numFound = options.size() ?: 0
 
-	//if ((numFound == 0 && state.deviceRefreshCount > 25) || params.reset == "true") {
-    //	log.trace "Cleaning old device memory"
+	if ((numFound == 0 && state.deviceRefreshCount > 25) || params.reset == "true") {
+    	log.trace "Cleaning old device memory"
     //	clearDiscoveredHubs()
-    //    state.deviceRefreshCount = 0
-    //}
+        state.deviceRefreshCount = 0
+        deviceRefeshCount = 0
+    }
 
-	ssdpSubscribe()
+    if (deviceRefreshCount == 0) {
+        ssdpSubscribe()
+    }
 
 	//bridge discovery request every 5th refresh, retry discovery
-	if((deviceRefreshCount % 5) == 0) {
+	if((deviceRefreshCount % 15) == 0) {
 		ssdpDiscover()
 	}
 
