@@ -28,9 +28,10 @@ metadata {
     definition (name:      "AdvancedHueGroup", 
                 namespace: "apwelsh", 
                 author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy") {
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/advanced-hue-group.groovy") {
         
         capability "Light"
+        capability "Switch"
         capability "SwitchLevel"
         capability "Actuator"
         capability "ColorControl"
@@ -55,19 +56,37 @@ def off() {
 
 def setColor(colormap) {
     //colormap required (COLOR_MAP) - Color map settings [hue*:(0 to 100), saturation*:(0 to 100), level:(0 to 100)]
+    def hue = Math.round(colormap.hue * 655.35)
+    def saturation = Math.round(colormap.saturation * 2.54)
+    def level = Math.round(colormap.level * 2.54)
+    
+    def args = ["hue":hue, 
+                "sat":saturation,
+                "bri":level]
+    parent.setDeviceState(this, args)
+    
 }
 def setHue(hue) {
     //hue required (NUMBER) - Color Hue (0 to 100)
+    
+    def args = ["hue":Math.round(hue * 655.35)]
+    parent.setDeviceState(this, args)
 }
 
 def setSaturation(saturation) {
     //saturation required (NUMBER) - Color Saturation (0 to 100)
+    def args = ["sat":Math.round(saturation * 2.54)]
+    parent.setDeviceState(this, args)
 }
 
 /** ColorTemperature Commands **/
 
 def setColorTemperature(colortemperature) {
     //colortemperature required (NUMBER) - Color temperature in degrees Kelvin
+    //are capable of 153 (6500K) to 500 (2000K).
+    
+    def ct = Math.round(500 - ((colortemperature - 2000) / (4500 / 347)))
+    parent.setDeviceState(this, ["ct":ct])
 }
 
 /** SwitchLevel Commands **/
@@ -101,6 +120,14 @@ def setHueProperty(name, value) {
         case "bri":
         sendEvent(name: "level", value: Math.round(value / 2.54))
         break;
+        case "hue":
+        sendEvent(name: "hue", value: Math.round(value / 65.535))
+        break;
+        case "sat":
+        sendEvent(name: "saturation", value: Math.round(value / 2.54))
+        break;
+        case "ct":
+        sendEvent(name: "colortemperature", value: Math.round(((500 - value) * (4500 / 347)) + 2000 ))
+        break;
     }
-        
 }
