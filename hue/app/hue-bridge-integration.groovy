@@ -69,8 +69,10 @@ def mainPage(params=[:]) {
     } else {
         title="Find Bridges"
     }
+
+    def uninstall = (state.bridgehost) ? false : true
     
-	dynamicPage(name: "mainPage", title: "Manage your linked Hue Bridge", nextPage: null, uninstall: true, install: true) {
+	dynamicPage(name: "mainPage", title: "Manage your linked Hue Bridge", nextPage: null, uninstall: uninstall, install: true) {
         if (selectedDevice == null) {
             section("Setup"){
                 paragraph """ To begin, select Find Bridges to start searching for your Hue Bride."""
@@ -105,20 +107,22 @@ def bridgeDiscovery(params=[:]) {
 	def options = hubs ?: []
 	def numFound = options.size() ?: 0
 
-	//if ((numFound == 0 && state.deviceRefreshCount > 25) || params.reset == "true") {
+	if ((numFound == 0 && state.deviceRefreshCount > 30) || params.reset == "true") {
     //	log.trace "Cleaning old device memory"
-    //	clearDiscoveredHubs()
-    //    state.deviceRefreshCount = 0
-    //}
+    	//clearDiscoveredHubs()
+        state.deviceRefreshCount = 0
+    }
 
 	ssdpSubscribe()
 
 	//bridge discovery request every 5th refresh, retry discovery
-	if((deviceRefreshCount % 5) == 0) {
+	if((deviceRefreshCount % 3) == 0) {
 		ssdpDiscover()
 	}
 
-	return dynamicPage(name:"bridgeDiscovery", title:"Discovery Started!", nextPage:"bridgeBtnPush", refreshInterval:refreshInterval, uninstall: true) {
+    def uninstall = state.bridgehost ? false : true
+    
+	return dynamicPage(name:"bridgeDiscovery", title:"Discovery Started!", nextPage:"bridgeBtnPush", refreshInterval:refreshInterval, uninstall:uninstall) {
 		section("Please wait while we discover your Hue Bridge. Note that you must first configure your Hue Bridge and Lights using the Philips Hue application. Discovery can take five minutes or more, so sit back and relax, the page will reload automatically! Select your Hue Bridge below once discovered.") {
 			input "selectedDevice", "enum", required:false, title:"Select Hue Bridge (${numFound} found)", multiple:false, options:options
 		}
@@ -158,7 +162,9 @@ def bridgeLinking() {
     	paragraphText = "You haven't selected a Hue Bridge, please Press \"Done\" and select one before clicking next."
     }
 
-	return dynamicPage(name:"bridgeBtnPush", title:title, nextPage:nextPage, refreshInterval:refreshInterval) {
+    def uninstall = state.bridgehost ? false : true
+    
+	return dynamicPage(name:"bridgeBtnPush", title:title, nextPage:nextPage, refreshInterval:refreshInterval, uninstsall: uninstall) {
 		section("") {
 			paragraph """${paragraphText}"""
 		}
@@ -194,7 +200,7 @@ def addDevice(device) {
     }
         
     
-    return dynamicPage(name:"addDevice", title:title, nextPage:"mainPage",  uninstall: false) {
+    return dynamicPage(name:"addDevice", title:title, nextPage:"mainPage") {
         section() {
             paragraph sectionText
         }
@@ -221,8 +227,8 @@ def findGroups(params){
     def numFound = options.size()
     def refreshInterval = numFound == 0 ? 30 : 120
 
-	return dynamicPage(name:"findGroups", title:"Group Discovery Started!", nextPage:"addGroups", refreshInterval:refreshInterval, uninstall: true) {
-		section("""Let's find some groups.  Please click the ""Refresh Group Discovery"" Button if you aren't seeing your Groups / Rooms.""") {
+	return dynamicPage(name:"findGroups", title:"Group Discovery Started!", nextPage:"addGroups", refreshInterval:refreshInterval) {
+		section("""Let's find some groups.""") {
 			input "selectedGroups", "enum", required:false, title:"Select additional rooms / zones to add (${numFound} available)", multiple:true, options:options
             if (!installed.isEmpty()) {
                 paragraph "Previously added Hue Groups"
@@ -275,7 +281,7 @@ def addGroups(params){
         title = "Failed to add Group"
     }
     
-	return dynamicPage(name:"addGroups", title:title, nextPage:"mainPage", refreshInterval:refreshInterval, uninstall: true) {
+	return dynamicPage(name:"addGroups", title:title, nextPage:"mainPage") {
 		section() {
             paragraph sectionText
 		}
@@ -289,10 +295,6 @@ def findScenes(params){
     def groupOptions = [:]
     getInstalledGroups().each { groupOptions[deviceIdNode(it.deviceNetworkId)] = it.label }
     
-    //def installed = getInstalledScenes().collect { it.label }
-    //def dnilist = getInstalledScenes().collect { it.deviceNetworkId }
-    //log.info "${dnilist}"
-
     def options = [:]
     def scenes
     def group
@@ -320,7 +322,7 @@ def findScenes(params){
     def numFound = options.size()
     def refreshInterval = numFound == 0 ? 30 : 120
 
-	return dynamicPage(name:"findScenes", title:"Scene Discovery Started!", nextPage:"addScenes", refreshInterval:refreshInterval, uninstall: true) {
+	return dynamicPage(name:"findScenes", title:"Scene Discovery Started!", nextPage:"addScenes", refreshInterval:refreshInterval) {
 		section("""Let's find some scenes.  Please click the ""Refresh Scene Discovery"" Button if you aren't seeing your Scenes.""") {
             input "selectedGroup",  "enum", required:true,  title:"Select the group to add scenes to (${groupOptions.size()} installed)", multiple:false, options:groupOptions, submitOnChange: true
             if (selectedGroup) {
@@ -379,8 +381,8 @@ def addScenes(params){
     } else {
         title = "Failed to add Scene"
     }
-    
-	return dynamicPage(name:"addScenes", title:title, nextPage:"mainPage", refreshInterval:refreshInterval, uninstall: true) {
+
+	return dynamicPage(name:"addScenes", title:title, nextPage:"mainPage") {
 		section() {
             paragraph sectionText
 		}
@@ -895,6 +897,7 @@ def findScene(group, scene) {
         return state.scenes.find{ it.value.group == group && it.value.name == scene }?.key
     }
 }
+
 
 
 
