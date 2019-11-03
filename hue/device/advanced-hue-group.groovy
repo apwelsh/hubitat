@@ -28,7 +28,7 @@ metadata {
     definition (name:      "AdvancedHueGroup", 
                 namespace: "apwelsh", 
                 author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/advanced-hue-group.groovy") {
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy") {
         
         capability "Light"
         capability "Switch"
@@ -39,17 +39,18 @@ metadata {
         capability "ColorTemperature"
         capability "Refresh"
         
+        command "activateScene", [[type: "string"]]
     }
 }
 
 /** Switch Commands **/
 
 def on() {
-    parent.setDeviceState(this, ["on":true])
+    setDeviceState(["on":true])
 }
 
 def off() {
-    parent.setDeviceState(this, ["on": false])
+    setDeviceState(["on": false])
 }
 
 /** ColorControl Commands **/
@@ -63,20 +64,20 @@ def setColor(colormap) {
     def args = ["hue":hue, 
                 "sat":saturation,
                 "bri":level]
-    parent.setDeviceState(this, args)
+    setDeviceState(args)
     
 }
 def setHue(hue) {
     //hue required (NUMBER) - Color Hue (0 to 100)
     
     def args = ["hue":Math.round(hue * 655.35)]
-    parent.setDeviceState(this, args)
+    setDeviceState(args)
 }
 
 def setSaturation(saturation) {
     //saturation required (NUMBER) - Color Saturation (0 to 100)
     def args = ["sat":Math.round(saturation * 2.54)]
-    parent.setDeviceState(this, args)
+    setDeviceState(args)
 }
 
 /** ColorTemperature Commands **/
@@ -86,7 +87,7 @@ def setColorTemperature(colortemperature) {
     //are capable of 153 (6500K) to 500 (2000K).
     
     def ct = Math.round(500 - ((colortemperature - 2000) / (4500 / 347)))
-    parent.setDeviceState(this, ["ct":ct])
+    setDeviceState(["ct":ct])
 }
 
 /** SwitchLevel Commands **/
@@ -99,7 +100,7 @@ def setLevel(level, duration=null) {
     if (duration != null) {
         args["transitiontime"] = duration * 10
     }
-    parent.setDeviceState(this, args)
+    setDeviceState(args)
 }
 
 /** Refresh Commands **/
@@ -129,5 +130,29 @@ def setHueProperty(name, value) {
         case "ct":
         sendEvent(name: "colortemperature", value: Math.round(((500 - value) * (4500 / 347)) + 2000 ))
         break;
+        case "scene":
+        def nid = networkIdForScene(value)
+        getChildDevice(nid)?.setSwitchState("on")        
+        break;
+    }
+}
+
+def deviceIdNode(deviceNodeId) {
+     parent.deviceIdNode(deviceNodeId)
+}
+
+def setDeviceState(args) {
+    parent.setDeviceState(this, args)
+}
+
+def networkIdForScene(sceneId) {
+    parent.networkIdForScene(deviceIdNode(device.deviceNetworkId), sceneId)
+}
+
+def activateScene(scene) {
+    def sceneId = parent.findScene(deviceIdNode(device.deviceNetworkId), scene)
+    if (sceneId) {
+        log.info "Activate Scene: ${sceneId}"
+        setDeviceState(["scene": sceneId])
     }
 }

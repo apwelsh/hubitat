@@ -34,8 +34,11 @@ preferences {
     page(name: "addDevice", title: "Add Hue Bridge", content: "addDevice")
 	page(name: "bridgeBtnPush", title:"Linking with your Hue", content:"bridgeLinking", refreshTimeout:5)
     page(name: "configurePDevice")
-    page(name: "findGroups", title: "Group Discover Started!", content: "findGroups", refreshTimeout:10)
+    page(name: "findGroups", title: "Group Discovery Started!", content: "findGroups", refreshTimeout:10)
     page(name: "addGroups", title: "Add Group")
+    page(name: "findScenes", title: "Scene Discovery Started!", content: "findScenes", refreshTimeout:10)
+    page(name: "addScenes", title: "Add Scene")
+
 }
 
 def routerPage() {
@@ -77,6 +80,7 @@ def mainPage(params=[:]) {
             section("Configure"){
                 
                 href "findGroups", title:"Find Groups", description:""
+                href "findScenes", title:"Find Scenes", description:""
                 href "bridgeDiscovery", title:title, description:"", state:selectedDevice? "complete" : null //, params: [nextPage: "bridgeBtnPush"]
 
                // getChildDevices().sort({ a, b -> a["deviceNetworkId"] <=> b["deviceNetworkId"] }).each {
@@ -101,19 +105,16 @@ def bridgeDiscovery(params=[:]) {
 	def options = hubs ?: []
 	def numFound = options.size() ?: 0
 
-	if ((numFound == 0 && state.deviceRefreshCount > 25) || params.reset == "true") {
-    	log.trace "Cleaning old device memory"
+	//if ((numFound == 0 && state.deviceRefreshCount > 25) || params.reset == "true") {
+    //	log.trace "Cleaning old device memory"
     //	clearDiscoveredHubs()
-        state.deviceRefreshCount = 0
-        deviceRefeshCount = 0
-    }
+    //    state.deviceRefreshCount = 0
+    //}
 
-    if (deviceRefreshCount == 0) {
-        ssdpSubscribe()
-    }
+	ssdpSubscribe()
 
 	//bridge discovery request every 5th refresh, retry discovery
-	if((deviceRefreshCount % 15) == 0) {
+	if((deviceRefreshCount % 5) == 0) {
 		ssdpDiscover()
 	}
 
@@ -281,6 +282,113 @@ def addGroups(params){
 	}
 
 }
+
+def findScenes(params){
+    enumerateScenes()
+    
+    def groupOptions = [:]
+    getInstalledGroups().each { groupOptions[deviceIdNode(it.deviceNetworkId)] = it.label }
+    
+    //def installed = getInstalledScenes().collect { it.label }
+    //def dnilist = getInstalledScenes().collect { it.deviceNetworkId }
+    //log.info "${dnilist}"
+
+    def options = [:]
+    def scenes
+    def group
+    def installed
+    def dnilist
+    if (selectedGroup) {
+        group = getChildDevice(networkIdForGroup(selectedGroup))
+        if (group) {
+            group.getChildDevices().each {log.info it}
+            installed = group.getChildDevices().collect { it.label }
+            dnilist = group.getChildDevices()?.collect { it.deviceNetworkId }
+        }
+        scenes = state.scenes?.findAll { it.value.type == "GroupScene" && it.value.group == selectedGroup }
+    }    
+    if (scenes) {
+        scenes.each {key, value ->
+            def groupName = groupOptions."${selectedGroup}"
+            def lights = value.lights ?: []
+            if ( lights.size()  == 0 ) return
+            if ( dnilist.find { it == networkIdForScene(selectedGroup, key) } ) return
+            options["${key}"] = "${value.name} (${value.type} [${groupName}])"
+        }
+    }
+
+    def numFound = options.size()
+    def refreshInterval = numFound == 0 ? 30 : 120
+
+	return dynamicPage(name:"findScenes", title:"Scene Discovery Started!", nextPage:"addScenes", refreshInterval:refreshInterval, uninstall: true) {
+		section("""Let's find some scenes.  Please click the ""Refresh Scene Discovery"" Button if you aren't seeing your Scenes.""") {
+            input "selectedGroup",  "enum", required:true,  title:"Select the group to add scenes to (${groupOptions.size()} installed)", multiple:false, options:groupOptions, submitOnChange: true
+            if (selectedGroup) {
+                input "selectedScenes", "enum", required:false, title:"Select additional scenes to add (${numFound} available)", multiple:true, options:options
+                if (!installed.isEmpty()) {
+                    paragraph "Previously added Hue Scenes for ${group.label}"
+                    paragraph "[${installed.join(', ')}]"
+                }
+            }
+		}
+	}
+
+}
+
+
+def addScenes(params){
+
+    if (!selectedScenes)
+        return findScenes()
+    
+    def group = getChildDevice(networkIdForGroup(selectedGroup))
+    
+    def subject = selectedScenes.size == 1 ? "Scene" : "Scenes"
+    
+    def title = ""
+    def sectionText = ""
+    
+    def appId = app.getId()
+    def scenes = selectedScenes.collect { it }
+    
+    selectedScenes.each { sceneId -> 
+        def name = "${group.label} - ${state.scenes[sceneId].name}"
+        def dni = networkIdForScene(selectedGroup, sceneId)
+        try {
+            
+            group.addChildDevice("apwelsh", "AdvancedHueScene", "${dni}", ["label": "${name}"])
+            
+            scenes.remove(sceneId)
+            
+        } catch (ex) {
+            if (ex.message =~ "A device with the same device network ID exists.*") {
+                sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Scene [${name}]"""
+            } else {
+                sectionText += """\nFailed to add scene [${name}]; see logs for details"""
+                log.error "${ex}"
+            }
+        }
+    }
+    
+    if (scenes.size() == 0)
+        app.removeSetting("selectedScenes")
+    
+    if (!sectionText) {
+        title = "Adding ${subject} to Hubitat"
+        sectionText = """Added Scenes"""
+    } else {
+        title = "Failed to add Scene"
+    }
+    
+	return dynamicPage(name:"addScenes", title:title, nextPage:"mainPage", refreshInterval:refreshInterval, uninstall: true) {
+		section() {
+            paragraph sectionText
+		}
+	}
+
+}
+
+
 
 // Life Cycle Functions
 
@@ -643,6 +751,11 @@ private getInstalledGroups() {
     getChildDevices().findAll { it.deviceNetworkId =~ 'hueGroup:.*' }
 }
 
+private getInstalledScenes() {
+    getChildDevices().findAll { it.deviceNetworkId =~ 'hueScene:.*' }
+}
+
+
 private String deviceIdType(deviceNetworkId) {
     switch (deviceNetworkId) {
         case ~/hueGroup:.*/:    "groups"; break
@@ -762,7 +875,6 @@ def parseGroups(data) {
 }
 
 def parseLights(data) {
-    log.debug(data)
     data.each { id, value -> 
         //log.debug "${id}"
         
@@ -770,10 +882,17 @@ def parseLights(data) {
 }
 
 def parseScenes(data) {
-    log.debug(data)
     data.each { id, value -> 
         //log.debug "${id}"
         
+    }
+}
+
+def findScene(group, scene) {
+    if (state.scenes."${scene}") {
+        return scene
+    } else {
+        return state.scenes.find{ it.value.group == group && it.value.name == scene }?.key
     }
 }
 
