@@ -12,9 +12,20 @@ The functionality is very limited at this time.
  - [Advanced Hue Bridge Child Device](device/advanced-hue-bridge.groovy)
    - The main app will install an instance of this device after the app successfully pairs the hue bridge.
  - [Advance Hue Group Child Device](device/advanced-hue-group.groovy)
-   - All imported Hue Groups will use this device to manage the group.  This device depends on the parent app to operate. The initial version of this device will support all color light control capabilities, and per-group refresh.  
+   - All imported Hue Groups will use this device to manage the group.  This device depends on the parent app to operate. The initial version of this device supports all color light control capabilities, and the ability to activate any hue scene by scene ID or scene name (as identified in the hue bridge).
+- [Advance Hue Scene Child Device](device/advanced-hue-scene.groovy)
+   - All imported Hue Scenes will use this device to manage the scene.  This device depends on the parent app and the group device to operate. The initial version of this device supports the ability to activate a scene using the on button.  This is device does not maintain state, as Hue does not maintain state.
 
-As this project is in early development stages, the only functionality presently implemented is the ability to turn on/off groups, and set the group's dimmer level.  These features will be expanded upon daily, so if you choose to play with the project, watch the project page for updates.
+**Not yet implemented** 
+Hue Lights (RGB, CT and Dimmable) are not yet available.
+Refresh of device state is not yet implemented.
+
+### Status Updates
+November 22, 2019
+- The Hue Scenes can now be used to turn on / activate any registered scene.  Scenes are created as child devices of the hue hue group for which they belong.
+- Added the ability to activate any scene on the Hue bridge from the group device, by providing the scene name or scene ID (for speed, the scene ID is recommended)
+- Added ablity to control hue, saturation, colormap, and colortemp to the hue groups.
+- Added a scene manager to the Hue Hub Integration application.
 
 ## License
 
