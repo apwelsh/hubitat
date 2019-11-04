@@ -28,7 +28,7 @@ metadata {
     definition (name:      "AdvancedHueScene", 
                 namespace: "apwelsh", 
                 author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-scene.groovy") {
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-sceme.groovy") {
         
         capability "Switch"
         capability "Actuator"
@@ -41,7 +41,7 @@ metadata {
 
 def on() {
     def node = deviceIdNode(device.deviceNetworkId)
-    setDeviceState(["scene":node])
+    setDeviceState(this, ["scene":node])
 }
 
 def off() {
@@ -65,7 +65,7 @@ def deviceIdNode(deviceNetworkId) {
     parent.deviceIdNode(deviceNetworkId)
 }
 
-def setDeviceState(args) {
+def setDeviceState(device, args) {
     parent.setDeviceState(args)
 }
 
