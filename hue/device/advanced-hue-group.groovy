@@ -42,7 +42,7 @@ metadata {
         capability "ColorTemperature"
         capability "Refresh"
         
-        command "activateScene", [[type: "string"]]
+        command "activateScene", [[name: "Scene Identitier*", type: "STRING", description: "Enter a scene name or the scene number as defined by the Hue Bridge"]]
     }
 }
 
@@ -127,7 +127,7 @@ def parse(String description) {
 }
 
 def setHueProperty(name, value) {
-    if (logEnable) log.info "setHueProperty(${name}) = ${value}"
+//    if (logEnable) log.info "setHueProperty(${name}) = ${value}"
     switch (name) {
         case "on":
         sendEvent(name: "switch", value: value == true ? "on" : "off")
@@ -147,6 +147,7 @@ def setHueProperty(name, value) {
         case "scene":
         def nid = networkIdForScene(value)
         getChildDevice(nid)?.setSwitchState("on")
+        refresh()
         break;
         case "any_on":
         if (anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
