@@ -91,13 +91,16 @@ def mainPage(params=[:]) {
                     //}
 
                 //}
-            }    
+            }
+            section("Options") {
+                input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
+            }
         }
     }
 }
 
 def bridgeDiscovery(params=[:]) {
-	log.debug "Searching for Hub additions and updates"
+	if (logEnable) log.debug "Searching for Hub additions and updates"
 	def hubs = discoveredHubs()
     
 	int deviceRefreshCount = !state.deviceRefreshCount ? 0 : state.deviceRefreshCount as int
@@ -108,7 +111,7 @@ def bridgeDiscovery(params=[:]) {
 	def numFound = options.size() ?: 0
 
 	if ((numFound == 0 && state.deviceRefreshCount > 30) || params.reset == "true") {
-    //	log.trace "Cleaning old device memory"
+    //	if (logEnable) log.trace "Cleaning old device memory"
     	//clearDiscoveredHubs()
         state.deviceRefreshCount = 0
     }
@@ -145,7 +148,7 @@ def bridgeLinking() {
         
         def hub = getHubForMac(selectedDevice)
         if (hub?.username) { //if discovery worked
-            log.debug "Hub linking completed for ${hub.name}"
+            if (logEnable) log.debug "Hub linking completed for ${hub.name}"
             return addDevice(hub)
         }
         if (hub?.networkAddress) {
@@ -187,7 +190,7 @@ def addDevice(device) {
     }
 
     if (!d && device != null) {
-        log.debug "Creating Hue Bridge device with dni: ${dni}"
+        if (logEnable) log.debug "Creating Hue Bridge device with dni: ${dni}"
         try {
             addChildDevice("apwelsh", "AdvancedHueBridge", dni, null, ["label": device.name])
         } catch (ex) {
@@ -266,7 +269,7 @@ def addGroups(params){
                 sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Group [${name}]"""
             } else {
                 sectionText += """\nFailed to add group [${name}]; see logs for details"""
-                log.error "${ex}"
+                if (logEnable) log.error "${ex}"
             }
         }
     }
@@ -303,7 +306,6 @@ def findScenes(params){
     if (selectedGroup) {
         group = getChildDevice(networkIdForGroup(selectedGroup))
         if (group) {
-            group.getChildDevices().each {log.info it}
             installed = group.getChildDevices().collect { it.label }
             dnilist = group.getChildDevices()?.collect { it.deviceNetworkId }
         }
@@ -395,7 +397,6 @@ def addScenes(params){
 // Life Cycle Functions
 
 def installed() {
-    log.debug "Installed with settings: ${settings}"
     state.bridgeRefreshCount = 0
     state.bulbRefreshCoun    = 0
     state.inBulbDiscovery    = 0
@@ -409,7 +410,6 @@ def uninstalled() {
 }
 
 def updated() {
-    log.debug "Updated with settings: ${settings}"
     unsubscribe()
     unschedule()
     initialize()
@@ -478,7 +478,7 @@ void updateDevice(parsedEvent) {
         device << ["networkAddress": parsedEvent.networkAddress,
                    "deviceAddress": parsedEvent.deviceAddress]
         
-        log.debug "Discovered hub address update: ${device.name}"
+        if (logEnable) log.debug "Discovered hub address update: ${device.name}"
     }
 }
 
@@ -505,7 +505,7 @@ def verifyDeviceHandler(response, parsedEvent) {
         def model = device.modelName
         def ssdpUSN = "${parsedEvent.ssdpUSN.toString()}"
 
-        log.debug "Identified model: ${model}"
+        if (logEnable) log.debug "Identified model: ${model}"
         if (model =~ 'Philips hue bridge.*') {
             def hubId = "${parsedEvent.mac}"[-6..-1]
             def name = "${device.friendlyName}".replaceAll(~/\(.*\)/, "(${hubId})")
@@ -515,7 +515,7 @@ def verifyDeviceHandler(response, parsedEvent) {
 
             def hubs = getHubs()
             hubs << ["${ssdpUSN}": parsedEvent]
-            log.debug "Discovered new hub: ${name}"
+            if (logEnable) log.debug "Discovered new hub: ${name}"
         }
     }
 }
@@ -547,17 +547,17 @@ def requestHubAccessHandler(response, args) {
 
     if (data) {
         if (data.error?.description) {
-            log.error "${data.error.description[0]}"
+            if (logEnable) log.error "${data.error.description[0]}"
         } else if (data.success) {
             if (data.success.username) {
                 def device = getHubForMac(args.device.mac)
                 device << [username: "${data.success.username[0]}"]
-                log.debug "Obtained credentials: ${device}"
+                if (logEnable) log.debug "Obtained credentials: ${device}"
             } else {
                 log.error "Problem with hub linking.  Received response: ${data}"
             }
         } else {
-            log.error $data
+            if (logEnable) log.error $data
         }
 
     }
@@ -581,7 +581,7 @@ def getHubStatusHandler(response, args) {
     def data = response.getJson()
     if (data) {
         if (data.error?.description) {
-            log.error "${data.error.description[0]}"
+            if (logEnable) log.error "${data.error.description[0]}"
         } else {
             parseStatus(data)
         }
@@ -591,7 +591,7 @@ def getHubStatusHandler(response, args) {
 private enumerateGroups() {
     
     def url = "http://${state.bridgeHost}/api/${state.username}/groups"
-    //log.debug "${url}"
+    //if (logEnable) log.debug "${url}"
     
     asynchttpGet(enumerateGroupsHandler,
                   [uri: url,
@@ -608,7 +608,7 @@ def enumerateGroupsHandler(response, args) {
     def data = response.getJson()
     if (data) {
         if (data.error?.description) {
-            log.error "${data.error.description[0]}"
+            if (logEnable) log.error "${data.error.description[0]}"
         } else {
             if (data) state.groups = data
             parseGroups(data)
@@ -619,7 +619,7 @@ def enumerateGroupsHandler(response, args) {
 private enumerateScenes() {
     
     def url = "http://${state.bridgeHost}/api/${state.username}/scenes"
-    //log.debug "${url}"
+    //if (logEnable) log.debug "${url}"
     
     asynchttpGet(enumerateScenesHandler,
                   [uri: url,
@@ -636,7 +636,7 @@ def enumerateScenesHandler(response, args) {
     def data = response.getJson()
     if (data) {
         if (data.error?.description) {
-            log.error "${data.error.description[0]}"
+            if (logEnable) log.error "${data.error.description[0]}"
         } else {
             if (data) state.scenes = data
             parseScenes(data)
@@ -647,7 +647,7 @@ def enumerateScenesHandler(response, args) {
 private enumerateLights() {
     
     def url = "http://${state.bridgeHost}/api/${state.username}/lights"
-    //log.debug "${url}"
+    //if (logEnable) log.debug "${url}"
     
     asynchttpGet(enumerateScenesHandler,
                   [uri: url,
@@ -664,7 +664,7 @@ def enumerateLightsHandler(response, args) {
     def data = response.getJson()
     if (data) {
         if (data.error?.description) {
-            log.error "${data.error.description[0]}"
+            if (logEnable) log.error "${data.error.description[0]}"
         } else {
             if (data) state.lights = data
             parseLights(data)
@@ -684,8 +684,8 @@ def setDeviceState(child, deviceState) {
     def node = deviceIdNode(deviceNetworkId)
     
     def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/action"
-    log.debug "URL: ${url}"
-    log.debug "args: ${deviceState}"
+    if (logEnable) log.debug "URL: ${url}"
+    if (logEnable) log.debug "args: ${deviceState}"
     asynchttpPut(setDeviceStateHandler,
                   [uri: url,
                    contentType: "application/json",
@@ -703,13 +703,12 @@ def setDeviceStateHandler(response, args) {
     
     def data = response.getJson()
     if (data) {
-//        log.info data
+    //    if (logEnable) log.info data
         data.each { 
             if (it.error?.description) {
-                log.error "${it.error.description[0]}"
+                if (logEnable) log.error "${it.error.description[0]}"
             }
             if (it.success) {
-                log.info it.success
                 it.success.each { key, value ->
                     
                     def result = key.split('/')
@@ -719,7 +718,7 @@ def setDeviceStateHandler(response, args) {
                         case "lights":  nid=networkIdForLight(result[2]); break;
                         case "scenes":  nid=networkIdForScene(result[2]); break;
                         default:
-                            log.warn "Unhandled device state handler repsonse: ${result}"
+                            if (logEnable) log.warn "Unhandled device state handler repsonse: ${result}"
                         return;
                     }
                     def device = getChildDevice(nid)
@@ -742,7 +741,7 @@ def getDeviceState(child) {
     def node = deviceIdNode(deviceNetworkId)
     
     def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
-    log.debug "URL: ${url}"
+    if (logEnable) log.debug "URL: ${url}"
     asynchttpGet(getDeviceStateHandler,
                   [uri: url,
                    contentType: "application/json",
@@ -759,18 +758,18 @@ def getDeviceStateHandler(response, args) {
     
     def data = response.getJson()
     if (data) {
-        log.info data
+        if (logEnable) log.info data  // temporary until lights are added, and all groups/all lights
         if ( data.error ) {
-            log.error "${it.error.description[0]}"
+            if (logEnable) log.error "${it.error.description[0]}"
             return
         }
         if (args.node) {
             def device = args.childDevice
-            log.info "Parsing response: $date for $node"
+            if (logEnable) log.info "Parsing response: $date for $node" // temporary
             data.state.each { key, value -> device.setHueProperty(key,value) }
             data.action.each { key, value -> device.setHueProperty(key, value) }
         } else {
-            log.info it
+            if (logEnable) log.info it  // temporary to catch unknown result state
         }
     }
 }
@@ -917,21 +916,21 @@ def parseStatus(data) {
 def parseGroups(data) {
     
     data.each { id, value -> 
-        //log.debug "${id}"
+        //if (logEnable) log.debug "${id}"
         // Add code to update all installed groups state
     }
 }
 
 def parseLights(data) {
     data.each { id, value -> 
-        //log.debug "${id}"
+        //if (logEnable) log.debug "${id}"
         
     }
 }
 
 def parseScenes(data) {
     data.each { id, value -> 
-        //log.debug "${id}"
+        //if (logEnable) log.debug "${id}"
         
     }
 }
@@ -951,3 +950,8 @@ def findScene(groupId, sceneId) {
         return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
     }
 }
+
+
+
+
+
