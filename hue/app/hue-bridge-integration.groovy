@@ -730,6 +730,51 @@ def setDeviceStateHandler(response, args) {
     }
 }
 
+def getDeviceState(child) {
+
+    def deviceNetworkId = child.device.deviceNetworkId
+    def hubId = deviceIdHub(deviceNetworkId)
+    if ("${hubId}" != "${app.getId()}") {
+        log.warn "Received getDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
+        return
+    }
+    def type = deviceIdType(deviceNetworkId)
+    def node = deviceIdNode(deviceNetworkId)
+    
+    def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
+    log.debug "URL: ${url}"
+    asynchttpGet(getDeviceStateHandler,
+                  [uri: url,
+                   contentType: "application/json",
+                   requestContentType: "application/json"],
+                  ["childDevice": child,
+                   "type": type,
+                   "node": node])
+}
+
+def getDeviceStateHandler(response, args) {
+    def status = response.getStatus();
+    if (status < 200 || status >= 300)
+        return
+    
+    def data = response.getJson()
+    if (data) {
+        log.info data
+        if ( data.error ) {
+            log.error "${it.error.description[0]}"
+            return
+        }
+        if (args.node) {
+            def device = args.childDevice
+            log.info "Parsing response: $date for $node"
+            data.state.each { key, value -> device.setHueProperty(key,value) }
+            data.action.each { key, value -> device.setHueProperty(key, value) }
+        } else {
+            log.info it
+        }
+    }
+}
+
 
 /*
  *
@@ -850,6 +895,7 @@ def refreshHubStatus(dni) {
     }
 }
 
+
 /*
  *
  * Device Parsers
@@ -890,14 +936,18 @@ def parseScenes(data) {
     }
 }
 
-def findScene(group, scene) {
-    if (state.scenes."${scene}") {
-        return scene
+def findGroup(groupId) {
+    if (state.groups."${groupId}") {
+        return state.groups."${groupId}"
     } else {
-        return state.scenes.find{ it.value.group == group && it.value.name == scene }?.key
+        return state.groups.find{ it.value.name == groupId }
     }
 }
 
-
-
-
+def findScene(groupId, sceneId) {
+    if (state.scenes."${sceneId}") {
+        return state.scenes."${sceneId}"
+    } else {
+        return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
+    }
+}

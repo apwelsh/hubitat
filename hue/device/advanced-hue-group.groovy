@@ -19,8 +19,11 @@
  **/
 
 preferences {
-    input name: "refreshEnabled", type: "bool", title: "Enable refresh", defaultValue: false
-    input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
+    input name: "autoRefresh", type: "bool", defaultValue: false, title: "Auto Refresh",        description: "Should this device support automatic refresh" 
+    if (autoRefresh)
+        input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
+    input name: "anyOn",       type: "bool", defaultValue: true,  title: "ANY on or ALL on",    description: "When ebabled, the group is considered on when any light is on"
+    input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
 
 }
 
@@ -41,6 +44,17 @@ metadata {
         
         command "activateScene", [[type: "string"]]
     }
+}
+
+def installed() {
+    parent.getDeviceState(this)
+}
+
+def updated() {
+    if (logEnable) log.debug "Preferences updated"
+    parent.getDeviceState(this)
+    unschedule()
+    schedule("0/${refreshInterval} * * * * ?", refresh)
 }
 
 /** Switch Commands **/
@@ -105,7 +119,7 @@ def setLevel(level, duration=null) {
 
 /** Refresh Commands **/
 def refresh() {
-
+    parent.getDeviceState(this)
 }
 
 def parse(String description) {
@@ -113,7 +127,7 @@ def parse(String description) {
 }
 
 def setHueProperty(name, value) {
-    log.info "setHutProperty(${name}) = ${value}"
+    if (logEnable) log.info "setHueProperty(${name}) = ${value}"
     switch (name) {
         case "on":
         sendEvent(name: "switch", value: value == true ? "on" : "off")
@@ -122,7 +136,7 @@ def setHueProperty(name, value) {
         sendEvent(name: "level", value: Math.round(value / 2.54))
         break;
         case "hue":
-        sendEvent(name: "hue", value: Math.round(value / 65.535))
+        sendEvent(name: "hue", value: Math.round(value / 655.35))
         break;
         case "sat":
         sendEvent(name: "saturation", value: Math.round(value / 2.54))
@@ -132,7 +146,13 @@ def setHueProperty(name, value) {
         break;
         case "scene":
         def nid = networkIdForScene(value)
-        getChildDevice(nid)?.setSwitchState("on")        
+        getChildDevice(nid)?.setSwitchState("on")
+        break;
+        case "any_on":
+        if (anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
+        break;
+        case "all_on":
+        if (!anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
         break;
     }
 }
@@ -150,9 +170,9 @@ def networkIdForScene(sceneId) {
 }
 
 def activateScene(scene) {
-    def sceneId = parent.findScene(deviceIdNode(device.deviceNetworkId), scene)
+    def sceneId = parent.findScene(deviceIdNode(device.deviceNetworkId), scene)?.key
     if (sceneId) {
-        log.info "Activate Scene: ${sceneId}"
+        if (logEnable) log.info "Activate Scene: ${sceneId}"
         setDeviceState(["scene": sceneId])
     }
 }
