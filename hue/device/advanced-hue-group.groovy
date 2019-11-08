@@ -53,8 +53,6 @@ def installed() {
 def updated() {
     if (logEnable) log.debug "Preferences updated"
     parent.getDeviceState(this)
-    unschedule()
-    schedule("0/${refreshInterval} * * * * ?", refresh)
 }
 
 /** Switch Commands **/
@@ -71,9 +69,9 @@ def off() {
 
 def setColor(colormap) {
     //colormap required (COLOR_MAP) - Color map settings [hue*:(0 to 100), saturation*:(0 to 100), level:(0 to 100)]
-    def hue = Math.round(colormap.hue * 655.35)
-    def saturation = Math.round(colormap.saturation * 2.54)
-    def level = Math.round(colormap.level * 2.54)
+    def hue = Math.round((colormap.hue?:device.currentValue('hue')?:0) * 655.35)
+    def saturation = Math.round((colormap.saturation?:device.currentValue('saturation')?:50) * 2.54)
+    def level = Math.round((colormap.level?:device.currentValue('level')?:100 ) * 2.54)
     
     def args = ["hue":hue, 
                 "sat":saturation,
@@ -101,7 +99,7 @@ def setColorTemperature(colortemperature) {
     //are capable of 153 (6500K) to 500 (2000K).
     
     def ct = Math.round(500 - ((colortemperature - 2000) / (4500 / 347)))
-    setDeviceState(["ct":ct])
+    setDeviceState(["ct":ct, "colormode":"ct"])
 }
 
 /** SwitchLevel Commands **/
@@ -119,7 +117,9 @@ def setLevel(level, duration=null) {
 
 /** Refresh Commands **/
 def refresh() {
+    unschedule()
     parent.getDeviceState(this)
+    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events
 }
 
 def parse(String description) {
@@ -127,7 +127,7 @@ def parse(String description) {
 }
 
 def setHueProperty(name, value) {
-//    if (logEnable) log.info "setHueProperty(${name}) = ${value}"
+    // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
     switch (name) {
         case "on":
         sendEvent(name: "switch", value: value == true ? "on" : "off")
@@ -155,6 +155,16 @@ def setHueProperty(name, value) {
         case "all_on":
         if (!anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
         break;
+        case "colormode":
+        if (value == "hs") {
+            sendEvent(name: "colorMode", value: "RGB")
+        }
+        if (value == "ct") {
+            sendEvent(name: "colorMode", value: "CT")
+        }
+        if (value == "xy") {
+            sendEvent(name: "colorMode", value: "RGB")
+        }
     }
 }
 
