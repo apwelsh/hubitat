@@ -117,10 +117,14 @@ def setLevel(level, duration=null) {
 
 /** Refresh Commands **/
 def refresh() {
-    unschedule()
     parent.getDeviceState(this)
-    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events
 }
+
+def resetRefreshSchedule() {
+    unschedule()
+    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events    
+}
+
 
 def parse(String description) {
     if (logEnable) log.debug "parse(${description}) called"
@@ -187,3 +191,4 @@ def activateScene(scene) {
         setDeviceState(["scene": sceneId])
     }
 }
+

@@ -18,10 +18,12 @@
 import groovy.json.JsonSlurper
 
 preferences {
-    input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
-    input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
-    input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
-    input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
+    input name: "autoRefresh", type: "bool", defaultValue: false, title: "Auto Refresh",        description: "Should this device support automatic refresh" 
+    if (autoRefresh)
+        input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
+    input name: "anyOn",       type: "bool", defaultValue: true,  title: "ANY on or ALL on",    description: "When ebabled, the group is considered on when any light is on"
+    input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
+
 }
 
 metadata {
@@ -31,6 +33,7 @@ metadata {
 		author:    "Armand Welsh", 
 		importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy") {
 		
+        capability "Switch"
         capability "Refresh"
 
     }
@@ -46,23 +49,33 @@ def installed() {
 
 def updated() {
     if (logEnable) log.debug "Preferences updated"
-	unschedule()
-	if (deviceIp && refreshInterval > 0) {
-        if (refreshUnits == "Seconds") {            
-            schedule("${new Date().format("s")}/${refreshInterval} * * * * ?", refresh)
-        } else {
-    		schedule("${new Date().format("s")} 0/${refreshInterval} * * * ?", refresh)
-        }
-	}
+	refresh()
 }
 
 /*
  * Device Capability Interface Functions
  */
 
+/** Switch Commands **/
+
+def on() {
+    setDeviceState(["on":true])
+}
+
+def off() {
+    setDeviceState(["on": false])
+}
+
+
 def refresh() {
     if (logEnable) log.trace "Executing 'refresh'"
-    parent.refreshHubStatus(device.deviceNetworkId)    
+    parent.getDeviceState(this)
+    parent.getHubStatus()
+}
+
+def resetRefreshSchedule() {
+    unschedule()
+    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events    
 }
 
 /**
@@ -86,6 +99,31 @@ def parseGroups(groups) {
 
 private def cleanState() {
 	this.state.clear
+}
+
+
+def setHueProperty(name, value) {
+    // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
+    switch (name) {
+        case "on":
+        sendEvent(name: "switch", value: value == true ? "on" : "off")
+        break;
+        case "any_on":
+        sendEvent(name: "switch", value: value ? "on" : "off")
+        break;
+    }
+}
+
+def deviceIdNode(deviceNodeId) {
+     parent.deviceIdNode(deviceNodeId)
+}
+
+def setDeviceState(args) {
+    parent.setDeviceState(this, args)
+}
+
+def networkIdForScene(sceneId) {
+    parent.networkIdForScene(deviceIdNode(device.deviceNetworkId), sceneId)
 }
 
 

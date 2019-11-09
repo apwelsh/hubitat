@@ -564,8 +564,8 @@ def requestHubAccessHandler(response, args) {
 }
 private getHubStatus() {
     
-    def url = "http://${state.bridgeHost}/api/${state.username}"
-    
+    def url = "http://${state.bridgeHost}/api/${state.username}/"
+
     asynchttpGet(getHubStatusHandler,
                   [uri: url,
                    contentType: "application/json",
@@ -579,6 +579,7 @@ def getHubStatusHandler(response, args) {
         return
     
     def data = response.getJson()
+
     if (data) {
         if (data.error?.description) {
             if (logEnable) log.error "${data.error.description[0]}"
@@ -676,13 +677,20 @@ def setDeviceState(child, deviceState) {
 
     def deviceNetworkId = child.device.deviceNetworkId
     def hubId = deviceIdHub(deviceNetworkId)
-    if ("${hubId}" != "${app.getId()}") {
+    def type
+    def node
+
+    if ( deviceNetworkId =~ "hue\\-[0-9A-F]{12}" ) {
+        type = "groups"
+        node = "0"
+    } else if ("${hubId}" != "${app.getId()}") {
         log.warn "Received setDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
         return
+    } else {
+        type = deviceIdType(deviceNetworkId)
+        node = deviceIdNode(deviceNetworkId)
     }
-    def type = deviceIdType(deviceNetworkId)
-    def node = deviceIdNode(deviceNetworkId)
-    
+
     def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/action"
     if (logEnable) log.debug "URL: ${url}"
     if (logEnable) log.debug "args: ${deviceState}"
@@ -721,7 +729,7 @@ def setDeviceStateHandler(response, args) {
                             if (logEnable) log.warn "Unhandled device state handler repsonse: ${result}"
                         return;
                     }
-                    def device = getChildDevice(nid)
+                    def device = args.type == "groups" && args.node == "0" ? args.childDevice : getChildDevice(nid)
                     device.setHueProperty(result[4],value)
                 }
             }
@@ -733,13 +741,19 @@ def getDeviceState(child) {
 
     def deviceNetworkId = child.device.deviceNetworkId
     def hubId = deviceIdHub(deviceNetworkId)
-    if ("${hubId}" != "${app.getId()}") {
+    def type
+    def node
+
+    if ( deviceNetworkId =~ "hue\\-[0-9A-F]{12}" ) {
+        type = "groups"
+        node = "0"
+    } else if ("${hubId}" != "${app.getId()}") {
         log.warn "Received getDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
         return
+    } else {
+        type = deviceIdType(deviceNetworkId)
+        node = deviceIdNode(deviceNetworkId)
     }
-    def type = deviceIdType(deviceNetworkId)
-    def node = deviceIdNode(deviceNetworkId)
-    
     def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
     if (logEnable) log.debug "URL: ${url}"
     asynchttpGet(getDeviceStateHandler,
@@ -766,6 +780,7 @@ def getDeviceStateHandler(response, args) {
         if (args.node) {
             def device = args.childDevice
             if (logEnable) log.info "Parsing response: $date for $node" // temporary
+            device.resetRefreshSchedule()
             data.state.each { key, value -> device.setHueProperty(key,value) }
             data.action.each { key, value -> device.setHueProperty(key, value) }
         } else {
@@ -773,6 +788,7 @@ def getDeviceStateHandler(response, args) {
         }
     }
 }
+
 
 
 /*
@@ -851,7 +867,8 @@ private getHubForNetworkId(deviceNetworkId) {
 }
 
 private getChildDeviceForMac(mac) {
-    getChildDevices()?.find {it.deviceNetworkId == deviceNetworkId(mac)  }    
+    //getChildDevices()?.find {it.deviceNetworkId == deviceNetworkId(mac)  }    
+    getChildDevice(deviceNetworkId(mac))
 }
 
 private clearDiscoveredHubs() {
@@ -881,18 +898,7 @@ def getHubs() {
     state.hubs = state.hubs ?: [:]
 }
 
-def refreshHubStatus(dni) {
-    def hub = getHubs().find { deviceNetworkId(it.value.mac) == dni }.value
-    if (!hub) {
-        return
-    }
-    def url = "${hub.url}/api/${hub.username}"
-    httpGet(url) { response ->
-        if (response.data) {
-            getChildDevice(dni).parse(response.data)
-        }
-    }
-}
+
 
 
 /*
@@ -902,7 +908,7 @@ def refreshHubStatus(dni) {
  */
 
 def parseStatus(data) {
-    
+
     def groups = data.groups
     def lights = data.lights
     def scenes = data.scenes
@@ -913,11 +919,17 @@ def parseStatus(data) {
     
 }
 
-def parseGroups(data) {
-    
-    data.each { id, value -> 
-        //if (logEnable) log.debug "${id}"
+def parseGroups(json) {
+    def hub=getChildDeviceForMac(selectedDevice)
+    json.each { id, data -> 
         // Add code to update all installed groups state
+        def group = getChildDevice(networkIdForGroup(id))
+        if (group) {
+            if (logEnable) log.info "Parsing response: $date for $node" // temporary
+            group.resetRefreshSchedule()
+            data.state.each  { key, value -> group.setHueProperty(key,value) }
+            data.action.each { key, value -> group.setHueProperty(key, value) }
+        }
     }
 }
 
@@ -950,3 +962,5 @@ def findScene(groupId, sceneId) {
         return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
     }
 }
+
+
