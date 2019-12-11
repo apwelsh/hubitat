@@ -124,10 +124,11 @@ def bridgeDiscovery(params=[:]) {
 	}
 
     def uninstall = state.bridgehost ? false : true
+    def nextPage = selectedDevice ? "bridgeBtnPush" : null
     
-	return dynamicPage(name:"bridgeDiscovery", title:"Discovery Started!", nextPage:"bridgeBtnPush", refreshInterval:refreshInterval, uninstall:uninstall) {
+	return dynamicPage(name:"bridgeDiscovery", title:"Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
 		section("Please wait while we discover your Hue Bridge. Note that you must first configure your Hue Bridge and Lights using the Philips Hue application. Discovery can take five minutes or more, so sit back and relax, the page will reload automatically! Select your Hue Bridge below once discovered.") {
-			input "selectedDevice", "enum", required:false, title:"Select Hue Bridge (${numFound} found)", multiple:false, options:options
+			input "selectedDevice", "enum", required:false, title:"Select Hue Bridge (${numFound} found)", multiple:false, options:options, submitOnChange: true
 		}
 	}
 }
@@ -229,10 +230,11 @@ def findGroups(params){
 
     def numFound = options.size()
     def refreshInterval = numFound == 0 ? 30 : 120
+    def nextPage = selectedGroups ? "addGroups" : null
 
-	return dynamicPage(name:"findGroups", title:"Group Discovery Started!", nextPage:"addGroups", refreshInterval:refreshInterval) {
+	return dynamicPage(name:"findGroups", title:"Group Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval) {
 		section("""Let's find some groups.""") {
-			input "selectedGroups", "enum", required:false, title:"Select additional rooms / zones to add (${numFound} available)", multiple:true, options:options
+			input "selectedGroups", "enum", required:false, title:"Select additional rooms / zones to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
             if (!installed.isEmpty()) {
                 paragraph "Previously added Hue Groups"
                 paragraph "[${installedGroups.join(', ')}]"
@@ -323,13 +325,15 @@ def findScenes(params){
 
     def numFound = options.size()
     def refreshInterval = numFound == 0 ? 30 : 120
+    
+    def nextPage = selectedGroup && selectedScenes ? "addScenes" : null
 
-	return dynamicPage(name:"findScenes", title:"Scene Discovery Started!", nextPage:"addScenes", refreshInterval:refreshInterval) {
+	return dynamicPage(name:"findScenes", title:"Scene Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval) {
 		section("""Let's find some scenes.  Please click the ""Refresh Scene Discovery"" Button if you aren't seeing your Scenes.""") {
             input "selectedGroup",  "enum", required:true,  title:"Select the group to add scenes to (${groupOptions.size()} installed)", multiple:false, options:groupOptions, submitOnChange: true
             if (selectedGroup) {
-                input "selectedScenes", "enum", required:false, title:"Select additional scenes to add (${numFound} available)", multiple:true, options:options
-                if (!installed.isEmpty()) {
+                input "selectedScenes", "enum", required:false, title:"Select additional scenes to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
+                if (installed && !installed.isEmpty()) {
                     paragraph "Previously added Hue Scenes for ${group.label}"
                     paragraph "[${installed.join(', ')}]"
                 }
@@ -962,5 +966,6 @@ def findScene(groupId, sceneId) {
         return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
     }
 }
+
 
 
