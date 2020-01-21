@@ -101,6 +101,15 @@ Note: The TV Device does not keep an active link with the Roku, and there is not
 
 The Roku App child device handler is just a child switch.  The switch allows the buttons to appear in Alexa as devices.  The status of the switch will automatically change to on or off based on the currently running application.  If the switch is commanded on or off, then the switch status will change to turning-on or turning-off until the actual state is confirmed.
 
+**Not yet implemented** 
+Roke Integration App to find and manage roku device installatios
+Roke Integration Child App to manage each roku devices features.
+
+### Status Updates
+January 20, 2020
+- Relocated device drivers to now location for better management of code
+- Created a temporary old device with new URL.  This new device should act as a bridge to migrate existing installations to using the new devices.
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.  Portions of this code are licensed from Eric Boehs [LICENSE.md](https://raw.githubusercontent.com/ericboehs/smartthings-roku-tv/master/LICENSE)

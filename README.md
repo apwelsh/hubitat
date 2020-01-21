@@ -5,13 +5,18 @@ Welcome to my Hubitat Github repo.  All drivers and applications in this repo ar
 
 ## Current Projects
 
- - [Roku TV and Media Players](Roku.md)
+ - [Roku TV and Media Players](roku/README.md)
    - A set of drivers for controlling a Roku TV or Media Player.
  - [Timer Device](Timer.md)
    - This is a simple count-down timer tile.  This tile is still in development. Use this device when you want a timer that shows you the amount of time remaining and that is SharpTools.io HERO tile friendly.
  - [Advanced Hue Hub Integration](hue/README.md)
-   - This project's goal is to bridge the gap that currently exists between Hubitat and Hue Bridge.  The hubitat native support should be used whenever possible -- however, there are some things in the native hue integration that drive an unpleasent user experience.  Hue Scenes are not supported in hubitat.  This *experimental*, and **in development** project's goal is to bring Hue scenes to hubitat as child devices of the hue groups.  
+   - This project's goal is to bridge the gap that currently exists between Hubitat and Hue Bridge.  The hubitat native support should be used whenever possible -- however, there are some things in the native hue integration that create an unpleasent user experience.  Hue Scenes are not supported in hubitat.  This *experimental*, and **in development** project's goal is to bring Hue scenes to hubitat as child devices of the hue groups.  
+- [Tesla Connect](tesla/README.md)
+   - This project's goal is to convert the SmartThings Tesla-Connect solution for Hubitat, and enhance it to provide features not available with the current SmartThings solution.  This *experimental*, and **in development** project's goal is to bring Tesla Presence based logic to Hubit and provide an alternative to Tesla HomeLink.
+
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.  Portions of this code are licensed from Eric Boehs [LICENSE.md](https://raw.githubusercontent.com/ericboehs/smartthings-roku-tv/master/LICENSE)
+Portions of this repository are licensed under the MIT License - see the [MIT LICENSE](MIT-LICENSE.md)
+
+Portions of this repository are licensed under the Apache 2.0 License - see the [Apache LICENSE](APACHE-LICENSE.md)
