@@ -13,17 +13,24 @@
  *  for the specific language governing permissions and limitations under the License.
  *
  */
+preferences {
+    input name: "homelink", type: "bool", title: "Use HomeLink presence", defaultValue: false
+    if (homelink)
+        input name: "geofence", type: "number", title: "Meters from home for presence", defaultValue: 50
+    input name: "logEnable", type: "bool", title: "Enable logging", defaultValue: false
+}
+
 metadata {
-	definition (name: "Tesla", namespace: "trentfoley", author: "Trent Foley") {
+	definition (name: "Tesla", namespace: "apwelsh", author: "Armand Welsh") {
 		capability "Actuator"
 		capability "Battery"
 		capability "Lock"
-		capability "Motion Sensor"
-		capability "Presence Sensor"
+		capability "MotionSensor"
+		capability "PresenceSensor"
 		capability "Refresh"
-		capability "Temperature Measurement"
-		capability "Thermostat Mode"
-		capability "Thermostat Setpoint"
+		capability "TemperatureMeasurement"
+		capability "ThermostatMode"
+		capability "ThermostatSetpoint"
 
 		attribute "state", "string"
 		attribute "vin", "string"
@@ -35,8 +42,8 @@ metadata {
 		attribute "longitude", "number"
 		attribute "method", "string"
 		attribute "heading", "number"
-		attribute "lastUpdateTime", "string"
-		attribute “distanceAway”, “number”
+		attribute "lastUpdateTime", "date"
+		attribute "distanceAway", "number"
 
 		command "wake"
 		command "setThermostatSetpoint"
@@ -49,7 +56,7 @@ metadata {
 }
 
 def initialize() {
-	log.debug "Executing 'initialize'"
+	if (logEnable) log.debug "Executing 'initialize'"
     
     sendEvent(name: "supportedThermostatModes", value: ["auto", "off"])
     
@@ -58,12 +65,12 @@ def initialize() {
 
 // parse events into attributes
 def parse(String description) {
-	log.debug "Parsing '${description}'"
+	if (logEnable) log.debug "Parsing '${description}'"
 }
 
 private processData(data) {
-	  if(data) {
-        log.debug "processData: ${data}"
+    if(data) {
+        if (logEnable) log.debug "processData: ${data}"
         
         sendEvent(name: "state", value: data.state)
         sendEvent(name: "motion", value: data.motion)
@@ -84,8 +91,11 @@ private processData(data) {
             sendEvent(name: "heading", value: data.driveState.heading)
             sendEvent(name: "lastUpdateTime", value: data.driveState.lastUpdateTime)
             def dist = distance(location.latitude, location.longitude, data.driveState.latitude, data.driveState.longitude)
-            log.debug "distance: ${dist}"
+            if (logEnable) log.debug "distance: ${dist}"
             sendEvent(name: "distanceAway", value: dist)
+            if (!homelink) {
+                sendEvent(name: "presence", value: (dist <= (geofence?:50) ? "present" : "not present")
+            }
         }
         
         if (data.vehicleState) {
@@ -99,65 +109,64 @@ private processData(data) {
             sendEvent(name: "thermostatSetpoint", value: data.climateState.thermostatSetpoint)
         }
     } else {
-    	  log.error "No data found for ${device.deviceNetworkId}"
+        if (logEnable) log.error "No data found for ${device.deviceNetworkId}"
     }
 }
 
 def refresh() {
-	  log.debug "Executing 'refresh'"
-    log.debug "Home Location (lat/lon) ${location.latitude}/${location.longitude}"
+    if (logEnable) log.debug "Executing 'refresh'"
     def data = parent.refresh(this)
-	  processData(data)
+    processData(data)
 }
 
 def wake() {
-    log.debug "Executing 'wake'"
+    if (logEnable) log.debug "Executing 'wake'"
     def data = parent.wake(this)
     processData(data)
     runIn(30, refresh)
 }
 
 def lock() {
-    log.debug "Executing 'lock'"
+    if (logEnable) log.debug "Executing 'lock'"
     def result = parent.lock(this)
     if (result) { refresh() }
 }
 
 def unlock() {
-    log.debug "Executing 'unlock'"
+    if (logEnable) log.debug "Executing 'unlock'"
     def result = parent.unlock(this)
     if (result) { refresh() }
 }
 
 def auto() {
-	log.debug "Executing 'auto'"
+	if (logEnable) log.debug "Executing 'auto'"
 	def result = parent.climateAuto(this)
     if (result) { refresh() }
 }
 
 def off() {
-	log.debug "Executing 'off'"
+	if (logEnable) log.debug "Executing 'off'"
 	def result = parent.climateOff(this)
     if (result) { refresh() }
 }
 
 def heat() {
-	log.debug "Executing 'heat'"
+	if (logEnable) log.debug "Executing 'heat'"
 	// Not supported
 }
 
 def emergencyHeat() {
-	log.debug "Executing 'emergencyHeat'"
+	if (logEnable) log.debug "Executing 'emergencyHeat'"
 	// Not supported
 }
 
 def cool() {
-	log.debug "Executing 'cool'"
+	if (logEnable) log.debug "Executing 'cool'"
 	// Not supported
 }
 
 def setThermostatMode(mode) {
-	log.debug "Executing 'setThermostatMode'"
+	if (logEnable) log.debug "Executing 'setThermostatMode'"
 	switch (mode) {
     	case "auto":
         	auto()
@@ -166,36 +175,36 @@ def setThermostatMode(mode) {
         	off()
             break
         default:
-        	log.error "setThermostatMode: Only thermostat modes Auto and Off are supported"
+        	if (logEnable) log.error "setThermostatMode: Only thermostat modes Auto and Off are supported"
     }
 }
 
 def setThermostatSetpoint(setpoint) {
-	log.debug "Executing 'setThermostatSetpoint'"
+	if (logEnable) log.debug "Executing 'setThermostatSetpoint'"
 	def result = parent.setThermostatSetpoint(this, setpoint)
     if (result) { refresh() }
 }
 
 def startCharge() {
-	log.debug "Executing 'startCharge'"
+	if (logEnable) log.debug "Executing 'startCharge'"
     def result = parent.startCharge(this)
     if (result) { refresh() }
 }
 
 def stopCharge() {
-	log.debug "Executing 'stopCharge'"
+	if (logEnable) log.debug "Executing 'stopCharge'"
     def result = parent.stopCharge(this)
     if (result) { refresh() }
 }
 
 def openFrontTrunk() {
-	log.debug "Executing 'openFrontTrunk'"
+	if (logEnable) log.debug "Executing 'openFrontTrunk'"
     def result = parent.openTrunk(this, "front")
     // if (result) { refresh() }
 }
 
 def openRearTrunk() {
-	log.debug "Executing 'openRearTrunk'"
+	if (logEnable) log.debug "Executing 'openRearTrunk'"
     def result = parent.openTrunk(this, "rear")
     // if (result) { refresh() }
 }
@@ -205,10 +214,12 @@ def distance(lat1, lon1, lat2, lon2) {
 
     final int R = 6371; // Radius of the earth (equator 6378, at poles 6357, median radius 6371)
 
-    def latDistance = Math.toRadians(lat2 - lat1);
-    def lonDistance = Math.toRadians(lon2 - lon1);
-    def a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2) + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
-    def c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    def latDistance = Math.toRadians(lat2 - lat1)
+    def lonDistance = Math.toRadians(lon2 - lon1)
+    def sinLat = Math.sin(latDistance/2)
+    def sinLon = Math.sin(lonDistance/2)
+    def a = sinLat * sinLat + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2)) * sinLon * sinLon
+    def c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
     def distance = R * c * 1000; // convert to meters
 
     return distance

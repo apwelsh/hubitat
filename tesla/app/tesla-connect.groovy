@@ -15,8 +15,8 @@
  */
 definition(
     name: "Tesla Connect",
-    namespace: "trentfoley",
-    author: "Trent Foley",
+    namespace: "apwelsh",
+    author: "Armand Welsh",
     description: "Integrate your Tesla car with SmartThings.",
     category: "Convenience",
     iconUrl: "https://s3.amazonaws.com/smartapp-icons/Partner/tesla-app%402x.png",
@@ -60,7 +60,7 @@ def selectVehicles() {
 	}
 }
 
-def getChildNamespace() { "trentfoley" }
+def getChildNamespace() { "apwelsh" }
 def getChildName() { "Tesla" }
 def getServerUrl() { "https://owner-api.teslamotors.com" }
 def getClientId () { "81527cff06843c8634fdc09e8ac0abefb46ac849f38fe1e431c2ef2106796384" }
@@ -221,7 +221,7 @@ private ensureDevicesForSelectedVehicles() {
             def d = getChildDevice(dni)
             if(!d) {
                 def vehicleName = state.accountVehicles[dni]
-                device = addChildDevice("trentfoley", "Tesla", dni, null, [name:"Tesla ${dni}", label:vehicleName])
+                device = addChildDevice(getChildNamespace(), "Tesla", dni, null, [name:"Tesla ${dni}", label:vehicleName])
                 log.debug "created device ${device.label} with id ${dni}"
                 device.initialize()
             } else {
