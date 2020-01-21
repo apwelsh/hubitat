@@ -26,7 +26,7 @@ metadata {
     definition (name:      "Roku App", 
                 namespace: "apwelsh", 
                 author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-app-child.groovy") {
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv-app.groovy") {
         
         capability "Momentary"
         capability "Switch"
