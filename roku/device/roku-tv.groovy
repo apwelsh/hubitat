@@ -48,7 +48,7 @@ metadata {
         name:      "Roku TV", 
         namespace: "apwelsh", 
         author:    "Armand Welsh", 
-        importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/roku-tv.groovy") {
+        importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy") {
         
         capability "TV"
         capability "AudioVolume"
