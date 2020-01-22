@@ -63,6 +63,8 @@ metadata {
         capability "Polling"
         capability "Refresh"
 
+        attribute "refresh", "string"
+
         command "home"
         command "keyPress", [[name:"Key Press Action", type: "ENUM", constraints: [
                 "Home",      "Back",       "FindRemote",  "Select",        "Up",        "Down",       "Left",        "Right",
@@ -81,6 +83,7 @@ metadata {
  * Hubitat DTH Lifecycle Functions
  **/
 def installed() {
+    sendEvent(name: "refresh", value: "idle")
     updated()
 }
 
@@ -127,6 +130,28 @@ def appIdForNetworkId(String netId) {
 
 def iconPathForApp(String netId) {
     return "http://${deviceIp}:8060/query/icon/${appIdForNetworkId(netId)}"    
+}
+    
+/*
+ * Component Child Methods
+ */
+
+ void componentOn(child) {
+    def appId = appIdForNetworkId(child.deviceNetworkId)
+    launchApp(appId)
+}
+
+void componentOff(child) {
+    if (child.currentValue("switch") == "off")
+        return
+    home()
+}
+
+void componentRefresh(cd){
+    if (logEnable) log.info "received refresh request from ${cd.displayName}"
+    if ("${device.currentValue('refresh')}" == "idle") {
+        queryCurrentApp()
+    }
 }
     
 /*
@@ -217,6 +242,7 @@ def input_hdmi4() {
 }
 
 def reloadApps() {
+    sendEvent(name: "refresh", value: "reload-apps")
     purgeInstalledApps()
     queryInstalledApps()
 }
@@ -239,6 +265,7 @@ def sendWakeUp() {
 }
 
 def queryDeviceState() {
+    sendEvent(name: "refresh", value: "device-info")
     asynchttpGet(parseDeviceState, [uri: "http://${deviceIp}:8060/query/device-info"])
 }
 
@@ -250,6 +277,7 @@ def parseDeviceState(response, data) {
     def body = response.getXml()
     parsePowerState(body)
     parseState(body)
+    sendEvent(name: "refresh", value: "idle")
 }
 
 private def parseState(body) {
@@ -343,8 +371,9 @@ def parseCurrentApp(response, data) {
         childDevices.each { child ->
             def appName = "${child.name}"
             def value = (currentApp.equals(appName)) ? "on" : "off"
-            child.sendEvent(name: "switch", value: value)
-//            if (value == "on")     sendEvent(name: "current_app_icon_html", value:"<img src=\"${iconPathForApp(child.deviceNetworkId)}\"/>")
+            if ("${child.currentValue('switch')}" != "${value}") {
+                child.parse([[name: "switch", value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+            }
         }
     }
 }
@@ -358,6 +387,9 @@ private def purgeInstalledApps() {
 def queryInstalledApps() {
     if (!autoManage) 
         return
+    if ("${device.currentValue("refresh")}" == "idle") {
+        sendEvent(name: "refresh", value: "find-apps")
+    }
     asynchttpGet(parseInstalledApps, [uri: "http://${deviceIp}:8060/query/apps"])
 }
 
@@ -410,6 +442,7 @@ def parseInstalledApps(response, data) {
         def appName = node.text()
         updateChildApp(netId, appName)
     }
+    sendEvent(name: "refresh", value: "idle")
 }
 
 def keyPress(key) {
@@ -501,9 +534,10 @@ private void updateChildApp(String netId, String appName) {
 private void createChildApp(String netId, String appName) {
     try {
         def label = deviceLabel()
-        addChildDevice("Roku App", "${netId}",
+        def child = addChildDevice("hubitat", "Generic Component Switch", "${netId}",
             [label: "${label}-${appName}", 
              isComponent: false, name: "${appName}"])
+        child.updateSetting("txtEnable", false)
         if (logEnable) log.debug "Created child device: ${appName} (${netId})"
     } catch(IllegalArgumentException e) {
         if (getChildDevice(netId)) {

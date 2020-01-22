@@ -128,6 +128,25 @@ def appIdForNetworkId(String netId) {
 def iconPathForApp(String netId) {
     return "http://${deviceIp}:8060/query/icon/${appIdForNetworkId(netId)}"    
 }
+
+/*
+ * Component Child Methods
+ */
+
+ void componentOn(child) {
+    def appId = appIdForNetworkId(child.deviceNetworkId)
+    launchApp(appId)
+}
+
+void componentOff(child) {
+    if (child.currentValue("switch") == "off")
+        return
+    home()
+}
+
+void componentRefresh(cd){
+    if (logEnable) log.info "received refresh request from ${cd.displayName}"
+}
     
 /*
  * Device Capability Interface Functions
@@ -343,8 +362,9 @@ def parseCurrentApp(response, data) {
         childDevices.each { child ->
             def appName = "${child.name}"
             def value = (currentApp.equals(appName)) ? "on" : "off"
-            child.sendEvent(name: "switch", value: value)
-//            if (value == "on")     sendEvent(name: "current_app_icon_html", value:"<img src=\"${iconPathForApp(child.deviceNetworkId)}\"/>")
+            if ("${child.currentValue('switch')}" != "${value}") {
+                child.parse([[name: "switch", value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+            }
         }
     }
 }
@@ -501,9 +521,10 @@ private void updateChildApp(String netId, String appName) {
 private void createChildApp(String netId, String appName) {
     try {
         def label = deviceLabel()
-        addChildDevice("Roku App", "${netId}",
+        def child = addChildDevice("hubitat", "Generic Component Switch", "${netId}",
             [label: "${label}-${appName}", 
              isComponent: false, name: "${appName}"])
+        child.updateSetting("txtEnable", false)
         if (logEnable) log.debug "Created child device: ${appName} (${netId})"
     } catch(IllegalArgumentException e) {
         if (getChildDevice(netId)) {

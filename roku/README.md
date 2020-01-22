@@ -10,10 +10,9 @@ WARNING:  Upgrading to this new version may break some of your automations, as s
 
 To use this software, you must download two files:
  - [roku-tv.groovy](devices/roku-tv.groovy)
- - [roku-app-child.groovy](devices/roku-app-child.groovy)
-
+ 
 ## Installation
-Sign into your Hubitat device, and add the two device handlers.  To do so, from the menu select the **"Drivers Code"** menu option.
+Sign into your Hubitat device, and add the Roku TV device handler.  To do so, from the menu select the **"Drivers Code"** menu option.
 
 ![](images/HubitatMenuDriversCode.png)
 
@@ -21,14 +20,11 @@ Next, click the **"(+) New Driver"** button
 
 ![](images/NewDriverButton.png)
 
-### Roku TV Child App
-Select the import button, and put in the URL to the [roku-app-child.groovy](devices/roku-app-child.groovy), Click the import button, and the new driver is ready.  
+### Roku TV App
+Select the import button, and put in the URL to the [roku-tv.groovy](device/roku-tv.groovy), Click the import button, and the new driver is ready.  
 Click **Save**. 
 ![save button](images/NewDriverExample.png)
 
-### Roku TV App
-Next, navigate to **"Drivers Code"**
-and repeat the process for the [roku-tv.groovy](/devices/roku-tv.groovy) driver.
 
 ## Configuration
 
@@ -104,8 +100,12 @@ The Roku App child device handler is just a child switch.  The switch allows the
 **Not yet implemented** 
 Roke Integration App to find and manage roku device installatios
 Roke Integration Child App to manage each roku devices features.
+Implement a refresh stack to limit TV  refresh status to one-at-a-time.  Parallel refreshes seem to severely slow down the Hub.
 
 ### Status Updates
+January 21, 2020
+- Remove roku-tv child app, and replace with built-in Generic Component Switch device
+- Add new attribute "refresh" to track the current refresh status.  If refresh is pending, some refresh operations are suppressed.
 January 20, 2020
 - Relocated device drivers to now location for better management of code
 - Created a temporary old device with new URL.  This new device should act as a bridge to migrate existing installations to using the new devices.
