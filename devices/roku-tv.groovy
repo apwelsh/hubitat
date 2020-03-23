@@ -521,7 +521,7 @@ private void updateChildApp(String netId, String appName) {
 private void createChildApp(String netId, String appName) {
     try {
         def label = deviceLabel()
-        def child = addChildDevice("hubitat", "Generic Component Switch", "${netId}",
+        def child = addChildDevice("apwelsh", "Roku App", "${netId}",
             [label: "${label}-${appName}", 
              isComponent: false, name: "${appName}"])
         child.updateSetting("txtEnable", false)
