@@ -8,8 +8,10 @@ WARNING:  Upgrading to this new version may break some of your automations, as s
 
 ## Getting Started
 
-To use this software, you must download two files:
+To use this software, you must download just this one file:
  - [roku-tv.groovy](devices/roku-tv.groovy)
+ 
+ ** Note ** that there used to be two files, but I have converted the device driver to use the built-in Generic Switch driver.
  
 ## Installation
 Sign into your Hubitat device, and add the Roku TV device handler.  To do so, from the menu select the **"Drivers Code"** menu option.
