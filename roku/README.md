@@ -11,21 +11,21 @@ WARNING:  Upgrading to this new version may break some of your automations, as s
 To use this software, you must download just this one file:
  - [roku-tv.groovy](devices/roku-tv.groovy)
  
- ** Note ** that there used to be two files, but I have converted the device driver to use the built-in Generic Switch driver.
+ _** Note ** that there used to be two files, but I have converted the device driver to use the built-in Generic Switch driver._
  
 ## Installation
 Sign into your Hubitat device, and add the Roku TV device handler.  To do so, from the menu select the **"Drivers Code"** menu option.
 
-![](images/HubitatMenuDriversCode.png)
+![](../images/HubitatMenuDriversCode.png)
 
 Next, click the **"(+) New Driver"** button
 
-![](images/NewDriverButton.png)
+![](../images/NewDriverButton.png)
 
 ### Roku TV App
 Select the import button, and put in the URL to the [roku-tv.groovy](device/roku-tv.groovy), Click the import button, and the new driver is ready.  
 Click **Save**. 
-![save button](images/NewDriverExample.png)
+![save button](../images/NewDriverExample.png)
 
 
 ## Configuration
@@ -38,16 +38,16 @@ For smart home automation to work reliably, all devices on your network that wil
 ### Adding the Roku Device
 To add your Roku device, navigate the **Devices** in the Hubitat menu, and select **Add Virtual Device**
 
-![](images/AddVirtualDeviceButton.png)
+![](../images/AddVirtualDeviceButton.png)
 
 Give your device a Friendly, but unique device name, and device network Id.
 I like to prefix my Device Network Id with a discriptive prefix to help ensure uniqueness, and to isolate my virtual devices by type. Be sure to select the new **Roky TV** devicea as the type, and then Save the device information.
 
-![](images/RokuTVDeviceInfo.png)
+![](../images/RokuTVDeviceInfo.png)
 
 Enter the IP Address of your Roku TV device in the Prefrences section, the MAC address is not required, it will attempt to fill-in when the Roku device is queried.
 
-![](images/RokuTVPreferences.png)
+![](../images/RokuTVPreferences.png)
 
 Click the **Save Prefrences** button.  
 
@@ -57,13 +57,13 @@ The next step is a little quirky, because the Roku TV device handler is going to
 
 ## Using the new device
 
-![](images/RokuTVCurrentState.png)
+![](../images/RokuTVCurrentState.png)
 
 Once the device looks something like the above image, your TV is configured and ready to go.
 
 At this point, you should see the installed child devices for the apps, which should look something like this:
 
-![](images/InstalledAppsList.png)
+![](../images/InstalledAppsList.png)
 
 Note:  The MAC address is used to institute a wake-on-lan event to wakeup Roku devices that entered into a deep sleep.
 
