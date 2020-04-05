@@ -481,9 +481,9 @@ private def isValidKey(key) {
 
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
-    if (appId =~ /\d+/) {
+    if (appId =~ /^\d+$/ ) {
         asynchttpPost(launchAppHandler, [uri: "http://${deviceIp}:8060/launch/${appId}"], [appId: appId])
-    } else if (appId =~ /(hdmi\d)|AV1|Tuner/) {
+    } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
     } else {
         this.keyPress(appId)
@@ -555,3 +555,4 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
+
