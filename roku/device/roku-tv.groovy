@@ -32,20 +32,40 @@ preferences {
         "VolumeUp",  "VolumeDown", "VolumeMute",
         "Power",     "PowerOff",   "ChannelUp",   "ChannelDown"
         ]
-    input name: "deviceIp",        type: "text",   title: "Device IP", required: true
-    input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
-    input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
-    input name: "appRefresh",      type: "bool",   title: "Refresh current application status seperate from TV status.", defaultValue: false, required: true
-    if (appRefresh) {
-        input name: "appInterval",     type: "number", title: "Refresh the current application at least every n seconds.", range: 1..120, defaultValue: 60, required: true        
+    def apps=[:]
+    def installed=[:]
+    if (deviceIp && (!autoManage || !manageApps)) {
+        getInstalledApps().each { netId, appName ->
+            if (getChildDevice(netId)) {
+                installed[netId] = appName
+            } else {
+                apps[netId] = appName
+            }
+        }
     }
-    input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
-    if (autoManage) {
-        input name: "manageApps",      type: "bool",   title: "Enable management of Roku installed Applications", defaultValue: true, required: true
-        input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
-        input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
-        input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
-        input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
+
+
+    input name: "deviceIp",        type: "text",   title: "Device IP", required: true
+    if (deviceIp) {
+        input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
+        input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
+        input name: "appRefresh",      type: "bool",   title: "Refresh current application status seperate from TV status.", defaultValue: false, required: true
+        if (appRefresh) {
+            input name: "appInterval",     type: "number", title: "Refresh the current application at least every n seconds.", range: 1..120, defaultValue: 60, required: true        
+        }
+        input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
+        if (autoManage) {
+            input name: "manageApps",      type: "bool",   title: "Auto-manage Roku Applications", defaultValue: true, required: true
+            input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
+            input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
+            input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
+            input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
+        }
+        if (!autoManage || !manageApps) {
+            input name: "createChildApp",     type: "enum",   title: "Add Roku App", options: apps, required: false
+            input name: "deleteChildApp",     type: "enum",   title: "Remove Roku App", options: installed, required: false
+
+        }
     }
     input name: "logEnable",       type: "bool",   title: "Enable debug logging", defaultValue: true, required: true
 }
@@ -111,6 +131,23 @@ def updated() {
         device.updateSetting("createChildKey", [value: "", type:"enum"])
         updateChildApp(networkIdForApp(key), text)
     }
+    if (createChildApp) {
+        def netId=createChildApp
+        device.updateSetting("createChildApp", [value: "", type:"enum"])
+        if (autoManage==false || manageApps==false) {
+            def apps=getInstalledApps()
+            def appName=apps[netId]
+            if (appName && netId)
+                updateChildApp(netId, appName)
+        }
+    }
+    if (deleteChildApp) {
+        def netId=deleteChildApp
+        device.updateSetting("deleteChildApp", [value: "", type:"enum"])
+        if (autoManage==false || manageApps==false) {
+            deleteChildDevice(netId)
+        }
+    }
 
 }
 
@@ -148,10 +185,10 @@ void componentOff(child) {
 }
 
 void componentRefresh(cd){
-    if (logEnable) log.info "received refresh request from ${cd.displayName}"
-    if ("${device.currentValue('refresh')}" == "idle") {
-        queryCurrentApp()
-    }
+    if (logEnable) log.info "received refresh request from ${cd.displayName} - ignored"
+    //if ("${device.currentValue('refresh')}" == "idle") {
+    //    queryCurrentApp()
+    //}
 }
     
 /*
@@ -266,18 +303,16 @@ def sendWakeUp() {
 
 def queryDeviceState() {
     sendEvent(name: "refresh", value: "device-info")
-    asynchttpGet(parseDeviceState, [uri: "http://${deviceIp}:8060/query/device-info"])
-}
+    httpGet("http://${deviceIp}:8060/query/device-info") { response -> 
+        if (!response.isSuccess())
+            return
 
-def parseDeviceState(response, data) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def body = response.getXml()
-    parsePowerState(body)
-    parseState(body)
-    sendEvent(name: "refresh", value: "idle")
+        def body = response.data
+        parsePowerState(body)
+        parseState(body)
+        sendEvent(name: "refresh", value: "idle")
+
+    }
 }
 
 private def parseState(body) {
@@ -354,25 +389,22 @@ private def parsePowerState(body) {
 
 
 def queryCurrentApp() {
-    asynchttpGet(parseCurrentApp, [uri: "http://${deviceIp}:8060/query/active-app"])
-}
+    httpGet("http://${deviceIp}:8060/query/active-app") { response -> 
+        if (!response.isSuccess()) 
+            return
+        
+        def body = response.data
+        def app = body.app.text()
+        if (app != null) {
+            def currentApp = "${app.replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
+            sendEvent(name: "application", value: currentApp, isStateChange: true)
 
-def parseCurrentApp(response, data) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def body = response.getXml()
-    def app = body.app.text()
-    if (app != null) {
-        def currentApp = "${app.replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
-        sendEvent(name: "application", value: currentApp, isStateChange: true)
-
-        childDevices.each { child ->
-            def appName = "${child.name}"
-            def value = (currentApp.equals(appName)) ? "on" : "off"
-            if ("${child.currentValue('switch')}" != "${value}") {
-                child.parse([[name: "switch", value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+            childDevices.each { child ->
+                def appName = "${child.name}"
+                def value = (currentApp.equals(appName)) ? "on" : "off"
+                if ("${child.currentValue('switch')}" != "${value}") {
+                    child.parse([[name: "switch", value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+                }
             }
         }
     }
@@ -384,65 +416,78 @@ private def purgeInstalledApps() {
     }
 }
 
+def getInstalledApps() {
+    def apps=[:]
+    httpGet("http://${deviceIp}:8060/query/apps") { response ->
+        
+        if (!response.isSuccess())
+        return
+
+        def body = response.data
+        
+        body.app.each{ node ->
+            if (node.attributes().type != "appl") {
+                return
+            }
+
+            def netId = networkIdForApp(node.attributes().id)
+            def appName = node.text()
+            apps[netId] = appName
+        }
+    }
+    return apps
+}
+
 def queryInstalledApps() {
     if (!autoManage) 
         return
     if ("${device.currentValue("refresh")}" == "idle") {
         sendEvent(name: "refresh", value: "find-apps")
     }
-    asynchttpGet(parseInstalledApps, [uri: "http://${deviceIp}:8060/query/apps"])
-}
+    
+    def apps = getInstalledApps()
 
-def parseInstalledApps(response, data) {
+    if (apps) { 
 
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-
-    def body = response.getXml()
-    def hdmiCount = hdmiPorts as int
+        def hdmiCount = hdmiPorts as int
         
-    childDevices.each{ child ->
-        //log.debug "child: ${child.deviceNetworkId} (${child.name})"
-        def nodeExists = false
-        if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
-            nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
-        }
-        
-        if (inputAV)
-            nodeExists = nodeExists || networkIdForApp("AV1") == child.deviceNetworkId
-
-        if (inputTuner)
-            nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
-        
-        body.app.each{ node ->
-            nodeExists = nodeExists || networkIdForApp(node.attributes().id) == child.deviceNetworkId
-        }
-        
-        if (!nodeExists) {
-            if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
-                if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
-                deleteChildDevice(child.deviceNetworkId)
+        childDevices.each{ child ->
+            //log.debug "child: ${child.deviceNetworkId} (${child.name})"
+            def nodeExists = false
+            if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
+                nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
+            }
+            
+            if (inputAV)
+                nodeExists = nodeExists || networkIdForApp("AV1") == child.deviceNetworkId
+    
+            if (inputTuner)
+                nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
+            
+            nodeExists = nodeExists || apps.containsKey(child.deviceNetworkId)
+            
+            if (!nodeExists) {
+                if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
+                    if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+                    deleteChildDevice(child.deviceNetworkId)
+                }
             }
         }
-    }
-    
-    if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
-    if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
-    if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
-        updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
-    }
-
-    if (manageApps) body.app.each{ node ->
-        if (node.attributes().type != "appl") {
-            return
+        
+        if (inputAV)    updateChildApp(networkIdForApp("AV1"), "AV")
+        if (inputTuner) updateChildApp(networkIdForApp("Tuner"), "Antenna TV")
+        if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+            updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
         }
 
-        def netId = networkIdForApp(node.attributes().id)
-        def appName = node.text()
-        updateChildApp(netId, appName)
+        if (manageApps) apps.each { netId, appName ->
+            updateChildApp(netId, appName)
+        }
+    
+        sendEvent(name: "refresh", value: "idle")
+
     }
-    sendEvent(name: "refresh", value: "idle")
+
 }
 
 def keyPress(key) {
@@ -451,15 +496,12 @@ def keyPress(key) {
         return
     }
     if (logEnable) log.debug "Executing '${key}'"
-    asynchttpPost(keyPressHandler, [uri: "http://${deviceIp}:8060/keypress/${key}"], [key: key])
-}
-
-def keyPressHandler(response, data) {
-    def status = response.getStatus();
-    if (200 <= status && status < 300)
-        poll()
-    else
-        log.error "Failed to send key press event for ${data.key}"
+    httpPost("http://${deviceIp}:8060/keypress/${key}") { response -> 
+        if (response.isSuccess())
+            poll()
+        else
+            log.error "Failed to send key press event for ${key}"
+    }
 }
 
 private def isValidKey(key) {
@@ -482,20 +524,17 @@ private def isValidKey(key) {
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     if (appId =~ /^\d+$/ ) {
-        asynchttpPost(launchAppHandler, [uri: "http://${deviceIp}:8060/launch/${appId}"], [appId: appId])
+        httpPost("http://${deviceIp}:8060/launch/${appId}") { response ->
+            if (response.isSuccess()) 
+                queryCurrentApp()
+            else
+                log.error "Failed to launch appId: ${data.appId}"
+        }
     } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
     } else {
         this.keyPress(appId)
     }
-}
-
-def launchAppHandler(response, data) {
-    def status = response.getStatus()
-    if (200 <= status && status < 300)
-        queryCurrentApp()
-    else
-        log.error "Failed to launch appId: ${data.appId}"
 }
 
 /**
@@ -520,11 +559,11 @@ private def getChildDevice(String netId) {
 
 private void updateChildApp(String netId, String appName) {
     def child = getChildDevice(netId)
-    if(child != null) { //If child exists, do not create it
+    if(child) { //If child exists, do not create it
         return
     }
 
-    if (appName != null) {
+    if (appName) {
         createChildApp(netId, appName)
     } else {
         if (logEnable) log.error "Cannot create child: (${netId}) due to missing 'appName'"
@@ -532,6 +571,7 @@ private void updateChildApp(String netId, String appName) {
 }
 
 private void createChildApp(String netId, String appName) {
+    sendEvent(name: "refresh", value: "busy")
     try {
         def label = deviceLabel()
         def child = addChildDevice("hubitat", "Generic Component Switch", "${netId}",
@@ -548,6 +588,7 @@ private void createChildApp(String netId, String appName) {
     } catch(Exception e) {
         if (logEnable) log.error "Failed to create child device with exception: ${e}"
     }
+    sendEvent(name: "refresh", value: "idle")
 }
 
 private def deviceLabel() {
