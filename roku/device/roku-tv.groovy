@@ -496,7 +496,7 @@ def keyPress(key) {
         return
     }
     if (logEnable) log.debug "Executing '${key}'"
-    httpPost("http://${deviceIp}:8060/keypress/${key}") { response -> 
+    httpPost("http://${deviceIp}:8060/keypress/${key}",null) { response -> 
         if (response.isSuccess())
             poll()
         else
