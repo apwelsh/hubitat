@@ -181,7 +181,9 @@ def iconPathForApp(String netId) {
 void componentOff(child) {
     if (child.currentValue("switch") == "off")
         return
-    home()
+    def appId = appIdForNetworkId(child.deviceNetworkId)
+    if (appId =~ /^(AV1|Tuner|hdmi\d|\d+)$/)
+        home()
 }
 
 void componentRefresh(cd){
@@ -198,10 +200,12 @@ void componentRefresh(cd){
 def on() {
     if (device.currentValue('switch') == "off")
         sendWakeUp()
+    sendEvent(name: "switch", value: "on")
     keyPress('Power')
 }
 
 def off() {
+    sendEvent(name: "switch", value: "off")
     keyPress('PowerOff')
 }
 
@@ -496,7 +500,7 @@ def keyPress(key) {
         return
     }
     if (logEnable) log.debug "Executing '${key}'"
-    httpPost("http://${deviceIp}:8060/keypress/${key}",null) { response -> 
+    httpPost("http://${deviceIp}:8060/keypress/${key}", null) { response -> 
         if (response.isSuccess())
             poll()
         else
@@ -524,11 +528,16 @@ private def isValidKey(key) {
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     if (appId =~ /^\d+$/ ) {
-        httpPost("http://${deviceIp}:8060/launch/${appId}") { response ->
-            if (response.isSuccess()) 
+        httpPost("http://${deviceIp}:8060/launch/${appId}", null) { response ->
+            if (response.isSuccess()) {
+                def netId = networkIdForApp(appId)
+                def child = getChildDevice(netId)
+                log.info "Launch app: ${appId} with Network Id: ${netId}"
+                child.sendEvent(name: "switch", value: "on")
                 queryCurrentApp()
-            else
+            } else {
                 log.error "Failed to launch appId: ${data.appId}"
+            }
         }
     } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
@@ -542,20 +551,20 @@ def launchApp(appId) {
  * These functions are used to manage the child devices bound to this device
  */
 
-private def getChildDevice(String netId) {
-    try {
-        def result = null
-        childDevices.each{ child ->
-            if(child.deviceNetworkId == netId) {
-                result = child
-            }
-        }
-        return result
-    } catch(e) {
-        if (logEnable) log.error "Failed to find child with exception: ${e}";
-    }
-    return null
-}
+// private def getChildDevice(String netId) {
+//     try {
+//         def result = getChildDevice(netId)
+//         // childDevices.each{ child ->
+//         //     if(child.deviceNetworkId == netId) {
+//         //         result = child
+//         //     }
+//         // }
+//         return result
+//     } catch(e) {
+//         if (logEnable) log.error "Failed to find child with exception: ${e}";
+//     }
+//     return null
+// }
 
 private void updateChildApp(String netId, String appName) {
     def child = getChildDevice(netId)
@@ -596,4 +605,7 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
+
+
+
 
