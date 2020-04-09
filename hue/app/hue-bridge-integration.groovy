@@ -372,7 +372,9 @@ def addScenes(params){
         try {
             
             group.addChildDevice("apwelsh", "AdvancedHueScene", "${dni}", ["label": "${name}"])
-            
+            // def child = group.addChildDevice("hubitat", "Generic Component Switch", "${dni}",
+            // [label: "${name}", isComponent: false, name: "AdvancedHueScene"])
+            // child.updateSetting("txtEnable", false)
             scenes.remove(sceneId)
             
         } catch (ex) {
@@ -411,6 +413,8 @@ def installed() {
     state.bridgeRefreshCount = 0
     state.bulbRefreshCoun    = 0
     state.inBulbDiscovery    = 0
+    ssdpSubscribe()
+    ssdpDiscover()
 }
 
 def uninstalled() {
@@ -427,7 +431,7 @@ def updated() {
 }
 
 def initialize() {
-    ssdpSubscribe()
+    ssdpDiscover()
     runEvery5Minutes("ssdpDiscover")    
 }
 
@@ -499,35 +503,31 @@ void verifyDevice(parsedEvent) {
     // The Hue bridge publishes the device information in /description.xml, so if this ssdpPath does not match, skip this device.
     if (ssdpPath != "/description.xml")
         return
-
-    // Using the httpGet method, and arrow function, perform the validation check w/o the need for a callback function.
-    def url = "http://${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}${ssdpPath}"
-    asynchttpGet(verifyDeviceHandler, [uri: url], parsedEvent)
-}
-
-def verifyDeviceHandler(response, parsedEvent) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
     
-    def data = response.getXml()
-    if (data) {
-        def device = data.device
-        def model = device.modelName
-        def ssdpUSN = "${parsedEvent.ssdpUSN.toString()}"
+    // Using the httpGet method, and arrow function, perform the validation check w/o the need for a callback function.
+    httpGet("http://${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}${ssdpPath}") { response ->
+        if (!response.isSuccess()) {return}
 
-        if (logEnable) log.debug "Identified model: ${model}"
-        if (model =~ 'Philips hue bridge.*') {
-            def hubId = "${parsedEvent.mac}"[-6..-1]
-            def name = "${device.friendlyName}".replaceAll(~/\(.*\)/, "(${hubId})")
+        def data = response.data
+        if (data) {
+            def device = data.device
+            def model = device.modelName
+            def ssdpUSN = "${parsedEvent.ssdpUSN.toString()}"
 
-            parsedEvent << ["url":"${data.URLBase}", 
-                            "name":"${name}", "serialNumber":"${device.serialNumber}"]
+            if (logEnable) log.debug "Identified model: ${model}"
+            if (model =~ 'Philips hue bridge.*') {
+                def hubId = "${parsedEvent.mac}"[-6..-1]
+                def name = "${device.friendlyName}".replaceAll(~/\(.*\)/, "(${hubId})")
 
-            def hubs = getHubs()
-            hubs << ["${ssdpUSN}": parsedEvent]
-            if (logEnable) log.debug "Discovered new hub: ${name}"
+                parsedEvent << ["url":"${data.URLBase}", 
+                                "name":"${name}", "serialNumber":"${device.serialNumber}"]
+
+                def hubs = getHubs()
+                hubs << ["${ssdpUSN}": parsedEvent]
+                if (logEnable) log.debug "Discovered new hub: ${name}"
+            }
         }
+
     }
 }
 
@@ -577,26 +577,20 @@ private getHubStatus() {
     
     def url = "http://${state.bridgeHost}/api/${state.username}/"
 
-    asynchttpGet(getHubStatusHandler,
-                  [uri: url,
-                   contentType: "application/json",
-                   requestContentType: "application/json"])
-
-}
-
-def getHubStatusHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-
-    if (data) {
-        if (data.error?.description) {
-            if (logEnable) log.error "${data.error.description[0]}"
-        } else {
-            parseStatus(data)
+    httpGet([uri: url,
+             contentType: "application/json",
+             requestContentType: "application/json"]) { response -> 
+        if (!response.isSuccess()) { return }
+        
+        def data = response.data
+        if (data) {
+            if (data.error?.description) {
+                if (logEnable) log.error "${data.error.description[0]}"
+            } else {
+                parseStatus(data)
+            }
         }
+
     }
 }
 
@@ -605,27 +599,24 @@ private enumerateGroups() {
     def url = "http://${state.bridgeHost}/api/${state.username}/groups"
     //if (logEnable) log.debug "${url}"
     
-    asynchttpGet(enumerateGroupsHandler,
-                  [uri: url,
-                   contentType: "application/json",
-                   requestContentType: "application/json"])
-
-}
-
-def enumerateGroupsHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-    if (data) {
-        if (data.error?.description) {
-            if (logEnable) log.error "${data.error.description[0]}"
-        } else {
-            if (data) state.groups = data
-            parseGroups(data)
+    httpGet([uri: url,
+            contentType: "application/json",
+            requestContentType: "application/json"]) { response -> 
+        if (!response.isSuccess()) { return }
+        
+        def data = response.data
+        log.info "data: ${data}"
+        if (data) {
+            if (data.error?.description) {
+                if (logEnable) log.error "${data.error.description[0]}"
+            } else {
+                if (data) state.groups = data
+                parseGroups(data)
+            }
         }
+
     }
+
 }
 
 private enumerateScenes() {
@@ -633,27 +624,23 @@ private enumerateScenes() {
     def url = "http://${state.bridgeHost}/api/${state.username}/scenes"
     //if (logEnable) log.debug "${url}"
     
-    asynchttpGet(enumerateScenesHandler,
-                  [uri: url,
-                   contentType: "application/json",
-                   requestContentType: "application/json"])
+    httpGet([uri: url,
+             contentType: "application/json",
+             requestContentType: "application/json"]) { response -> 
+        if (!response.isSuccess()) { return }
 
-}
-
-def enumerateScenesHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-    if (data) {
-        if (data.error?.description) {
-            if (logEnable) log.error "${data.error.description[0]}"
-        } else {
-            if (data) state.scenes = data
-            parseScenes(data)
+        def data = response.data
+        if (data) {
+            if (data.error?.description) {
+                if (logEnable) log.error "${data.error.description[0]}"
+            } else {
+                if (data) state.scenes = data
+                parseScenes(data)
+            }
         }
+
     }
+
 }
 
 private enumerateLights() {
@@ -661,27 +648,22 @@ private enumerateLights() {
     def url = "http://${state.bridgeHost}/api/${state.username}/lights"
     //if (logEnable) log.debug "${url}"
     
-    asynchttpGet(enumerateScenesHandler,
-                  [uri: url,
-                   contentType: "application/json",
-                   requestContentType: "application/json"])
+    httpGet([uri: url,
+             contentType: "application/json",
+             requestContentType: "application/json"]) { response ->
+        if (!response.isSuccess()) { return }
 
-}
-
-def enumerateLightsHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-    if (data) {
-        if (data.error?.description) {
-            if (logEnable) log.error "${data.error.description[0]}"
-        } else {
-            if (data) state.lights = data
-            parseLights(data)
+        def data = response.data
+        if (data) {
+            if (data.error?.description) {
+                if (logEnable) log.error "${data.error.description[0]}"
+            } else {
+                if (data) state.lights = data
+                parseLights(data)
+            }
         }
     }
+
 }
 
 def setDeviceState(child, deviceState) {
@@ -705,48 +687,42 @@ def setDeviceState(child, deviceState) {
     def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/action"
     if (logEnable) log.debug "URL: ${url}"
     if (logEnable) log.debug "args: ${deviceState}"
-    asynchttpPut(setDeviceStateHandler,
-                  [uri: url,
-                   contentType: "application/json",
-                   requestContentType: "application/json", 
-                   body: deviceState],
-                  ["childDevice": child,
-                   "type": type,
-                   "node": node])
-}
+    httpPut([uri: url,
+             contentType: "application/json",
+             requestContentType: "application/json", 
+             body: deviceState]) { response ->
+        
+        if (!response.isSuccess()) { return }
+        
+        def data = response.data
+        if (data) {
+            //    if (logEnable) log.info data
+            data.each { 
+                if (it.error?.description) {
+                    if (logEnable) log.error "${it.error.description[0]}"
+                }
+                if (it.success) {
+                    it.success.each { key, value ->
 
-def setDeviceStateHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-    if (data) {
-    //    if (logEnable) log.info data
-        data.each { 
-            if (it.error?.description) {
-                if (logEnable) log.error "${it.error.description[0]}"
-            }
-            if (it.success) {
-                it.success.each { key, value ->
-                    
-                    def result = key.split('/')
-                    def nid
-                    switch (result[1]) {
-                        case "groups":  nid=networkIdForGroup(result[2]); break;
-                        case "lights":  nid=networkIdForLight(result[2]); break;
-                        case "scenes":  nid=networkIdForScene(result[2]); break;
-                        default:
-                            if (logEnable) log.warn "Unhandled device state handler repsonse: ${result}"
-                        return;
+                        def result = key.split('/')
+                        def nid
+                        switch (result[1]) {
+                            case "groups":  nid=networkIdForGroup(result[2]); break;
+                            case "lights":  nid=networkIdForLight(result[2]); break;
+                            case "scenes":  nid=networkIdForScene(result[2]); break;
+                            default:
+                                if (logEnable) log.warn "Unhandled device state handler repsonse: ${result}"
+                                return;
+                        }
+                        def device = args.type == "groups" && args.node == "0" ? args.childDevice : getChildDevice(nid)
+                        device.setHueProperty(result[4],value)
                     }
-                    def device = args.type == "groups" && args.node == "0" ? args.childDevice : getChildDevice(nid)
-                    device.setHueProperty(result[4],value)
                 }
             }
         }
     }
 }
+
 
 def getDeviceState(child) {
 
@@ -767,36 +743,29 @@ def getDeviceState(child) {
     }
     def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
     if (logEnable) log.debug "URL: ${url}"
-    asynchttpGet(getDeviceStateHandler,
-                  [uri: url,
-                   contentType: "application/json",
-                   requestContentType: "application/json"],
-                  ["childDevice": child,
-                   "type": type,
-                   "node": node])
-}
+    httpGet([uri: url,
+             contentType: "application/json",
+             requestContentType: "application/json"]) { response ->
+        
+        if (!response.isSuccess()) { return }
+        
+        def data = response.data
+        if (data) {
+            if (logEnable) log.info data  // temporary until lights are added, and all groups/all lights
+            if ( data.error ) {
+                if (logEnable) log.error "${it.error.description[0]}"
+                return
+            }
+            if (node) {
+                if (logEnable) log.info "Parsing response: $date for $node" // temporary
+                child.resetRefreshSchedule()
+                data.state.each { key, value -> child.setHueProperty(key,value) }
+                data.action.each { key, value -> child.setHueProperty(key, value) }
+            } else {
+                if (logEnable) log.info it  // temporary to catch unknown result state
+            }
+        }
 
-def getDeviceStateHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-    if (data) {
-        if (logEnable) log.info data  // temporary until lights are added, and all groups/all lights
-        if ( data.error ) {
-            if (logEnable) log.error "${it.error.description[0]}"
-            return
-        }
-        if (args.node) {
-            def device = args.childDevice
-            if (logEnable) log.info "Parsing response: $date for $node" // temporary
-            device.resetRefreshSchedule()
-            data.state.each { key, value -> device.setHueProperty(key,value) }
-            data.action.each { key, value -> device.setHueProperty(key, value) }
-        } else {
-            if (logEnable) log.info it  // temporary to catch unknown result state
-        }
     }
 }
 
@@ -973,6 +942,7 @@ def findScene(groupId, sceneId) {
         return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
     }
 }
+
 
 
 
