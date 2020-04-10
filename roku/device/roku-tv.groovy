@@ -496,7 +496,7 @@ def queryInstalledApps() {
 
 def keyPress(key) {
     if (!isValidKey(key)) {
-        log.warning("Invalid key press: ${key}")
+        log.warn("Invalid key press: ${key}")
         return
     }
     if (logEnable) log.debug "Executing '${key}'"
