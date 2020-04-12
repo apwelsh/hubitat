@@ -9,9 +9,15 @@ WARNING:  Upgrading to this new version may break some of your automations, as s
 ## Getting Started
 
 To use this software, you must download just this one file:
- - [roku-tv.groovy](devices/roku-tv.groovy)
+ - [roku-tv.groovy](device/roku-tv.groovy)
  
  _** Note ** that there used to be two files, but I have converted the device driver to use the built-in Generic Switch driver._
+ 
+ Optionally, if you choose, you may use the Roku Connect app for managing your roku devices.
+ - [roku-connect.groovy](app/roku-connect.groovy)
+
+### Alert
+The Roku Connect application is in early alpha stages of development.  It is fullyfunctional for adding Roku Devices, and renaming those devices.  It may also be used to easily rename the installed apps for managed roku devices, but it cannot add applications yet.  There are many other conveniences planned but not yet implemented.
  
 ## Installation
 Sign into your Hubitat device, and add the Roku TV device handler.  To do so, from the menu select the **"Drivers Code"** menu option.
@@ -22,7 +28,7 @@ Next, click the **"(+) New Driver"** button
 
 ![](../images/NewDriverButton.png)
 
-### Roku TV App
+### Roku TV Driver
 Select the import button, and put in the URL to the [roku-tv.groovy](device/roku-tv.groovy), Click the import button, and the new driver is ready.  
 Click **Save**. 
 ![save button](../images/NewDriverExample.png)
