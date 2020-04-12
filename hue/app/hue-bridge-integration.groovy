@@ -714,7 +714,7 @@ def setDeviceState(child, deviceState) {
                                 if (logEnable) log.warn "Unhandled device state handler repsonse: ${result}"
                                 return;
                         }
-                        def device = args.type == "groups" && args.node == "0" ? args.childDevice : getChildDevice(nid)
+                        def device = type == "groups" && node == "0" ? child : getChildDevice(nid)
                         device.setHueProperty(result[4],value)
                     }
                 }
@@ -757,7 +757,7 @@ def getDeviceState(child) {
                 return
             }
             if (node) {
-                if (logEnable) log.info "Parsing response: $date for $node" // temporary
+                if (logEnable) log.info "Parsing response: $data for $node" // temporary
                 child.resetRefreshSchedule()
                 data.state.each { key, value -> child.setHueProperty(key,value) }
                 data.action.each { key, value -> child.setHueProperty(key, value) }
@@ -905,7 +905,7 @@ def parseGroups(json) {
         // Add code to update all installed groups state
         def group = getChildDevice(networkIdForGroup(id))
         if (group) {
-            if (logEnable) log.info "Parsing response: $date for $node" // temporary
+            if (logEnable) log.info "Parsing response: $data for $id" // temporary
             group.resetRefreshSchedule()
             data.state.each  { key, value -> group.setHueProperty(key,value) }
             data.action.each { key, value -> group.setHueProperty(key, value) }
