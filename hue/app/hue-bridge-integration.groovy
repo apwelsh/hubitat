@@ -35,7 +35,6 @@ definition(
 )
     
 preferences {
-    page(name: "routerPage")
 	page(name: "mainPage")
     page(name: "bridgeDiscovery", title: "Device Discovery", content: "bridgeDiscovery", refreshTimeout:10)
     page(name: "addDevice", title: "Add Hue Bridge", content: "addDevice")
@@ -48,22 +47,19 @@ preferences {
 
 }
 
-def routerPage() {
+def mainPage(params=[:]) {
+    
     if (!state) {
-        return dynamicPage(name: "routerPage", title: "Advanced Hue Bridge Integration", nextPage: null, uninstall: true, install: true) {
+        return dynamicPage(name: "mainPage", title: "Advanced Hue Bridge Integration", nextPage: null, uninstall: true, install: true) {
             section {
                 paragraph "Hit Done to to install the Hue Bridge Integration.\nRe-open to setup."
             }
         }
-    } else if (!state.bridgeHost) {
+    } 
+    if (!state.bridgeHost) {
         return bridgeDiscovery()
-    } else {
-         return mainPage()   
     }
-}
 
-def mainPage(params=[:]) {
-    
     def hub = getHubs().find { it.value.mac == selectedDevice }?.value
     if (params[nextPage]=="bridgeBtnPush") {
         return bridgeLinking()
@@ -79,7 +75,7 @@ def mainPage(params=[:]) {
 
     def uninstall = (state.bridgehost) ? false : true
     
-	dynamicPage(name: "mainPage", title: "Manage your linked Hue Bridge", nextPage: null, uninstall: uninstall, install: true) {
+    return dynamicPage(name: "mainPage", title: "Manage your linked Hue Bridge", nextPage: null, uninstall: uninstall, install: true) {
         if (selectedDevice == null) {
             section("Setup"){
                 paragraph """ To begin, select Find Bridges to start searching for your Hue Bride."""
@@ -92,7 +88,7 @@ def mainPage(params=[:]) {
                 href "findScenes", title:"Find Scenes", description:""
                 href "bridgeDiscovery", title:title, description:"", state:selectedDevice? "complete" : null //, params: [nextPage: "bridgeBtnPush"]
 
-               // getChildDevices().sort({ a, b -> a["deviceNetworkId"] <=> b["deviceNetworkId"] }).each {
+            // getChildDevices().sort({ a, b -> a["deviceNetworkId"] <=> b["deviceNetworkId"] }).each {
                     //if(it.typeName == "Advanced Hue Bridge"){
                     //    href "configurePDevice", title:"$it.label", description:"", params: [did: it.deviceNetworkId]
                     //}
