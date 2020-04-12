@@ -1,11 +1,11 @@
 
 definition(
-    name: "aaa Roku Connect",
+    name: "Roku Connect",
     namespace: "apwelsh",
     author: "Armand Welsh (apwelsh)",
     description: "Service Manager for Roku devices",
     category: "Convenience",
-    //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/hue-connect.groovy",
+    //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
     iconUrl: "",
     iconX2Url: "",
     iconX3Url: ""
