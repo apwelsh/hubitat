@@ -34,16 +34,17 @@ preferences {
         ]
     def apps=[:]
     def installed=[:]
-    if (deviceIp && (!autoManage || !manageApps)) {
-        getInstalledApps().each { netId, appName ->
-            if (getChildDevice(netId)) {
-                installed[netId] = appName
-            } else {
-                apps[netId] = appName
+    try {
+        if (deviceIp && (!autoManage || !manageApps)) {
+            getInstalledApps().each { netId, appName ->
+                if (getChildDevice(netId)) {
+                    installed[netId] = appName
+                } else {
+                    apps[netId] = appName
+                }
             }
         }
-    }
-
+    } catch (ex) {}
 
     input name: "deviceIp",        type: "text",   title: "Device IP", required: true
     if (deviceIp) {
@@ -307,16 +308,23 @@ def sendWakeUp() {
 
 def queryDeviceState() {
     sendEvent(name: "refresh", value: "device-info")
-    httpGet("http://${deviceIp}:8060/query/device-info") { response -> 
-        if (!response.isSuccess())
+    try {
+        httpGet("http://${deviceIp}:8060/query/device-info") { response -> 
+            if (!response.isSuccess())
             return
 
-        def body = response.data
-        parsePowerState(body)
-        parseState(body)
-        sendEvent(name: "refresh", value: "idle")
+            def body = response.data
+            parsePowerState(body)
+            parseState(body)
+
+
+        }
+    } catch (ex) {
+        if (logEnable) log.error ex
+        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
 
     }
+    sendEvent(name: "refresh", value: "idle")
 }
 
 private def parseState(body) {
@@ -393,24 +401,30 @@ private def parsePowerState(body) {
 
 
 def queryCurrentApp() {
-    httpGet("http://${deviceIp}:8060/query/active-app") { response -> 
-        if (!response.isSuccess()) 
+    try {
+        httpGet("http://${deviceIp}:8060/query/active-app") { response -> 
+            if (!response.isSuccess()) 
             return
-        
-        def body = response.data
-        def app = body.app.text()
-        if (app != null) {
-            def currentApp = "${app.replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
-            sendEvent(name: "application", value: currentApp, isStateChange: true)
 
-            childDevices.each { child ->
-                def appName = "${child.name}"
-                def value = (currentApp.equals(appName)) ? "on" : "off"
-                if ("${child.currentValue('switch')}" != "${value}") {
-                    child.parse([[name: "switch", value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+            def body = response.data
+            def app = body.app.text()
+            if (app != null) {
+                def currentApp = "${app.replaceAll( ~ /\h/," ")}"  // Convert non-ascii spaces to spaces.
+                sendEvent(name: "application", value: currentApp, isStateChange: true)
+
+                childDevices.each { child ->
+                    def appName = "${child.name}"
+                    def value = (currentApp.equals(appName)) ? "on" : "off"
+                    if ("${child.currentValue('switch')}" != "${value}") {
+                        child.parse([[name: "switch", value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+                    }
                 }
             }
         }
+    } catch (ex) {
+        if (logEnable) log.error ex
+        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
+
     }
 }
 
@@ -422,22 +436,27 @@ private def purgeInstalledApps() {
 
 def getInstalledApps() {
     def apps=[:]
-    httpGet("http://${deviceIp}:8060/query/apps") { response ->
-        
-        if (!response.isSuccess())
-        return
+    try {
+        httpGet("http://${deviceIp}:8060/query/apps") { response ->
 
-        def body = response.data
-        
-        body.app.each{ node ->
-            if (node.attributes().type != "appl") {
-                return
+            if (!response.isSuccess())
+            return
+
+            def body = response.data
+
+            body.app.each{ node ->
+                if (node.attributes().type != "appl") {
+                    return
+                }
+
+                def netId = networkIdForApp(node.attributes().id)
+                def appName = node.text()
+                apps[netId] = appName
             }
-
-            def netId = networkIdForApp(node.attributes().id)
-            def appName = node.text()
-            apps[netId] = appName
         }
+    } catch (ex) {
+        if (logEnable) log.error ex
+        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
     }
     return apps
 }
@@ -496,15 +515,20 @@ def queryInstalledApps() {
 
 def keyPress(key) {
     if (!isValidKey(key)) {
-        log.warn("Invalid key press: ${key}")
+        log.warn "Invalid key press: ${key}"
         return
     }
     if (logEnable) log.debug "Executing '${key}'"
-    httpPost("http://${deviceIp}:8060/keypress/${key}", null) { response -> 
-        if (response.isSuccess())
+    try {
+        httpPost("http://${deviceIp}:8060/keypress/${key}", null) { response -> 
+            if (response.isSuccess())
             poll()
-        else
-            log.error "Failed to send key press event for ${key}"
+            else
+                log.error "Failed to send key press event for ${key}"
+        }
+    } catch (ex) {
+        if (logEnable) log.error ex
+        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
     }
 }
 
@@ -528,16 +552,21 @@ private def isValidKey(key) {
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     if (appId =~ /^\d+$/ ) {
-        httpPost("http://${deviceIp}:8060/launch/${appId}", null) { response ->
-            if (response.isSuccess()) {
-                def netId = networkIdForApp(appId)
-                def child = getChildDevice(netId)
-                log.info "Launch app: ${appId} with Network Id: ${netId}"
-                child.sendEvent(name: "switch", value: "on")
-                queryCurrentApp()
-            } else {
-                log.error "Failed to launch appId: ${data.appId}"
+        try {
+            httpPost("http://${deviceIp}:8060/launch/${appId}", null) { response ->
+                if (response.isSuccess()) {
+                    def netId = networkIdForApp(appId)
+                    def child = getChildDevice(netId)
+                    log.info "Launch app: ${appId} with Network Id: ${netId}"
+                    child.sendEvent(name: "switch", value: "on")
+                    queryCurrentApp()
+                } else {
+                    log.error "Failed to launch appId: ${data.appId}"
+                }
             }
+        } catch (ex) {
+            if (logEnable) log.error ex
+            log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
         }
     } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
@@ -550,21 +579,6 @@ def launchApp(appId) {
  * Child Device Maintenance Section
  * These functions are used to manage the child devices bound to this device
  */
-
-// private def getChildDevice(String netId) {
-//     try {
-//         def result = getChildDevice(netId)
-//         // childDevices.each{ child ->
-//         //     if(child.deviceNetworkId == netId) {
-//         //         result = child
-//         //     }
-//         // }
-//         return result
-//     } catch(e) {
-//         if (logEnable) log.error "Failed to find child with exception: ${e}";
-//     }
-//     return null
-// }
 
 private void updateChildApp(String netId, String appName) {
     def child = getChildDevice(netId)
@@ -605,7 +619,3 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
-
-
-
-
