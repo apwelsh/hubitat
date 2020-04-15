@@ -46,7 +46,8 @@ preferences {
         }
     } catch (ex) {}
 
-    input name: "deviceIp",        type: "text",   title: "Device IP", required: true
+    if (!parent)
+        input name: "deviceIp",        type: "text",   title: "Device IP", required: true
     if (deviceIp) {
         input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
         input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
@@ -55,14 +56,14 @@ preferences {
             input name: "appInterval",     type: "number", title: "Refresh the current application at least every n seconds.", range: 1..120, defaultValue: 60, required: true        
         }
         input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
-        if (autoManage) {
+        if (autoManage?:true == true) {
             input name: "manageApps",      type: "bool",   title: "Auto-manage Roku Applications", defaultValue: true, required: true
             input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
             input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
             input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
             input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
         }
-        if (!autoManage || !manageApps) {
+        if ((autoManage?:true == false || manageApps?:true == false) && !parent) {
             input name: "createChildApp",     type: "enum",   title: "Add Roku App", options: apps, required: false
             input name: "deleteChildApp",     type: "enum",   title: "Remove Roku App", options: installed, required: false
 
@@ -113,7 +114,7 @@ def updated() {
     if (deviceIp) {
         def mac = getMACFromIP(deviceIp)
         if (state.deviceMac != mac) {
-            log.debug "Updating Mac from IP: ${mac}"
+            if (logEnable) log.debug "Updating Mac from IP: ${mac}"
             state.deviceMac = mac
         }
     }
@@ -146,7 +147,7 @@ def updated() {
         def netId=deleteChildApp
         device.updateSetting("deleteChildApp", [value: "", type:"enum"])
         if (autoManage==false || manageApps==false) {
-            deleteChildDevice(netId)
+            deleteChildAppDevice(netId)
         }
     }
 
@@ -321,7 +322,7 @@ def queryDeviceState() {
         }
     } catch (ex) {
         if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
+        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
 
     }
     sendEvent(name: "refresh", value: "idle")
@@ -587,13 +588,13 @@ private void updateChildApp(String netId, String appName) {
     }
 
     if (appName) {
-        createChildApp(netId, appName)
+        createChildAppDevice(netId, appName)
     } else {
         if (logEnable) log.error "Cannot create child: (${netId}) due to missing 'appName'"
     }
 }
 
-private void createChildApp(String netId, String appName) {
+void createChildAppDevice(String netId, String appName) {
     sendEvent(name: "refresh", value: "busy")
     try {
         def label = deviceLabel()
@@ -614,8 +615,21 @@ private void createChildApp(String netId, String appName) {
     sendEvent(name: "refresh", value: "idle")
 }
 
+void deleteChildAppDevice(String netId) {
+    sendEvent(name: "refresh", value: "busy")
+    try {
+        def appName = getChildDevice(netId)?.name ?: ""
+        deleteChildDevice(netId)
+        if (logEnable) log.debug "Removed child device: ${appName} (${netId})"
+    } catch(Exception e) {
+        if (logEnable) log.error "Failed to remove child device with exception: ${e}"
+    }
+    sendEvent(name: "refresh", value: "idle")
+}
+
 private def deviceLabel() {
     if (device.label == null)
         return device.name
     return device.label
 }
+

@@ -3,7 +3,7 @@ definition(
     name: "Roku Connect",
     namespace: "apwelsh",
     author: "Armand Welsh (apwelsh)",
-    description: "Service Manager for Roku devices",
+    description: "Roku Device Integration",
     category: "Convenience",
     //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
     iconUrl: "",
@@ -13,13 +13,13 @@ definition(
 
 preferences {
 	page(name: "mainPage")
-    page(name: "deviceDiscovery", title: "Device Discover", content:"deviceDiscovery", refreshTimeout:10)
+    page(name: "deviceDiscovery", title: "Device Discovery", refreshTimeout:10)
     page(name: "addSelectedDevices")
     page(name: "configureDevice")
     page(name: "changeName")
-    page(name: "appDiscovery")
-    page(name: "installApps", content:"installApps")
     page(name: "manageApp")
+    page(name: "appDiscovery")
+    page(name: "installApps")
 }
 
 /*
@@ -59,28 +59,19 @@ def subscribe() {
  * Application Screens
  */
 
-def routerPage() {
-    if (!state) {
-        return dynamicPage(name: "routerPage", title: "Roku Connect", nextPage: null, uninstall: true, install: true) {
-            section {
-                paragraph "Hit Done to to install the Roku Connect Integration.\nRe-open to setup."
-            }
-        }
-    } else {
-         return mainPage()   
-    }
-}
-
 def mainPage() {
 
     if (!state) {
-        return dynamicPage(name: "mainPage", title: "Roku Connect", nextPage: null, uninstall: true, install: true) {
+        return dynamicPage(name: "mainPage", title: "Roku Connect", uninstall: true, install: true) {
             section {
                 paragraph "Hit Done to to install the Roku Connect Integration.\nRe-open to setup."
             }
         }
     } else {
-        return dynamicPage(name: "mainPage", title: "Manage your Roku connected devices", nextPage: null, uninstall: true, install: true) {
+        app.removeSetting("deviceNetworkId")
+        app.removeSetting("selectedDevice")
+        app.removeSetting("selectedApps")
+        return dynamicPage(name: "mainPage", title: "Manage your Roku connected devices", uninstall: true) {
             section(){
                 href "deviceDiscovery", title:"Discover New Devices", description:""
             }
@@ -114,7 +105,7 @@ def deviceDiscovery() {
     if (discovered) {
         discovered.each {key, value ->
             if (installed.find { it == value.mac }) return
-            options["${key}"]= "${value.name}"
+            options["${key}"] = "${value.name}"
         }
     }
 
@@ -122,7 +113,6 @@ def deviceDiscovery() {
         
     def uninstall = false
     def nextPage = selectedDevices ? "addSelectedDevices" : null
-    log.info "Rendering Page with options: ${options}"
     
 	return dynamicPage(name:"deviceDiscovery", title:"Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
 		section("Please wait while we discover your Roku devices.  Discovery can take a few minutes, so sit back and relax. The page will reload automatically! Select your Roku below once discovered.") {
@@ -131,7 +121,7 @@ def deviceDiscovery() {
 	}    
 }
 
-def addSelectedDevices(params) {
+def addSelectedDevices() {
     if (!selectedDevices)
         return deviceDiscovery()
     
@@ -175,7 +165,7 @@ def addSelectedDevices(params) {
         title = "Failed to add Roku ${subject}"
     }
     
-	return dynamicPage(name:"addSelectedDevices", title:title, install: false, uninstall: flase, nextPage:"mainPage") {
+	return dynamicPage(name:"addSelectedDevices", title:title, nextPage:"mainPage") {
 		section() {
             paragraph sectionText
 		}
@@ -184,25 +174,30 @@ def addSelectedDevices(params) {
 }
 
 def configureDevice(params) {
-    log.info "Configure Device: params = ${params}"
-    def networkId = params?.netId
+    app.removeSetting("applicationNetworkId")
+    
+    def networkId = params?.netId ?: settings["deviceNetworkId"]
     if (!networkId) return mainPage()
     
     def child = getChildDevice(networkId)
     if (!child)
         return mainPage()
     
+    // track state to backup to.
+    app.updateSetting("deviceNetworkId", networkId)
+    
     def label = child.label
     def newLabel = settings["${networkId}_label"]
     if (newLabel) {
         if (label != settings["${networkId}_label"]) { 
             renameChildDevice(this, networkId, settings["${networkId}_label"])
-            app.removeSetting("${networkId}_label")
-            label = settings["${networkId}_label"]
+            label = newLabel
         }
     }
+    app.removeSetting("${networkId}_label")
     
-    return dynamicPage(name:"configureDevice", title:"Configure device", nextPage:null, params: params) {
+    
+    return dynamicPage(name:"configureDevice", title:"Configure device", nextPage:null) {
         section() {
             paragraph "Use this section to configure your Roku device settings"
             input "${networkId}_label", "text", title: "Device name", defaultValue:label, submitOnChange: true
@@ -212,37 +207,46 @@ def configureDevice(params) {
             paragraph "Manage installed apps"
             child.getChildDevices().sort({ a, b -> a["label"] <=> b["label"] }).each {
                 def desc = it.label != it.name ? it.name : ""
+                app.removeSetting("${networkId}_selectedApps")
                 href "manageApp", title:desc, description:"", params: [netId: networkId, appId: it.deviceNetworkId]
+                
             }
         }
     }
 }
 
 def manageApp(params) {
-    log.info "Params: ${params}"
-    def networkId = params?.netId
-    def appId = params?.appId
-    if (!networkId || !appId) return configureDevice(params)
-    
-    def child = getChildDevice(networkId)
-    def app = child?.getChildDevice(appId)
-    log.info app.name
-    log.info app.label
-    
-    def label = app.label
-    def newLabel = settings["${appId}_label"]
-    if (newLabel) {
-        if (label != settings["${appId}_label"]) { 
-            renameChildDevice(child, appId, settings["${appId}_label"])
-            app.removeSetting("${appId}_label")
-            label = settings["${appId}_label"]
-        }
+    def networkId = params?.netId ?: settings["deviceNetworkId"]
+    def appId     = params?.appId ?: settings["applicationNetworkId"]
+    if (!networkId || !appId) {
+        app.removeSetting("applicationNetworkId")
+        return configureDevice()
     }
     
-    return dynamicPage(name: "manageApp", title:"Manage Installed Apps for ${child.label}", nextPage:"configureDevice", params: [netId: networkId]) {
+    def child = getChildDevice(networkId)
+    
+    if (!child)
+        return mainPage()
+    
+    // track state to backup to.
+    app.updateSetting("deviceNetworkId", networkId)
+
+    def label = deviceLabel(child.getChildDevice(appId))
+    
+    def newLabel = settings["${appId}_label"]
+    if (newLabel) {
+        if (label != newLabel) { 
+            renameChildDevice(child, appId, newLabel)
+            label = newLabel
+        }
+    }
+    app.removeSetting("${appId}_label")
+
+    
+    return dynamicPage(name: "manageApp", title:"Manage Installed Apps for ${child.label}", nextPage:null) {
         section() {
             paragraph "Use this section to set the ${app.name} application name for ${child.label}"
-            input "${appId}_label", "text", title: "Application name", defaultValue:app.label, submitOnChange: true
+            input "${appId}_label", "text", title: "Application name", defaultValue:label, submitOnChange: true
         }    
     }
     
@@ -256,34 +260,36 @@ def appDiscovery(params) {
     if (!child)
         return mainPage()
     
-    def apps = child.getInstalledApps()
+    def rokuApps = child.getInstalledApps()
+    def installedApps = child.getChildDevices().collect { it.deviceNetworkId}.findAll { it =~ /^.*\-\d+$/ }
+    def selectedApps = settings["${networkId}_selectedApps"] ?: []
+    
+    // check the input for selected Apps to see if defined, and if not, pre-load the values
+    if (!settings["${networkId}_selectedApps"]) {
+        installedApps.each { selectedApps << it }
+    }
 
-    log.debug "Sending: ${params}"
-    return dynamicPage(name:"appDiscovery", title:"Discover Apps", nextPage:"installApps", params: params) {
+    // Remove unselected apps as children
+    installedApps?.findAll { !selectedApps.contains(it) }.each { appId ->
+        if (logEnable) log.info "Removing child application device ${appId} (${rokuApps[appId]})"
+        child.deleteChildAppDevice(appId) 
+    }
+    
+    // Add selected apps as children
+    selectedApps.findAll { !installedApps.contains(it) }.each { appId ->
+        def appName = rokuApps[appId]
+        if (logEnable) log.info "Installing child application device ${appId} (${appName})"
+        child.createChildAppDevice(appId, appName)
+    }
+    
+    app.updateSetting("${networkId}_selectedApps", selectedApps)
+    
+    return dynamicPage(name:"appDiscovery", title:"Add / Remove Child Devices", nextPage:null) {
         section() {
             paragraph ""
         }
         section("${child.label} Applications") {
-            input "${networkId}_selectedApps", "enum", title: "Select Roku Apps to publish as switches", required: flase, multiple: true, options: apps, submitOnChange: true
-        }
-    }
-}
-
-def installApps(args) {
-    // For some reason, params always arrive as null in this function
-    // def networkId = params?.netId
-    // if (!networkId) return mainPage()
-    log.debug "Received: ${args}"
-    def nids = apps.collect { key, value -> key}.findAll { child.getChildDevice(it) != null }
-
-    def selected = settings["selectedApps"]
-    selected.each { networkID ->
-        
-    }
-    
-    return dynamicPage(name:"installApps", title:"Updating child devices", nextPage:"mainPage") {
-        section() {
-            paragraph "Nothing to do"
+            input "${networkId}_selectedApps", "enum", title: "Select Apps to publish as switch devices, and unlselect Apps to remove", required: flase, multiple: true, options: rokuApps, submitOnChange: true
         }
     }
 }
@@ -413,6 +419,11 @@ private String convertIPtoHex(ipAddress) {
     String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
     return hex
 }
+
+private String deviceLabel(device) {
+    device?.label ?: device?.name
+}
+                                                                                  
 
 
 
