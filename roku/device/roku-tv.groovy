@@ -424,7 +424,7 @@ def queryCurrentApp() {
         }
     } catch (ex) {
         if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
+        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
 
     }
 }
@@ -457,7 +457,7 @@ def getInstalledApps() {
         }
     } catch (ex) {
         if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
+        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
     }
     return apps
 }
@@ -529,7 +529,7 @@ def keyPress(key) {
         }
     } catch (ex) {
         if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
+        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
     }
 }
 
@@ -567,7 +567,7 @@ def launchApp(appId) {
             }
         } catch (ex) {
             if (logEnable) log.error ex
-            log.warn "The device appears to be powered off.  Please make sure to Fast-Start is enabled on your Roku."
+            log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
         }
     } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
