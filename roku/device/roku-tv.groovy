@@ -110,6 +110,18 @@ def installed() {
 }
 
 def updated() {
+
+    if (settings.refreshUnits    == null) device.updateSetting("refreshUnits",   "Minutes")
+    if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 5       )
+    if (settings.appRefresh      == null) device.updateSetting("appRefresh",      false   )
+    if (settings.appInterval     == null) device.updateSetting("appInterval",     60      )
+    if (settings.autoManage      == null) device.updateSetting("autoManage",      true    )
+    if (settings.manageApps      == null) device.updateSetting("manageApps",      true    )
+    if (settings.hdmiPorts       == null) device.updateSetting("hdmiPorts",       3       )
+    if (settings.inputAV         == null) device.updateSetting("inputAV",         false   )
+    if (settings.inputTuner      == null) device.updateSetting("inputTuner",      false   )
+    if (settings.logEnable       == null) device.updateSetting("logEnable",       false   )
+
     if (logEnable) log.debug "Preferences updated"
     if (deviceIp) {
         def mac = getMACFromIP(deviceIp)
@@ -310,7 +322,7 @@ def sendWakeUp() {
 def queryDeviceState() {
     sendEvent(name: "refresh", value: "device-info")
     try {
-        httpGet("http://${deviceIp}:8060/query/device-info") { response -> 
+        httpGet([uri:"http://${deviceIp}:8060/query/device-info", timeout:3]) { response -> 
             if (!response.isSuccess())
             return
 
@@ -403,7 +415,7 @@ private def parsePowerState(body) {
 
 def queryCurrentApp() {
     try {
-        httpGet("http://${deviceIp}:8060/query/active-app") { response -> 
+        httpGet([uri:"http://${deviceIp}:8060/query/active-app", timeout:3]) { response -> 
             if (!response.isSuccess()) 
             return
 
@@ -438,7 +450,7 @@ private def purgeInstalledApps() {
 def getInstalledApps() {
     def apps=[:]
     try {
-        httpGet("http://${deviceIp}:8060/query/apps") { response ->
+        httpGet([uri:"http://${deviceIp}:8060/query/apps",timeout:3]) { response ->
 
             if (!response.isSuccess())
             return
@@ -521,7 +533,7 @@ def keyPress(key) {
     }
     if (logEnable) log.debug "Executing '${key}'"
     try {
-        httpPost("http://${deviceIp}:8060/keypress/${key}", null) { response -> 
+        httpPost([uri:"http://${deviceIp}:8060/keypress/${key}", timeout: 3]) { response -> 
             if (response.isSuccess())
             poll()
             else
@@ -554,7 +566,7 @@ def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     if (appId =~ /^\d+$/ ) {
         try {
-            httpPost("http://${deviceIp}:8060/launch/${appId}", null) { response ->
+            httpPost([uri:"http://${deviceIp}:8060/launch/${appId}", timeout:3], null) { response ->
                 if (response.isSuccess()) {
                     def netId = networkIdForApp(appId)
                     def child = getChildDevice(netId)

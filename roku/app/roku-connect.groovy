@@ -18,8 +18,6 @@ preferences {
     page(name: "configureDevice")
     page(name: "changeName")
     page(name: "manageApp")
-    //page(name: "appDiscovery")
-    page(name: "installApps")
 }
 
 /*
@@ -207,15 +205,19 @@ def configureDevice(params) {
         child.createChildAppDevice(appId, appName)
     }
     
-    
     app.updateSetting("${networkId}_selectedApps", selectedApps)   
     
     def label = (deviceLabel(child)?:"").trim()
     def newLabel = (settings["${networkId}_label"]?:"").trim()
     if (newLabel != "" && label != newLabel) {
         renameChildDevice(this, networkId, newLabel)
+        child.getChildDevices().findAll { deviceLabel(it)?.startsWith("${label}") }.each {
+            renameChildDevice(child, it.deviceNetworkId, deviceLabel(it).replace("${label}", "${newLabel}"))
+        }
+        
         label = newLabel
     }
+    
     app.removeSetting("${networkId}_label")
 
     return dynamicPage(name:"configureDevice", title:"Configure device", nextPage:null) {
@@ -321,7 +323,7 @@ private verifyDevice(event) {
     if (logEnabe) log.info "Verifying ${event.networkAddress}"
     
     // Using the httpGet method, and arrow function, perform the validation check w/o the need for a callback function.
-    httpGet("http://${event.networkAddress}:${event.deviceAddress}${ssdpPath}") { response ->
+    httpGet([uri:"http://${event.networkAddress}:${event.deviceAddress}${ssdpPath}",timeout:5]) { response ->
         
         if (!response.isSuccess()) {return}
 
@@ -376,7 +378,7 @@ def renameChildDevice(parent, networkId, name) {
     if (networkId) {
         def child = parent.getChildDevice(networkId)
         if (logEnable) log.info "Renaming ${child.label} to ${name}"
-        child.label = settings["${networkId}_label"]
+        child.label = name
     }
 }
 
@@ -405,10 +407,3 @@ private String convertIPtoHex(ipAddress) {
 private String deviceLabel(device) {
     device?.label ?: device?.name
 }
-                                                                                  
-
-
-
-
-
-
