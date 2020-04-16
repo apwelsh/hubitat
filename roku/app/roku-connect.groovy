@@ -18,7 +18,7 @@ preferences {
     page(name: "configureDevice")
     page(name: "changeName")
     page(name: "manageApp")
-    page(name: "appDiscovery")
+    //page(name: "appDiscovery")
     page(name: "installApps")
 }
 
@@ -71,14 +71,14 @@ def mainPage() {
         app.removeSetting("deviceNetworkId")
         app.removeSetting("selectedDevice")
         app.removeSetting("selectedApps")
-        return dynamicPage(name: "mainPage", title: "Manage your Roku connected devices", uninstall: true) {
+        return dynamicPage(name: "mainPage", title: "Manage your Roku connected devices", uninstall: true, install: true) {
             section(){
                 href "deviceDiscovery", title:"Discover New Devices", description:""
             }
             section("Installed Devices"){
                 getChildDevices().sort({ a, b -> a["label"] <=> b["label"] }).each {
                     def desc = it.label != it.name ? it.name : ""
-                    href "configureDevice", title:"$it.label", description:desc, params: [netId: it.deviceNetworkId]
+                    href "configureDevice", title:"${deviceLabel(it)}", description:desc, params: [netId: it.deviceNetworkId]
                 }
             }
             section("Options") {
@@ -183,82 +183,7 @@ def configureDevice(params) {
     if (!child)
         return mainPage()
     
-    // track state to backup to.
     app.updateSetting("deviceNetworkId", networkId)
-    
-    def label = child.label
-    def newLabel = settings["${networkId}_label"]
-    if (newLabel) {
-        if (label != settings["${networkId}_label"]) { 
-            renameChildDevice(this, networkId, settings["${networkId}_label"])
-            label = newLabel
-        }
-    }
-    app.removeSetting("${networkId}_label")
-    
-    
-    return dynamicPage(name:"configureDevice", title:"Configure device", nextPage:null) {
-        section() {
-            paragraph "Use this section to configure your Roku device settings"
-            input "${networkId}_label", "text", title: "Device name", defaultValue:label, submitOnChange: true
-        }
-        section("Installed Applications") {
-            href "appDiscovery", title:"Add/Remove Roku Apps", description:"", params: params
-            paragraph "Manage installed apps"
-            child.getChildDevices().sort({ a, b -> a["label"] <=> b["label"] }).each {
-                def desc = it.label != it.name ? it.name : ""
-                app.removeSetting("${networkId}_selectedApps")
-                href "manageApp", title:desc, description:"", params: [netId: networkId, appId: it.deviceNetworkId]
-                
-            }
-        }
-    }
-}
-
-def manageApp(params) {
-    def networkId = params?.netId ?: settings["deviceNetworkId"]
-    def appId     = params?.appId ?: settings["applicationNetworkId"]
-    if (!networkId || !appId) {
-        app.removeSetting("applicationNetworkId")
-        return configureDevice()
-    }
-    
-    def child = getChildDevice(networkId)
-    
-    if (!child)
-        return mainPage()
-    
-    // track state to backup to.
-    app.updateSetting("deviceNetworkId", networkId)
-
-    def label = deviceLabel(child.getChildDevice(appId))
-    
-    def newLabel = settings["${appId}_label"]
-    if (newLabel) {
-        if (label != newLabel) { 
-            renameChildDevice(child, appId, newLabel)
-            label = newLabel
-        }
-    }
-    app.removeSetting("${appId}_label")
-
-    
-    return dynamicPage(name: "manageApp", title:"Manage Installed Apps for ${child.label}", nextPage:null) {
-        section() {
-            paragraph "Use this section to set the ${app.name} application name for ${child.label}"
-            input "${appId}_label", "text", title: "Application name", defaultValue:label, submitOnChange: true
-        }    
-    }
-    
-}
-
-def appDiscovery(params) {
-    def networkId = params?.netId
-    if (!networkId) return mainPage()
-    
-    def child = getChildDevice(networkId)
-    if (!child)
-        return mainPage()
     
     def rokuApps = child.getInstalledApps()
     def installedApps = child.getChildDevices().collect { it.deviceNetworkId}.findAll { it =~ /^.*\-\d+$/ }
@@ -282,16 +207,73 @@ def appDiscovery(params) {
         child.createChildAppDevice(appId, appName)
     }
     
-    app.updateSetting("${networkId}_selectedApps", selectedApps)
     
-    return dynamicPage(name:"appDiscovery", title:"Add / Remove Child Devices", nextPage:null) {
+    app.updateSetting("${networkId}_selectedApps", selectedApps)   
+    
+    def label = (deviceLabel(child)?:"").trim()
+    def newLabel = (settings["${networkId}_label"]?:"").trim()
+    if (newLabel != "" && label != newLabel) {
+        renameChildDevice(this, networkId, newLabel)
+        label = newLabel
+    }
+    app.removeSetting("${networkId}_label")
+
+    return dynamicPage(name:"configureDevice", title:"Configure device", nextPage:null) {
         section() {
-            paragraph ""
+            paragraph "Use this section to configure your Roku device settings"
+            input "${networkId}_label", "text", title: "Device name", defaultValue:label, submitOnChange: true
         }
-        section("${child.label} Applications") {
-            input "${networkId}_selectedApps", "enum", title: "Select Apps to publish as switch devices, and unlselect Apps to remove", required: flase, multiple: true, options: rokuApps, submitOnChange: true
+        
+        section("Add / Remove Applications") {
+            //href "appDiscovery", title:"Add/Remove Roku Apps", description:"", params: params
+            input "${networkId}_selectedApps", "enum", title: "Select Apps to use as switch devices, unlselect Apps to remove the switch device", required: flase, multiple: true, options: rokuApps, submitOnChange: true
+        }
+        
+        section("Manage installed apps") {
+            child.getChildDevices().sort({ a, b -> a["label"] <=> b["label"] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
+                def desc = it.label != it.name ? it.name : ""
+                href "manageApp", title:"<img src='${child.iconPathForApp(it.deviceNetworkId)}' style='width:auto; height:1em'/> ${desc}", description:"", params: [netId: networkId, appId: it.deviceNetworkId]
+                
+            }
         }
     }
+}
+
+def manageApp(params) {
+    def networkId = params?.netId ?: settings["deviceNetworkId"]
+    def appId     = params?.appId ?: settings["applicationNetworkId"]
+    if (!networkId || !appId) {
+        app.removeSetting("applicationNetworkId")
+        return configureDevice()
+    }
+    
+    def child = getChildDevice(networkId)
+    
+    if (!child)
+        return mainPage()
+    
+    // track state to backup to.
+    app.updateSetting("deviceNetworkId", networkId)
+
+    def device = child.getChildDevice(appId)
+    def label = (deviceLabel(device)?:"").trim()   
+    def newLabel = (settings["${appId}_label"]?:"").trim()
+
+    if (newLabel != "" && label != newLabel) { 
+        renameChildDevice(child, appId, newLabel)
+        label = newLabel
+    }
+    app.removeSetting("${appId}_label")
+
+    return dynamicPage(name: "manageApp", title:"Manage Installed Apps for ${deviceLabel(child)}", nextPage:null) {
+        section() {
+            paragraph "Use this section to set the ${device.name} application name for ${deviceLabel(child)}"
+            input "${appId}_label", "text", title: "Application name", defaultValue:label, submitOnChange: true
+            paragraph "<img src='${child.iconPathForApp(appId)}'/>"
+
+        }    
+    }
+    
 }
 
 /*
@@ -336,7 +318,7 @@ def ssdpHandler(event) {
 private verifyDevice(event) {
    def ssdpPath = event.ssdpPath
     
-    log.info "Verifying ${event.networkAddress}"
+    if (logEnabe) log.info "Verifying ${event.networkAddress}"
     
     // Using the httpGet method, and arrow function, perform the validation check w/o the need for a callback function.
     httpGet("http://${event.networkAddress}:${event.deviceAddress}${ssdpPath}") { response ->
@@ -424,6 +406,8 @@ private String deviceLabel(device) {
     device?.label ?: device?.name
 }
                                                                                   
+
+
 
 
 
