@@ -163,7 +163,7 @@ def addSelectedDevices() {
         title = "Failed to add Roku ${subject}"
     }
     
-	return dynamicPage(name:"addSelectedDevices", title:title, nextPage:"mainPage") {
+	return dynamicPage(name:"addSelectedDevices", title:title, nextPage:null) {
 		section() {
             paragraph sectionText
 		}
@@ -407,3 +407,4 @@ private String convertIPtoHex(ipAddress) {
 private String deviceLabel(device) {
     device?.label ?: device?.name
 }
+
