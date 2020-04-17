@@ -343,6 +343,7 @@ private verifyDevice(event) {
             def discovered = getDiscovered()
             discovered << ["${ssdpUSN}": event]
             if (logEnable) log.debug "Discovered new Roku: ${name}"
+            cleanupOrphans(hubId)
         }
 
     }}
@@ -363,6 +364,17 @@ private updateDevice(event) {
     def child = getChildDevice(roku.mac)
     if (child) {
         child.updateSetting("deviceIp", roku.networkAddress)
+    } else {
+        cleanupOrphans(roku.mac)
+    }
+}
+
+private cleanupOrphans(hubId) {
+    if (getChildDevice(hubId)) return
+    
+    def orphans = settings.collect { key, value -> key }.findAll { it =~ /^${hubId}((\-\w+)?_\w+)?$/ }
+    orphans.each { key ->
+        app.removeSetting("${key}") 
     }
 }
 
@@ -407,4 +419,3 @@ private String convertIPtoHex(ipAddress) {
 private String deviceLabel(device) {
     device?.label ?: device?.name
 }
-
