@@ -566,7 +566,7 @@ def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     if (appId =~ /^\d+$/ ) {
         try {
-            httpPost([uri:"http://${deviceIp}:8060/launch/${appId}", timeout:3], null) { response ->
+            httpPost([uri:"http://${deviceIp}:8060/launch/${appId}", timeout:3]) { response ->
                 if (response.isSuccess()) {
                     def netId = networkIdForApp(appId)
                     def child = getChildDevice(netId)
