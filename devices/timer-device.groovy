@@ -83,7 +83,7 @@ def pause() {
 }
 
 private def shouldUpdate() {
-    def seconds = state.seconds?:0 as int
+    def seconds = (state.seconds?:0) as int
     if (seconds <= 10) // if 10 seconds remaining
         return true // every 1 second
     if (seconds <= 30) // if 30 seconds remaining
