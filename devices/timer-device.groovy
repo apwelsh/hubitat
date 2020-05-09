@@ -149,11 +149,16 @@ def setTimeRemaining(seconds) {
 
 def start() {
     setStatus("running")
+    unschedule()
     def refreshInterval = 1
-    schedule("0/${refreshInterval} * * * * ?", timerEvent, [mifire: true])
+    def duration = ((state.seconds?:0) as int)
+    runIn(duration, stop,[overwrite:false, misfire: "ignore"])
+
+    schedule("* * * * * ?", timerEvent, [misfire: "ignore", overwrite: false])
 }
 
 def stop() {
+    unschedule()
     setTimeRemaining(0)
 }
 
