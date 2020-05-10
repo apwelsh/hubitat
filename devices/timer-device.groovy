@@ -4,9 +4,8 @@
  * Description:
  * This is a simple count-down timer I created for a friend.  I wanted to use the standard TimedSession capability.
  * Making it work with rules is more difficult than it should be though, since HE does not seem to support this yet.
- * As such, I implement PushableButton as well to be able to trigger an event when the timer has expired.  This is a
- * very simple timer based on a cron type schedule.  It is not perfectly accurate, but it is rather light-weight.
- * In the next version, I plan to improve the computation of the timer.  
+ * As such, I implement the PushableButton as well to be able to trigger an event when the timer has expired.  This is a
+ * very simple timer based on a cron type schedule.  It is now an accurate timer, that is rather light-weight.
  * To use the timer, first set the TimeRemaining attribute, then start the timer.
  *-------------------------------------------------------------------------------------------------------------------
  * Copyright 2020 Armand Peter Welsh
@@ -73,54 +72,88 @@ def installed() {
  **/
 
 def cancel() {
+    if (logEnable) log.info "Canceling timer"
     setStatus("canceled")
     setTimeRemaining(0)
 }
 
 def pause() {
-    unschedule()
-    setStatus("paused")
+    if (state.alerttime) {
+        setTimeRemaining(((state.alerttime - now()) / 1000) as int)
+        unschedule()
+        state.remove("refreshInterval")
+        setStatus("paused")
+        if (logEnable) log.info "Timer paused"
+        
+    }
 }
 
 private def shouldUpdate() {
-    def seconds = (state.seconds?:0) as int
+    if (!state.alerttime)
+        return true
+    def seconds = ((state.alerttime - now())/1000) as int
     if (seconds <= 10) // if 10 seconds remaining
         return true // every 1 second
-    if (seconds <= 30) // if 30 seconds remaining
+    if (seconds <= 60) // if 30 seconds remaining
         if (seconds % 5 == 0) // every 5 seconds
             return true
-    if (seconds <= 60) // if 60 seconds remaining
-        if (seconds % 15 == 0) // every 15 seconds
-            return true
-    if (seconds <= 300) // if 5 minutes remaining
-        if (seconds % 30 == 0) // every 30 seconds
-            return true
-    if (seconds <= 1200) // if 20 minutes remaining
-        if (seconds % 60 == 0) // every 1 minute
-            return true
-    if (seconds <= 1800) // if 30 minutes remaining
-        if (seconds % 120 == 0) // every 2 minutes
-            return true
-    if (seconds <= 3600) // if 1 hour remaining
-        if (seconds % 300 == 0) // every 5 minutes
-            return true
-    if (seconds <= 14400) // if 4 hours remaining
-        if (seconds % 600 == 0) // every 10 minutes
-            return true
-    if (seconds % 1800 == 0) // every 30 minutes
+    if (seconds % 10 == 0)
         return true
+    
+//    if (seconds <= 60) // if 60 seconds remaining
+//        if (seconds % 10 == 0) // every 10 seconds
+//            return true
+//    if (seconds <= 300) // if 5 minutes remaining
+//        if (seconds % 30 == 0) // every 30 seconds
+//            return true
+//    if (seconds <= 1200) // if 20 minutes remaining
+//        if (seconds % 60 == 0) // every 1 minute
+//            return true
+//    if (seconds <= 1800) // if 30 minutes remaining
+//        if (seconds % 120 == 0) // every 2 minutes
+//            return true
+//    if (seconds <= 3600) // if 1 hour remaining
+//        if (seconds % 300 == 0) // every 5 minutes
+//            return true
+//    if (seconds <= 14400) // if 4 hours remaining
+//        if (seconds % 600 == 0) // every 10 minutes
+//            return true
+//    if (seconds % 1800 == 0) // every 30 minutes
+//        return true
     
     return false
 }
 
-def setTimeRemaining(seconds) {
-    if (seconds == 0)
-        state.remove("seconds")
-    else
-        state.seconds = seconds
+def scheduleTimerEvent(secondsRemaining) {
+    def refreshInterval = 1
+
+    if (secondsRemaining > 60) {
+        if ((secondsRemaining as int) % 10 == 0) refreshInterval = 10
+        else return
+    }
+    else if (secondsRemaining > 10) {
+        if ((secondsRemaining as int) % 5 == 0)  refreshInterval = 5
+        else return
+    }
     
-    if (!shouldUpdate())
-        return
+    if (((state.refreshInterval?:0) as int) != refreshInterval) {
+        def t = refreshInterval == 1 ? "*" : new Date().getSeconds() % refreshInterval
+        unschedule(timerEvent)
+        schedule("${t}/${refreshInterval} * * * * ?", timerEvent, [misfire: "ignore", overwrite: false])
+        state.refreshInterval = refreshInterval
+        if (logEnable) log.info "Changed timer update frequency to every ${refreshInterval} second(s)"
+    }
+
+}
+
+def setTimeRemaining(seconds) {
+    if (seconds == 0) {
+        state.remove("alerttime")
+        state.remove("refreshInterval")
+    }
+    
+    //if (!shouldUpdate())
+    //    return
     
     if (seconds == 0) {
         unschedule()
@@ -131,7 +164,12 @@ def setTimeRemaining(seconds) {
         runIn(1, resetDisplay)
         push()
     }
-    
+
+    // Experimental code to replace shouldUpdate
+    if (state.alerttime) {
+        scheduleTimerEvent(seconds as int)
+    }
+
     def hours = (seconds / 3600) as int
     if (hours > 0)
         seconds = seconds.intValue() % 3600 // remove the hours component
@@ -148,18 +186,23 @@ def setTimeRemaining(seconds) {
 }
 
 def start() {
+    if (logEnable) log.info "Timer started"
     setStatus("running")
     unschedule()
-    def refreshInterval = 1
-    def duration = ((state.seconds?:0) as int)
-    runIn(duration, stop,[overwrite:false, misfire: "ignore"])
+    
+    def timeRemaining = (device.latestValue("timeRemaining") as int)
+    runIn(timeRemaining, stop,[overwrite:false, misfire: "ignore"])
+    state.alerttime = now() + (timeRemaining * 1000)
 
+    def refreshInterval = 1
+    state.refreshInterval = refreshInterval
     schedule("* * * * * ?", timerEvent, [misfire: "ignore", overwrite: false])
 }
 
 def stop() {
     unschedule()
     setTimeRemaining(0)
+    if (logEnable) log.info "Timer stopped"
 }
 
 /**
@@ -192,11 +235,10 @@ def resetDisplay() {
 }
 
 def timerEvent() {
-    def timeRemaining = state.seconds
-    if (timeRemaining) {
-        timeRemaining = timeRemaining - 1
-        setTimeRemaining(timeRemaining)
+    if (state.alerttime) {
+        setTimeRemaining(((state.alerttime - now())/1000) as int)
     } else {
         stop()
     }
 }
+
