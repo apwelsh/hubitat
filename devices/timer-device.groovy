@@ -46,8 +46,6 @@ metadata {
         capability "Sensor"
         capability "PushableButton"
         
-        
-        
         attribute  "display", "string"
         attribute  "switch",  "string"
     }
@@ -88,42 +86,6 @@ def pause() {
     }
 }
 
-private def shouldUpdate() {
-    if (!state.alerttime)
-        return true
-    def seconds = ((state.alerttime - now())/1000) as int
-    if (seconds <= 10) // if 10 seconds remaining
-        return true // every 1 second
-    if (seconds <= 60) // if 30 seconds remaining
-        if (seconds % 5 == 0) // every 5 seconds
-            return true
-    if (seconds % 10 == 0)
-        return true
-    
-//    if (seconds <= 60) // if 60 seconds remaining
-//        if (seconds % 10 == 0) // every 10 seconds
-//            return true
-//    if (seconds <= 300) // if 5 minutes remaining
-//        if (seconds % 30 == 0) // every 30 seconds
-//            return true
-//    if (seconds <= 1200) // if 20 minutes remaining
-//        if (seconds % 60 == 0) // every 1 minute
-//            return true
-//    if (seconds <= 1800) // if 30 minutes remaining
-//        if (seconds % 120 == 0) // every 2 minutes
-//            return true
-//    if (seconds <= 3600) // if 1 hour remaining
-//        if (seconds % 300 == 0) // every 5 minutes
-//            return true
-//    if (seconds <= 14400) // if 4 hours remaining
-//        if (seconds % 600 == 0) // every 10 minutes
-//            return true
-//    if (seconds % 1800 == 0) // every 30 minutes
-//        return true
-    
-    return false
-}
-
 def scheduleTimerEvent(secondsRemaining) {
     def refreshInterval = 1
 
@@ -147,25 +109,11 @@ def scheduleTimerEvent(secondsRemaining) {
 }
 
 def setTimeRemaining(seconds) {
+
     if (seconds == 0) {
-        state.remove("alerttime")
-        state.remove("refreshInterval")
-    }
-    
-    //if (!shouldUpdate())
-    //    return
-    
-    if (seconds == 0) {
-        unschedule()
-        if (device.currentValue('sessionStatus') != "canceled") {
-            sendEvent(name: "timeRemaining", value: seconds)
-            setStatus("stopped")
-        }
-        runIn(1, resetDisplay)
-        push()
+        timerDone()
     }
 
-    // Experimental code to replace shouldUpdate
     if (state.alerttime) {
         scheduleTimerEvent(seconds as int)
     }
@@ -191,7 +139,7 @@ def start() {
     unschedule()
     
     def timeRemaining = (device.latestValue("timeRemaining") as int)
-    runIn(timeRemaining, stop,[overwrite:false, misfire: "ignore"])
+    runIn(timeRemaining, timerDone,[overwrite:false, misfire: "ignore"])
     state.alerttime = now() + (timeRemaining * 1000)
 
     def refreshInterval = 1
@@ -229,9 +177,22 @@ def setStatus(status) {
     }
 }
 
-
 def resetDisplay() {
     sendEvent(name: "display", value: idleText ? "idle" : "--:--")
+}
+
+def timerDone() {
+    if (state.alerttime) {
+        state.remove("alerttime")
+        state.remove("refreshInterval")
+        unschedule()
+        if (device.currentValue('sessionStatus') != "canceled") {
+            sendEvent(name: "timeRemaining", value: seconds)
+            setStatus("stopped")
+        }
+        runIn(1, resetDisplay)
+        push()
+    }
 }
 
 def timerEvent() {
@@ -241,4 +202,5 @@ def timerEvent() {
         stop()
     }
 }
+
 
