@@ -612,8 +612,11 @@ void createChildAppDevice(String netId, String appName) {
         def label = deviceLabel()
         def child = addChildDevice("hubitat", "Generic Component Switch", "${netId}",
             [label: "${label}-${appName}", 
-             isComponent: false, name: "${appName}"])
+             isComponent: parent ? true : false, name: "${appName}"])
         child.updateSetting("txtEnable", false)
+        if (appIdForNetworkId(netId) =~ /^\d+$/ ) {
+            child.updateDataValue("iconPath", iconPathForApp(netId))
+        }
         if (logEnable) log.debug "Created child device: ${appName} (${netId})"
     } catch(IllegalArgumentException e) {
         if (getChildDevice(netId)) {
@@ -644,4 +647,3 @@ private def deviceLabel() {
         return device.name
     return device.label
 }
-
