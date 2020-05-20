@@ -1,0 +1,17 @@
+{
+  "packageName": "Countdown Timer",
+  "author": "Armand Welsh",
+  "minimumHEVersion": "0.0",
+  "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/APACHE-LICENSE.md",
+  "dateReleased": "2020-05-10",
+  "drivers": [
+    {
+      "id": "622d6f64-7c1d-4d7f-9de0-e4038628438a",
+      "name": "Timer Device",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/timer-device.groovy",
+      "required": true,
+      "version": "1.0"
+    }
+  ]
+}

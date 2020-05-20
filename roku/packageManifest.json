@@ -1,0 +1,30 @@
+{
+  "packageName": "Roku TV Integration",
+  "author": "Armand Welsh",
+  "minimumHEVersion": "0.0",
+  "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/LICENSE.md",
+  "documentationLink": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/README.md",
+  "communityLink": "https://community.hubitat.com/t/new-roku-tv-device-handler/12038",
+  "dateReleased": "2020-01-21",
+  "apps": [
+    {
+      "id": "cbf5b247-9c87-4926-83db-69c1dd70e211",
+      "name": "Roku Connect",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
+      "required": false,
+      "oauth": false,
+      "version": "1.1.0"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "516bab57-6e80-4364-be6b-c4ef7c1361f5",
+      "name": "Roku TV",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
+      "required": true,
+      "version": "2.1.0"
+    }
+  ]
+}
