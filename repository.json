@@ -11,7 +11,7 @@
     },
     {
       "name": "Roku TV Integration",
-      "category": "Integration",
+      "category": "Integrations",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/packageManifest.json",
       "description": "Manage all your Roku TVs and Roku Media players through Hubitat with full support for activating applications as switches, and creating any remote command as a momentary switch.  Use this device to control your Roku system, or to make a smart home that responds to Roku actions."
     }
