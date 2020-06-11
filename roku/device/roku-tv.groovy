@@ -189,7 +189,17 @@ def iconPathForApp(String netId) {
 
  void componentOn(child) {
     def appId = appIdForNetworkId(child.deviceNetworkId)
-    launchApp(appId)
+
+    if (appId =~ /^\d+$/ ) {
+        launchApp(appId)
+    } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
+        this."input_$appId"()
+    } else {
+        // Key presses are actually button events, and do not keep state, this implements a momentary state of on while the event is being sent.
+        child.sendEvent(name: "switch", value: "on")
+        this.keyPress(appId)
+        child.sendEvent(name: "switch", value: "off")
+    }
 }
 
 void componentOff(child) {
@@ -198,6 +208,8 @@ void componentOff(child) {
     def appId = appIdForNetworkId(child.deviceNetworkId)
     if (appId =~ /^(AV1|Tuner|hdmi\d|\d+)$/)
         home()
+    else
+        child.sendEvent(name: "switch", value: "off")
 }
 
 void componentRefresh(cd){
@@ -534,10 +546,8 @@ def keyPress(key) {
     if (logEnable) log.debug "Executing '${key}'"
     try {
         httpPost([uri:"http://${deviceIp}:8060/keypress/${key}", timeout: 3]) { response -> 
-            if (response.isSuccess())
-            poll()
-            else
-                log.error "Failed to send key press event for ${key}"
+            if (response.isSuccess()) poll()
+            else log.error "Failed to send key press event for ${key}"
         }
     } catch (ex) {
         if (logEnable) log.error ex

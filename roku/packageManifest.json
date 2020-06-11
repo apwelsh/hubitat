@@ -24,7 +24,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.1.0"
+      "version": "2.1.1"
     }
   ]
 }
