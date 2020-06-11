@@ -5,7 +5,7 @@
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/LICENSE.md",
   "documentationLink": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/README.md",
   "communityLink": "https://community.hubitat.com/t/new-roku-tv-device-handler/12038",
-  "dateReleased": "2020-01-21",
+  "dateReleased": "2020-06-11",
   "apps": [
     {
       "id": "cbf5b247-9c87-4926-83db-69c1dd70e211",
@@ -26,5 +26,7 @@
       "required": true,
       "version": "2.1.1"
     }
-  ]
+  ],
+  "version": "1.2.1",
+  "releaseNotes": "Updated the keypress child devices to behave like momenatry switches"
 }
