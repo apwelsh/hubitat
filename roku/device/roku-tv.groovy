@@ -345,8 +345,10 @@ def queryDeviceState() {
 
         }
     } catch (ex) {
-        if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
+        if (logEnable) {
+            log.error ex
+            log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
+        }
 
     }
     sendEvent(name: "refresh", value: "idle")
