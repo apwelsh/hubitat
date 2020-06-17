@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.1.1"
+      "version": "2.1.2"
     }
   ],
-  "version": "1.2.1",
-  "releaseNotes": "Updated the keypress child devices to behave like momenatry switches"
+  "version": "1.2.2",
+  "releaseNotes": "Updated the logger in the Roku TV app to only log the notification regarding Fast-Start if the logging is enabled"
 }
