@@ -1,3 +1,31 @@
+/**
+ * Roku Connect
+ * Version 1.1.0
+ * Download: https://github.com/apwelsh/hubitat
+ * Description:
+ * This is an integration app for Hubitat designed to locate, and install any/all attached Roku devices.
+ * The app uses SSDP auto-discovery (as supported by the Roku ECP protocol).  This integration app is not
+ * required to use the Roku TV device, but if the app is installed, and used to manage the Roku TV devices,
+ * then auto-discovery will keep the IP address up-to-date as the SSDP listener discovers that the Roku device's
+ * IP Address has been changed.
+ *-------------------------------------------------------------------------------------------------------------------
+ * Copyright 2020 Armand Peter Welsh
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
+ * documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of 
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO 
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *-------------------------------------------------------------------------------------------------------------------
+ **/
 
 definition(
     name: "Roku Connect",
