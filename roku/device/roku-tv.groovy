@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.1.2
+ * Version 2.2.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -49,6 +49,7 @@ preferences {
 
     if (!parent)
         input name: "deviceIp",        type: "text",   title: "Device IP", required: true
+    input name: "timeout",         type: "number", title: "Communcation timeout", required: true, defaultValue: 10, range: 1..60, description: "The maximum number of seconds to wait for a roku instruction to complete.  Defaults to 10 seconds.  For fast networks, set to a lower time for better hub performance when your device is offline."
     if (deviceIp) {
         input name: "refreshUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Minutes", required: true
         input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
@@ -122,6 +123,7 @@ def updated() {
     if (settings.inputAV         == null) device.updateSetting("inputAV",         false   )
     if (settings.inputTuner      == null) device.updateSetting("inputTuner",      false   )
     if (settings.logEnable       == null) device.updateSetting("logEnable",       false   )
+    if (settings.timeout         == null) device.updateSetting("timeout",         10      )
 
     if (logEnable) log.debug "Preferences updated"
     if (deviceIp) {
@@ -335,7 +337,7 @@ def sendWakeUp() {
 def queryDeviceState() {
     sendEvent(name: "refresh", value: "device-info")
     try {
-        httpGet([uri:"http://${deviceIp}:8060/query/device-info", timeout:3]) { response -> 
+        httpGet([uri:"http://${deviceIp}:8060/query/device-info", timeout: timeout]) { response -> 
             if (!response.isSuccess())
             return
 
@@ -346,10 +348,7 @@ def queryDeviceState() {
 
         }
     } catch (ex) {
-        if (logEnable) {
-            log.error ex
-            log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
-        }
+        logExceptionWithPowerWarning(ex)
 
     }
     sendEvent(name: "refresh", value: "idle")
@@ -430,7 +429,7 @@ private def parsePowerState(body) {
 
 def queryCurrentApp() {
     try {
-        httpGet([uri:"http://${deviceIp}:8060/query/active-app", timeout:3]) { response -> 
+        httpGet([uri:"http://${deviceIp}:8060/query/active-app", timeout: timeout]) { response -> 
             if (!response.isSuccess()) 
             return
 
@@ -450,9 +449,7 @@ def queryCurrentApp() {
             }
         }
     } catch (ex) {
-        if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
-
+        logExceptionWithPowerWarning(ex)
     }
 }
 
@@ -465,7 +462,7 @@ private def purgeInstalledApps() {
 def getInstalledApps() {
     def apps=[:]
     try {
-        httpGet([uri:"http://${deviceIp}:8060/query/apps",timeout:3]) { response ->
+        httpGet([uri:"http://${deviceIp}:8060/query/apps",timeout: timeout]) { response ->
 
             if (!response.isSuccess())
             return
@@ -483,8 +480,7 @@ def getInstalledApps() {
             }
         }
     } catch (ex) {
-        if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
+        logExceptionWithPowerWarning(ex)
     }
     return apps
 }
@@ -548,13 +544,12 @@ def keyPress(key) {
     }
     if (logEnable) log.debug "Executing '${key}'"
     try {
-        httpPost([uri:"http://${deviceIp}:8060/keypress/${key}", timeout: 3]) { response -> 
+        httpPost([uri:"http://${deviceIp}:8060/keypress/${key}", timeout: timeout]) { response -> 
             if (response.isSuccess()) poll()
             else log.error "Failed to send key press event for ${key}"
         }
     } catch (ex) {
-        if (logEnable) log.error ex
-        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
+        logExceptionWithPowerWarning(ex)
     }
 }
 
@@ -579,7 +574,7 @@ def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
     if (appId =~ /^\d+$/ ) {
         try {
-            httpPost([uri:"http://${deviceIp}:8060/launch/${appId}", timeout:3]) { response ->
+            httpPost([uri:"http://${deviceIp}:8060/launch/${appId}", timeout: timeout]) { response ->
                 if (response.isSuccess()) {
                     def netId = networkIdForApp(appId)
                     def child = getChildDevice(netId)
@@ -591,8 +586,7 @@ def launchApp(appId) {
                 }
             }
         } catch (ex) {
-            if (logEnable) log.error ex
-            log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
+            logExceptionWithPowerWarning(ex)
         }
     } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
@@ -659,4 +653,11 @@ private def deviceLabel() {
     if (device.label == null)
         return device.name
     return device.label
+}
+
+private void logExceptionWithPowerWarning(ex) {
+    if (logEnable) {
+        log.error ex
+        log.warn "The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku."
+    }
 }

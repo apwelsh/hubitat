@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.1.2"
+      "version": "2.2.0"
     }
   ],
-  "version": "1.2.2",
-  "releaseNotes": "Updated the logger in the Roku TV app to only log the notification regarding Fast-Start if the logging is enabled"
+  "version": "1.2.3",
+  "releaseNotes": "Improved the logger to only log Fast-Start configuration reminders if logging is enabled.  Added a user customizable timeout for Roku API Calls so each user can tune their Roku for optimum performance."
 }
