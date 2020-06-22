@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.2.1
+ * Version 2.3.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -25,7 +25,7 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    def keys=[
+    def allKeys=[
         "Home",      "Back",       "FindRemote",  "Select",
         "Up",        "Down",       "Left",        "Right",
         "Play",      "Rev",        "Fwd",         "InstantReplay",
@@ -33,6 +33,19 @@ preferences {
         "VolumeUp",  "VolumeDown", "VolumeMute",
         "Power",     "PowerOff",   "ChannelUp",   "ChannelDown"
         ]
+    def keys=[]
+    def installedKeys=[:]
+    try {
+        allKeys.each { key ->
+            def netId = networkIdForApp(key)
+            if (getChildDevice(netId)) {
+                installedKeys[netId] = key
+            } else {
+                keys.add(key)
+            }
+        }
+    } catch (ex) {}
+
     def apps=[:]
     def installed=[:]
     try {
@@ -65,6 +78,7 @@ preferences {
             input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
         }
         input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
+        input name: "deleteChildKey",  type: "enum",   title: "Remove Roku Remote Control Key", options: installedKeys, required: false
         if ((autoManage?:true == false || manageApps?:true == false) && !parent) {
             input name: "createChildApp",     type: "enum",   title: "Add Roku App", options: apps, required: false
             input name: "deleteChildApp",     type: "enum",   title: "Remove Roku App", options: installed, required: false
@@ -148,6 +162,12 @@ def updated() {
         device.updateSetting("createChildKey", [value: "", type:"enum"])
         updateChildApp(networkIdForApp(key), text)
     }
+    if (deleteChildKey) {
+        def netId=deleteChildKey
+        device.updateSetting("deleteChildKey", [value: "", type:"enum"])
+        deleteChildAppDevice(netId)
+    }
+
     if (createChildApp) {
         def netId=createChildApp
         device.updateSetting("createChildApp", [value: "", type:"enum"])
