@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.2.0
+ * Version 2.2.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -63,8 +63,8 @@ preferences {
             input name: "hdmiPorts",       type: "enum",   title: "Number of HDMI inputs", options:["0","1","2","3","4"], defaultValue: "3", required: true
             input name: "inputAV",         type: "bool",   title: "Enable AV Input", defaultValue: false, required: true
             input name: "inputTuner",      type: "bool",   title: "Enable Tuner Input", defaultValue: false, required: true
-            input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
         }
+        input name: "createChildKey",  type: "enum",   title: "Select a key to add a child switch for, and save changes to add the child button for the selected key", options:keys, required: false
         if ((autoManage?:true == false || manageApps?:true == false) && !parent) {
             input name: "createChildApp",     type: "enum",   title: "Add Roku App", options: apps, required: false
             input name: "deleteChildApp",     type: "enum",   title: "Remove Roku App", options: installed, required: false
@@ -193,9 +193,9 @@ def iconPathForApp(String netId) {
  void componentOn(child) {
     def appId = appIdForNetworkId(child.deviceNetworkId)
 
-    if (appId =~ /^\d+$/ ) {
+    if (appId ==~ /^\d+$/ ) {
         launchApp(appId)
-    } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
+    } else if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
     } else {
         // Key presses are actually button events, and do not keep state, this implements a momentary state of on while the event is being sent.
@@ -209,7 +209,7 @@ void componentOff(child) {
     if (child.currentValue("switch") == "off")
         return
     def appId = appIdForNetworkId(child.deviceNetworkId)
-    if (appId =~ /^(AV1|Tuner|hdmi\d|\d+)$/)
+    if (appId ==~ /^(AV1|Tuner|hdmi\d|\d+)$/)
         home()
     else
         child.sendEvent(name: "switch", value: "off")
@@ -499,8 +499,9 @@ def queryInstalledApps() {
         def hdmiCount = hdmiPorts as int
         
         childDevices.each{ child ->
-            //log.debug "child: ${child.deviceNetworkId} (${child.name})"
+            
             def nodeExists = false
+            
             if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
                 nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
             }
@@ -510,11 +511,15 @@ def queryInstalledApps() {
     
             if (inputTuner)
                 nodeExists = nodeExists || networkIdForApp("Tuner") == child.deviceNetworkId
-            
+
+            if (!appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/) {
+                nodeExists = nodeExist || isValidKey(appIdForNetworkId(child.deviceNetworkId))            
+            }
+
             nodeExists = nodeExists || apps.containsKey(child.deviceNetworkId)
             
             if (!nodeExists) {
-                if (appIdForNetworkId(child.deviceNetworkId) =~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
+                if (appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/ || manageApps) {
                     if (logEnable) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
                     deleteChildDevice(child.deviceNetworkId)
                 }
@@ -572,7 +577,7 @@ private def isValidKey(key) {
 
 def launchApp(appId) {
     if (logEnable) log.debug "Executing 'launchApp ${appId}'"
-    if (appId =~ /^\d+$/ ) {
+    if (appId ==~ /^\d+$/ ) {
         try {
             httpPost([uri:"http://${deviceIp}:8060/launch/${appId}", timeout: timeout]) { response ->
                 if (response.isSuccess()) {
@@ -588,7 +593,7 @@ def launchApp(appId) {
         } catch (ex) {
             logExceptionWithPowerWarning(ex)
         }
-    } else if (appId =~ /^(AV1|Tuner|hdmi\d)$/ ) {
+    } else if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
     } else {
         this.keyPress(appId)
@@ -621,7 +626,7 @@ void createChildAppDevice(String netId, String appName) {
             [label: "${label}-${appName}", 
              isComponent: parent ? true : false, name: "${appName}"])
         child.updateSetting("txtEnable", false)
-        if (appIdForNetworkId(netId) =~ /^\d+$/ ) {
+        if (appIdForNetworkId(netId) ==~ /^\d+$/ ) {
             child.updateDataValue("iconPath", iconPathForApp(netId))
         }
         if (logEnable) log.debug "Created child device: ${appName} (${netId})"
