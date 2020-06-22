@@ -27,6 +27,6 @@
       "version": "2.2.1"
     }
   ],
-  "version": "1.2.3",
-  "releaseNotes": "Improved the logger to only log Fast-Start configuration reminders if logging is enabled.  Added a user customizable timeout for Roku API Calls so each user can tune their Roku for optimum performance."
+  "version": "1.2.4",
+  "releaseNotes": "Fixed a logic flaw that would auto-delete child apps for remote keys if auto manage was turned on for Roku TV devices not being managed by the Roku Connect app."
 }
