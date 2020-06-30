@@ -437,6 +437,7 @@ private def parsePowerState(body) {
             case "PowerOff":
             case "DisplayOff":
             case "Headless":
+            case "Ready":
                 if (this.state!="off") {
                     sendEvent(name: "switch", value: "off")
                     unschedule(queryCurrentApp)

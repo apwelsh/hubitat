@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.3.0"
+      "version": "2.3.1"
     }
   ],
-  "version": "1.2.5",
-  "releaseNotes": "Reworked logic for add/remove child key from within Roku TV device to make it behave the same as apps.  This fixes a discovered issue where child keys added to Roku Connect managed Roku TV cannot be deleted, as well as fixes a reported bug that self-managed RokuTV devices would add a child key and the key would be auto deleted immediately."
+  "version": "1.2.6",
+  "releaseNotes": "Updated power state parsing logic to fix power state not turning off after upgrading the Roku TV the latest firmware."
 }
