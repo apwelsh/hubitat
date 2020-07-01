@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.3.0
+ * Version 2.3.2
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -68,7 +68,8 @@ preferences {
         input name: "refreshInterval", type: "number", title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
         input name: "appRefresh",      type: "bool",   title: "Refresh current application status seperate from TV status.", defaultValue: false, required: true
         if (appRefresh) {
-            input name: "appInterval",     type: "number", title: "Refresh the current application at least every n seconds.", range: 1..120, defaultValue: 60, required: true        
+            input name: "appUnits",    type: "enum",   title: "Refresh interval measured in Minutes, or Seconds", options:["Minutes","Seconds"], defaultValue: "Seconds", required: true
+            input name: "appInterval", type: "number", title: "Refresh the current application at least every n seconds.", range: 1..59, defaultValue: 30, required: true        
         }
         input name: "autoManage",      type: "bool",   title: "Enable automatic management of child devices", defaultValue: true, required: true
         if (autoManage?:true == true) {
@@ -127,10 +128,12 @@ def installed() {
 
 def updated() {
 
+    // Default unset values
     if (settings.refreshUnits    == null) device.updateSetting("refreshUnits",   "Minutes")
     if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 5       )
     if (settings.appRefresh      == null) device.updateSetting("appRefresh",      false   )
-    if (settings.appInterval     == null) device.updateSetting("appInterval",     60      )
+    if (settings.appUnits        == null) device.updateSetting("appUnits",       "Minutes")
+    if (settings.appInterval     == null) device.updateSetting("appInterval",     1       )
     if (settings.autoManage      == null) device.updateSetting("autoManage",      true    )
     if (settings.manageApps      == null) device.updateSetting("manageApps",      true    )
     if (settings.hdmiPorts       == null) device.updateSetting("hdmiPorts",       3       )
@@ -138,6 +141,13 @@ def updated() {
     if (settings.inputTuner      == null) device.updateSetting("inputTuner",      false   )
     if (settings.logEnable       == null) device.updateSetting("logEnable",       false   )
     if (settings.timeout         == null) device.updateSetting("timeout",         10      )
+
+    // Override out-of-bounds values
+    if (settings.refreshInterval  > 59  ) device.updateSetting("refreshInterval", 59      )
+    if (settings.refreshInterval  < 1   ) device.updateSetting("refreshInterval", 1       )
+    if (settings.appInterval      > 59  ) device.updateSetting("appInterval",     59      )
+    if (settings.appInterval      < 1   ) device.updateSetting("appInterval",     1       )
+    if (settings.timeout          < 1   ) device.updateSetting("timeout",         1       )
 
     if (logEnable) log.debug "Preferences updated"
     if (deviceIp) {
@@ -155,7 +165,13 @@ def updated() {
             schedule("${new Date().format("s")} 0/${refreshInterval} * * * ?", refresh)
         }
     }
-    if (appRefresh && appInterval > 0) schedule("0/${appInterval} * * * * ?", queryCurrentApp)
+    if (appRefresh && appInterval > 0) {
+        if (appUnits == "Seconds") {            
+            schedule("0/${appInterval} * * * * ?", refresh)
+        } else {
+            schedule("${new Date().format("s")} 0/${appInterval} * * * ?", refresh)
+        }
+    }
     if (createChildKey) {
         def key=createChildKey
         def text=createChildKey.replaceAll( ~ /([A-Z])/, ' $1').trim()

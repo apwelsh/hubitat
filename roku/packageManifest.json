@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.3.1"
+      "version": "2.3.2"
     }
   ],
-  "version": "1.2.6",
-  "releaseNotes": "Updated power state parsing logic to fix power state not turning off after upgrading the Roku TV the latest firmware."
+  "version": "1.2.7",
+  "releaseNotes": "Updated power state parsing logic to fix power state not turning off after upgrading the Roku TV the latest firmware.  Added app refresh units to support refresh intervals > 59 seconds, and added bounds checks to limit the range of certain settings values."
 }
