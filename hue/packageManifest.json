@@ -1,0 +1,30 @@
+{
+  "packageName": "Advanced Hue Hub Integration",
+  "author": "Armand Welsh",
+  "version": "1.0",
+  "minimumHEVersion": "0.0",
+  "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
+  "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
+  "dateReleased": "2020-01-20",
+  "apps": [
+    {
+      "id": "4ca23ce9-4e0f-4d0d-9fd2-9034376dc134",
+      "name": "Advanced Hue Bridge Integration",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
+      "required": true,
+      "oauth": false,
+      "version": "0.8.0"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "11de790f-60db-48f4-bda3-72fa1d3c61b9",
+      "name": "AdvancedHueGroup",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy",
+      "required": false,
+      "version": "1.0.2"
+    }
+  ]
+}

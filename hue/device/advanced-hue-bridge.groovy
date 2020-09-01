@@ -22,7 +22,6 @@
  * IN THE SOFTWARE.
  *-------------------------------------------------------------------------------------------------------------------
  **/
-import groovy.json.JsonSlurper
 
 preferences {
     input name: "autoRefresh", type: "bool", defaultValue: false, title: "Auto Refresh",        description: "Should this device support automatic refresh" 
@@ -80,34 +79,15 @@ def refresh() {
     parent.getHubStatus()
 }
 
+def autoRefresh() {
+    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    refresh()
+}
+
 def resetRefreshSchedule() {
     unschedule()
-    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events    
+    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
 }
-
-/**
- * Event Parsers
- **/
-def parse(data) {
-    if (data.groups) {
-        parseGroups(data.groups)
-    }
-}
-
-def parseGroups(groups) {
-    if (!groups) {
-        return
-    }
-    groups.each { idx, group ->
-        log.debug "Found group: ${group.name} on ${device.label}"
-    }
-//    log.debug "${groups}"
-}
-
-private def cleanState() {
-	this.state.clear
-}
-
 
 def setHueProperty(name, value) {
     // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
@@ -132,6 +112,3 @@ def setDeviceState(args) {
 def networkIdForScene(sceneId) {
     parent.networkIdForScene(deviceIdNode(device.deviceNetworkId), sceneId)
 }
-
-
-

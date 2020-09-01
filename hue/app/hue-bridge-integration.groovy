@@ -367,10 +367,10 @@ def addScenes(params){
         def dni = networkIdForScene(selectedGroup, sceneId)
         try {
             
-            group.addChildDevice("apwelsh", "AdvancedHueScene", "${dni}", ["label": "${name}"])
-            // def child = group.addChildDevice("hubitat", "Generic Component Switch", "${dni}",
-            // [label: "${name}", isComponent: false, name: "AdvancedHueScene"])
-            // child.updateSetting("txtEnable", false)
+            // group.addChildDevice("apwelsh", "AdvancedHueScene", "${dni}", ["label": "${name}"])
+            def child = group.addChildDevice("hubitat", "Generic Component Switch", "${dni}",
+            [label: "${name}", isComponent: false, name: "AdvancedHueScene"])
+            child.updateSetting("txtEnable", false)
             scenes.remove(sceneId)
             
         } catch (ex) {
@@ -694,8 +694,10 @@ def setDeviceState(child, deviceState) {
         if (data) {
             //    if (logEnable) log.info data
             data.each { 
+                log.error "${it}"
                 if (it.error?.description) {
                     if (logEnable) log.error "${it.error.description[0]}"
+                    
                 }
                 if (it.success) {
                     it.success.each { key, value ->

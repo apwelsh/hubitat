@@ -157,7 +157,7 @@ def setHueProperty(name, value) {
         break;
         case "scene":
         def nid = networkIdForScene(value)
-        getChildDevice(nid)?.setSwitchState("on")
+        setSwitchState("on", getChildDevice(nid))
         refresh()
         break;
         case "any_on":
@@ -199,3 +199,32 @@ def activateScene(scene) {
     }
 }
 
+/*
+ * Component Child Methods
+ */
+
+ void componentOn(child) {
+    def node = deviceIdNode(child.deviceNetworkId)
+    setDeviceState(["scene":node])
+}
+
+void componentOff(child) {
+    setSwitchState("off", child)
+}
+
+void componentRefresh(child){
+    if (logEnable) log.info "received refresh request from ${child.displayName} - ignored"
+}
+
+def setSwitchState(value, child) {
+    if (value == "on") {
+        child.runInMillis(200, autoOff, [data: child])
+    } else {
+        child.unschedule(autoOff)
+    }
+    child.sendEvent(name: "switch", value: value)
+}
+
+def autoOff(child) {
+    child.sendEvent(name: "switch", value: "off")
+}
