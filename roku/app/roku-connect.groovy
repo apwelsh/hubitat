@@ -216,9 +216,9 @@ def configureDevice(params) {
     def selectedApps = settings["${networkId}_selectedApps"] ?: []
     
     // check the input for selected Apps to see if defined, and if not, pre-load the values
-    if (!settings["${networkId}_selectedApps"]) {
-        installedApps.each { selectedApps << it }
-    }
+    // if (!settings["${networkId}_selectedApps"]) {
+    //     installedApps.each { selectedApps << it }
+    // }
 
     // Remove unselected apps as children
     installedApps?.findAll { !selectedApps.contains(it) }.each { appId ->
