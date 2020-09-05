@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
       "required": false,
       "oauth": false,
-      "version": "1.1.0"
+      "version": "1.1.1"
     }
   ],
   "drivers": [
@@ -27,6 +27,6 @@
       "version": "2.3.2"
     }
   ],
-  "version": "1.2.7",
-  "releaseNotes": "Updated power state parsing logic to fix power state not turning off after upgrading the Roku TV the latest firmware.  Added app refresh units to support refresh intervals > 59 seconds, and added bounds checks to limit the range of certain settings values."
+  "version": "1.2.8",
+  "releaseNotes": "Fixed Roku Connect bug that prevents removing last channel from TV"
 }

@@ -1,6 +1,6 @@
 /**
  * Roku Connect
- * Version 1.1.0
+ * Version 1.1.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is an integration app for Hubitat designed to locate, and install any/all attached Roku devices.
