@@ -1073,32 +1073,34 @@ def setHueProperty(child, name, value) {
     // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
     switch (name) {
         case "on":
-        sendChildEvent(child, "switch", value == true ? "on" : "off")
-        break;
+            sendChildEvent(child, "switch", value == true ? "on" : "off")
+            break;
         case "bri":
-        sendChildEvent(child, "level", Math.round(value / 2.54))
-        break;
+            sendChildEvent(child, "level", Math.round(value / 2.54))
+            break;
         case "hue":
-        sendChildEvent(child, "hue", Math.round(value / 655.35))
-        break;
+            sendChildEvent(child, "hue", Math.round(value / 655.35))
+            break;
         case "sat":
-        sendChildEvent(child, "saturation", Math.round(value / 2.54))
-        break;
+            sendChildEvent(child, "saturation", Math.round(value / 2.54))
+            break;
         case "ct":
-        sendChildEvent(child, "colortemperature", Math.round(((500 - value) * (4500 / 347)) + 2000 ))
-        break;
+            sendChildEvent(child, "colortemperature", Math.round(((500 - value) * (4500 / 347)) + 2000 ))
+            break;
+        case "a(ny|ll)_on":
+            child.setHueProperty(name, value)
+            break;
         case "colormode":
-        if (value == "hs") {
-            sendChildEvent(child, "colorMode", "RGB")
-        }
-        if (value == "ct") {
-            sendChildEvent(child, "colorMode", "CT")
-        }
-        if (value == "xy") {
-            sendChildEvent(child, "colorMode", "RGB")
-        }
-        default:
-        child.setHueProperty(name, value)
+            if (value == "hs") {
+                sendChildEvent(child, "colorMode", "RGB")
+            }
+            if (value == "ct") {
+                sendChildEvent(child, "colorMode", "CT")
+            }
+            if (value == "xy") {
+                sendChildEvent(child, "colorMode", "RGB")
+            }
+            break;
     }
 }
 
@@ -1158,3 +1160,6 @@ def componentSetColorTemperature(child, colortemperature) {
     setDeviceState(child, ["ct":ct, "colormode":"ct"])
 }
 
+def transitionTime() {
+    2
+}
