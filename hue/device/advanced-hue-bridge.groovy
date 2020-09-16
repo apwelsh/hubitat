@@ -90,11 +90,8 @@ def resetRefreshSchedule() {
 }
 
 def setHueProperty(name, value) {
-    // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
+    
     switch (name) {
-        case "on":
-        sendEvent(name: "switch", value: value == true ? "on" : "off")
-        break;
         case "any_on":
         sendEvent(name: "switch", value: value ? "on" : "off")
         break;

@@ -7,13 +7,33 @@
       "name": "Countdown Timer",
       "category": "Utility",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/packageManifest.json",
-      "description": "A simple countdown timer device that is designed to integrate well with SharpTools"
+      "description": "A simple countdown timer device that is designed to integrate well with SharpTools",
+      "id": "7ca01f5b-02b5-4ce4-a77c-0067661eb91a",
+      "tags": [
+        "Timers"
+      ]
     },
     {
       "name": "Roku TV Integration",
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/packageManifest.json",
-      "description": "Manage all your Roku TVs and Roku Media players through Hubitat with full support for activating applications as switches, and creating any remote command as a momentary switch.  Use this device to control your Roku system, or to make a smart home that responds to Roku actions."
+      "description": "Manage all your Roku TVs and Roku Media players through Hubitat with full support for activating applications as switches, and creating any remote command as a momentary switch.  Use this device to control your Roku system, or to make a smart home that responds to Roku actions.",
+      "id": "6442a8c3-22c2-4cbd-af81-61bc84e1690a",
+      "tags": [
+        "Multimedia",
+        "LAN"
+      ]
+    },
+    {
+      "name": "Advanced Hue Hub Integration",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/packageManifest.json",
+      "description": "Add support to Hubitat for Hue Groups, Bulbs, and Scenes.  This integration differs from the built-in Hue integration, because this one allows you to import Hue scenes which can be added to any Hubitat scene/group to be turned on.  This was created specifically to satisfy a need the Hubitat could not.  With this driver, it is possible to smoothly transition hue scenes for any Hue group.  I plan to add management of Hue scenes at a later time, as well as a capture state, similar to Hubitat's scene manager.",
+      "id": "236c1937-ef40-4afb-a571-3cb54bce5723",
+      "tags": [
+        "Lights & Switches",
+        "LAN"
+      ]
     }
   ]
 }

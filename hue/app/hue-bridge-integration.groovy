@@ -40,6 +40,8 @@ preferences {
     page(name: "addDevice", title: "Add Hue Bridge", content: "addDevice")
 	page(name: "bridgeBtnPush", title:"Linking with your Hue", content:"bridgeLinking", refreshTimeout:5)
     page(name: "configurePDevice")
+    page(name: "findLights", title: "Light Discovery Started!", content: "findLights", refreshTimeout:10)
+    page(name: "addLights", title: "Add Light")
     page(name: "findGroups", title: "Group Discovery Started!", content: "findGroups", refreshTimeout:10)
     page(name: "addGroups", title: "Add Group")
     page(name: "findScenes", title: "Scene Discovery Started!", content: "findScenes", refreshTimeout:10)
@@ -84,6 +86,7 @@ def mainPage(params=[:]) {
         } else {
             section("Configure"){
                 
+                href "findLights", title:"Find Lights", description:""
                 href "findGroups", title:"Find Groups", description:""
                 href "findScenes", title:"Find Scenes", description:""
                 href "bridgeDiscovery", title:title, description:"", state:selectedDevice? "complete" : null //, params: [nextPage: "bridgeBtnPush"]
@@ -212,6 +215,93 @@ def addDevice(device) {
             paragraph sectionText
         }
     }    
+}
+
+def findLights(params){
+    enumerateLights()
+    
+    def installed = getInstalledLights().collect { it.label }
+    def dnilist = getInstalledLights().collect { it.deviceNetworkId }
+
+// TODO:
+    def options = [:]
+    def lights = state.lights
+    if (lights) {
+        lights.each {key, value ->
+            // def lights = value.lights ?: []
+            // if ( lights.size()  == 0 ) return
+            if ( dnilist.find { it == networkIdForLight(key) }) return
+            options["${key}"] = "${value.name} (${value.type})"
+        }
+    }
+
+    def numFound = options.size()
+    def refreshInterval = numFound == 0 ? 30 : 120
+    def nextPage = selectedLights ? "addLights" : null
+
+	return dynamicPage(name:"findLights", title:"Light Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval) {
+		section("""Let's find some groups.""") {
+			input "selectedLights", "enum", required:false, title:"Select additional lights to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
+            if (!installed.isEmpty()) {
+                paragraph "Previously added Hue Lights"
+                paragraph "[${installedLights.join(', ')}]"
+            }
+		}
+	}
+
+}
+
+def addLights(params){
+
+    if (!selectedLights)
+        return findLights()
+    
+    def subject = selectedLights.size == 1 ? "Light" : "Lights"
+    
+    def title = ""
+    def sectionText = ""
+    
+    def appId = app.getId()
+    def lights = selectedLights.collect { it }
+    
+    selectedLights.each { lightId -> 
+        def name = state.lights[lightId].name
+        def dni = networkIdForLight(lightId)
+        def type = bulbTypeForLight(lightId)
+        try {
+            
+            // addChildDevice("apwelsh", "AdvancedHueGroup", dni, null, ["label": "${name}"])
+            def child = addChildDevice("hubitat", "Generic Component ${type}", "${dni}",
+            [label: "${name}", isComponent: false, name: "AdvancedHueBulb"])
+            child.updateSetting("txtEnable", false)
+            lights.remove(lightId)
+            
+        } catch (ex) {
+            if (ex.message =~ "A device with the same device network ID exists.*") {
+                sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Light [${name}]"""
+            } else {
+                sectionText += """\nFailed to add light [${name}]; see logs for details"""
+                if (logEnable) log.error "${ex}"
+            }
+        }
+    }
+    
+    if (lights.size() == 0)
+        app.removeSetting("selectedLights")
+    
+    if (!sectionText) {
+        title = "Adding ${subject} to Hubitat"
+        sectionText = """Added ${subject}"""
+    } else {
+        title = "Failed to add ${subject}"
+    }
+    
+	return dynamicPage(name:"addLights", title:title, nextPage:"mainPage") {
+		section() {
+            paragraph sectionText
+		}
+	}
+
 }
 
 def findGroups(params){
@@ -668,6 +758,7 @@ def setDeviceState(child, deviceState) {
     def hubId = deviceIdHub(deviceNetworkId)
     def type
     def node
+    def action="action"
 
     if ( deviceNetworkId =~ "hue\\-[0-9A-F]{12}" ) {
         type = "groups"
@@ -678,9 +769,15 @@ def setDeviceState(child, deviceState) {
     } else {
         type = deviceIdType(deviceNetworkId)
         node = deviceIdNode(deviceNetworkId)
+        if (type == "lights")
+            action = "state"
     }
 
-    def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/action"
+    // Disabling scheduled refreshes for hub.
+    def hub = getChildDeviceForMac(selectedDevice)
+    hub.resetRefreshSchedule()
+
+    def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/${action}"
     if (logEnable) log.debug "URL: ${url}"
     if (logEnable) log.debug "args: ${deviceState}"
     httpPut([uri: url,
@@ -694,9 +791,8 @@ def setDeviceState(child, deviceState) {
         if (data) {
             //    if (logEnable) log.info data
             data.each { 
-                log.error "${it}"
                 if (it.error?.description) {
-                    if (logEnable) log.error "${it.error.description[0]}"
+                    if (logEnable) log.error "set state: ${it.error.description[0]}"
                     
                 }
                 if (it.success) {
@@ -713,7 +809,9 @@ def setDeviceState(child, deviceState) {
                                 return;
                         }
                         def device = type == "groups" && node == "0" ? child : getChildDevice(nid)
-                        device.setHueProperty(result[4],value)
+                        setHueProperty(device, result[4],value)
+                        hub.runIn(1, "autoRefresh", [overwrite: true, misfire:"ignore"])
+
                     }
                 }
             }
@@ -756,9 +854,9 @@ def getDeviceState(child) {
             }
             if (node) {
                 if (logEnable) log.info "Parsing response: $data for $node" // temporary
-                child.resetRefreshSchedule()
-                data.state.each { key, value -> child.setHueProperty(key,value) }
-                data.action.each { key, value -> child.setHueProperty(key, value) }
+                if (type == "groups") child.resetRefreshSchedule()
+                data.state.each { key, value -> setHueProperty(child, key,value) }
+                data.action.each { key, value -> setHueProperty(child, key, value) }
             } else {
                 if (logEnable) log.info it  // temporary to catch unknown result state
             }
@@ -778,21 +876,40 @@ def getDeviceState(child) {
 private networkIdForGroup(id) {
     "hueGroup:${app.getId()}/${id}"
 }
+
 private networkIdForLight(id) {
-    "${app.getId()}/${id}"
+    def type=bulbTypeForLight(id)
+    "hueBulb${type}:${app.getId()}/${id}"
 }
 private networkIdForScene(groupId,sceneId) {
     "hueScene:${app.getId()}/${groupId}/${sceneId}"
 }
 
+private bulbTypeForLight(id) {
 
+    def type=state.lights[id]?.type
+    switch (type) {
+        case "Dimmable light":
+            return "Dimmer"
+        case "Extended color light":
+            return "RGBW"
+        case "Color temperature light":
+            return "CT"
+        default:
+            return "RGB"
+    }
+}
+
+private getInstalledLights() {
+    getChildDevices().findAll { it.deviceNetworkId =~ /hueBulb\w*:.*/ }
+}
 
 private getInstalledGroups() {
-    getChildDevices().findAll { it.deviceNetworkId =~ 'hueGroup:.*' }
+    getChildDevices().findAll { it.deviceNetworkId =~ /hueGroup:.*/ }
 }
 
 private getInstalledScenes() {
-    getChildDevices().findAll { it.deviceNetworkId =~ 'hueScene:.*' }
+    getChildDevices().findAll { it.deviceNetworkId =~ /hueScene:.*/ }
 }
 
 
@@ -800,8 +917,7 @@ private String deviceIdType(deviceNetworkId) {
     switch (deviceNetworkId) {
         case ~/hueGroup:.*/:    "groups"; break
         case ~/hueScene:.*/:    "scenes"; break
-        case ~/hueBulb:.*/:
-        case ~/hueBulbRGBW:.*/: "lights"; break
+        case ~/hueBulb\w*:.*/:  "lights"; break
     }
 }
 
@@ -905,16 +1021,23 @@ def parseGroups(json) {
         if (group) {
             if (logEnable) log.info "Parsing response: $data for $id" // temporary
             group.resetRefreshSchedule()
-            data.state.each  { key, value -> group.setHueProperty(key,value) }
-            data.action.each { key, value -> group.setHueProperty(key, value) }
+            data.state.each  { key, value -> setHueProperty(group, key,value) }
+            data.action.each { key, value -> setHueProperty(group, key, value) }
         }
     }
 }
 
-def parseLights(data) {
-    data.each { id, value -> 
-        //if (logEnable) log.debug "${id}"
-        
+def parseLights(json) {
+    def hub=getChildDeviceForMac(selectedDevice)
+    json.each { id, data -> 
+        // Add code to update all installed lights state
+        def light = getChildDevice(networkIdForLight(id))
+        if (light) {
+            if (logEnable) log.info "Parsing response: $data for $id" // temporary
+            light.unschedule()
+            data.state.each  { key, value -> setHueProperty(light, key,value) }
+            data.action.each { key, value -> setHueProperty(light, key, value) }
+        }
     }
 }
 
@@ -941,6 +1064,97 @@ def findScene(groupId, sceneId) {
     }
 }
 
+private sendChildEvent(child, name, value) {
+    child.sendEvent(name: name, value: value)
+}
 
+def setHueProperty(child, name, value) {
+    
+    // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
+    switch (name) {
+        case "on":
+        sendChildEvent(child, "switch", value == true ? "on" : "off")
+        break;
+        case "bri":
+        sendChildEvent(child, "level", Math.round(value / 2.54))
+        break;
+        case "hue":
+        sendChildEvent(child, "hue", Math.round(value / 655.35))
+        break;
+        case "sat":
+        sendChildEvent(child, "saturation", Math.round(value / 2.54))
+        break;
+        case "ct":
+        sendChildEvent(child, "colortemperature", Math.round(((500 - value) * (4500 / 347)) + 2000 ))
+        break;
+        case "colormode":
+        if (value == "hs") {
+            sendChildEvent(child, "colorMode", "RGB")
+        }
+        if (value == "ct") {
+            sendChildEvent(child, "colorMode", "CT")
+        }
+        if (value == "xy") {
+            sendChildEvent(child, "colorMode", "RGB")
+        }
+        default:
+        child.setHueProperty(name, value)
+    }
+}
 
+// Component Dimmer delegates
+
+void componentOn(child) {
+    def node = deviceIdNode(child.deviceNetworkId)
+    setDeviceState(child, ["on": true])
+}
+
+void componentOff(child) {
+    setDeviceState(child, ["on": false])
+}
+
+void componentRefresh(child){
+    getDeviceState(child)
+}
+
+void componentSetLevel(child, level, duration=null){
+    def args = ["bri":Math.round(level * 2.54)]
+    if (duration != null) {
+        args["transitiontime"] = duration * 10
+    }
+    setDeviceState(child, args)
+}
+
+def componentSetColor(child, colormap) {
+    //colormap required (COLOR_MAP) - Color map settings [hue*:(0 to 100), saturation*:(0 to 100), level:(0 to 100)]
+    def hue = Math.round((colormap.hue?:device.currentValue('hue')?:0) * 655.35)
+    def saturation = Math.round((colormap.saturation?:device.currentValue('saturation')?:50) * 2.54)
+    def level = Math.round((colormap.level?:device.currentValue('level')?:100 ) * 2.54)
+    
+    def args = ["hue":hue, 
+                "sat":saturation,
+                "bri":level]
+    setDeviceState(child, args)
+    
+}
+def componentSetHue(child, hue) {
+    //hue required (NUMBER) - Color Hue (0 to 100)
+    
+    def args = ["hue":Math.round(hue * 655.35)]
+    setDeviceState(child, args)
+}
+
+def componentSetSaturation(child, saturation) {
+    //saturation required (NUMBER) - Color Saturation (0 to 100)
+    def args = ["sat":Math.round(saturation * 2.54)]
+    setDeviceState(child, args)
+}
+
+def componentSetColorTemperature(child, colortemperature) {
+    //colortemperature required (NUMBER) - Color temperature in degrees Kelvin
+    //are capable of 153 (6500K) to 500 (2000K).
+    
+    def ct = Math.round(500 - ((colortemperature - 2000) / (4500 / 347)))
+    setDeviceState(child, ["ct":ct, "colormode":"ct"])
+}
 

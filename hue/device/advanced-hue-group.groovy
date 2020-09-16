@@ -138,23 +138,7 @@ def parse(String description) {
 }
 
 def setHueProperty(name, value) {
-    // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
     switch (name) {
-        case "on":
-        sendEvent(name: "switch", value: value == true ? "on" : "off")
-        break;
-        case "bri":
-        sendEvent(name: "level", value: Math.round(value / 2.54))
-        break;
-        case "hue":
-        sendEvent(name: "hue", value: Math.round(value / 655.35))
-        break;
-        case "sat":
-        sendEvent(name: "saturation", value: Math.round(value / 2.54))
-        break;
-        case "ct":
-        sendEvent(name: "colortemperature", value: Math.round(((500 - value) * (4500 / 347)) + 2000 ))
-        break;
         case "scene":
         def nid = networkIdForScene(value)
         setSwitchState("on", getChildDevice(nid))
@@ -166,16 +150,6 @@ def setHueProperty(name, value) {
         case "all_on":
         if (!anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
         break;
-        case "colormode":
-        if (value == "hs") {
-            sendEvent(name: "colorMode", value: "RGB")
-        }
-        if (value == "ct") {
-            sendEvent(name: "colorMode", value: "CT")
-        }
-        if (value == "xy") {
-            sendEvent(name: "colorMode", value: "RGB")
-        }
     }
 }
 
@@ -203,7 +177,7 @@ def activateScene(scene) {
  * Component Child Methods
  */
 
- void componentOn(child) {
+void componentOn(child) {
     def node = deviceIdNode(child.deviceNetworkId)
     setDeviceState(["scene":node])
 }
@@ -218,9 +192,9 @@ void componentRefresh(child){
 
 def setSwitchState(value, child) {
     if (value == "on") {
-        child.runInMillis(200, autoOff, [data: child])
+        child.runInMillis(400, off)
     } else {
-        child.unschedule(autoOff)
+        unschedule(child.off)
     }
     child.sendEvent(name: "switch", value: value)
 }
