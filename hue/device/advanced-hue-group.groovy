@@ -41,6 +41,7 @@ metadata {
                 importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy") {
         
         capability "Light"
+        capability "ChangeLevel"
         capability "Switch"
         capability "SwitchLevel"
         capability "Actuator"
@@ -65,61 +66,46 @@ def updated() {
 /** Switch Commands **/
 
 def on() {
-    setDeviceState(["on":true])
+    parent.componentOn(this)
 }
 
 def off() {
-    setDeviceState(["on": false])
+    parent.componentOff(this)
 }
 
 /** ColorControl Commands **/
 
 def setColor(colormap) {
-    //colormap required (COLOR_MAP) - Color map settings [hue*:(0 to 100), saturation*:(0 to 100), level:(0 to 100)]
-    def hue = Math.round((colormap.hue?:device.currentValue('hue')?:0) * 655.35)
-    def saturation = Math.round((colormap.saturation?:device.currentValue('saturation')?:50) * 2.54)
-    def level = Math.round((colormap.level?:device.currentValue('level')?:100 ) * 2.54)
-    
-    def args = ["hue":hue, 
-                "sat":saturation,
-                "bri":level]
-    setDeviceState(args)
-    
+    parent.componentSetColor(this, colormap)
 }
 def setHue(hue) {
-    //hue required (NUMBER) - Color Hue (0 to 100)
-    
-    def args = ["hue":Math.round(hue * 655.35)]
-    setDeviceState(args)
+    parent.componentSetHue(this, hue)
 }
 
 def setSaturation(saturation) {
-    //saturation required (NUMBER) - Color Saturation (0 to 100)
-    def args = ["sat":Math.round(saturation * 2.54)]
-    setDeviceState(args)
+    parent.componentSetSaturation(this, saturation)
 }
 
 /** ColorTemperature Commands **/
 
 def setColorTemperature(colortemperature) {
-    //colortemperature required (NUMBER) - Color temperature in degrees Kelvin
-    //are capable of 153 (6500K) to 500 (2000K).
-    
-    def ct = Math.round(500 - ((colortemperature - 2000) / (4500 / 347)))
-    setDeviceState(["ct":ct, "colormode":"ct"])
+    parent.componentSetColorTemperature(this, colortemperature)
 }
 
 /** SwitchLevel Commands **/
 
 def setLevel(level, duration=null) {
-    //level required (NUMBER) - Level to set (0 to 100) (Hue expects 0-254)
-    //duration optional (NUMBER) - Transition duration in seconds
-    
-    def args = ["bri":Math.round(level * 2.54)]
-    if (duration != null) {
-        args["transitiontime"] = duration * 10
-    }
-    setDeviceState(args)
+    parent.componentSetLevel(this, level, duration)
+}
+
+/** ChangeLevel Commands **/
+
+def startLevelChange(direction) {
+    parent.componentStartLevelChange(this, direction)
+}
+
+def stopLevelChange() {
+    parent.componentStopLevelChange(this)
 }
 
 /** Refresh Commands **/
@@ -140,9 +126,10 @@ def parse(String description) {
 def setHueProperty(name, value) {
     switch (name) {
         case "scene":
-        def nid = networkIdForScene(value)
-        setSwitchState("on", getChildDevice(nid))
-        refresh()
+        def child = getChildDevice(networkIdForScene(value))
+        child.sendEvent(name: "switch", value: "on")
+        child.unschedule()
+        child.runInMillis(400, "off")
         break;
         case "any_on":
         if (anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
@@ -157,10 +144,6 @@ def deviceIdNode(deviceNodeId) {
      parent.deviceIdNode(deviceNodeId)
 }
 
-def setDeviceState(args) {
-    parent.setDeviceState(this, args)
-}
-
 def networkIdForScene(sceneId) {
     parent.networkIdForScene(deviceIdNode(device.deviceNetworkId), sceneId)
 }
@@ -169,7 +152,7 @@ def activateScene(scene) {
     def sceneId = parent.findScene(deviceIdNode(device.deviceNetworkId), scene)?.key
     if (sceneId) {
         if (logEnable) log.info "Activate Scene: ${sceneId}"
-        setDeviceState(["scene": sceneId])
+        parent.setDeviceState(this, ["scene": sceneId])
     }
 }
 
@@ -178,27 +161,15 @@ def activateScene(scene) {
  */
 
 void componentOn(child) {
-    def node = deviceIdNode(child.deviceNetworkId)
-    setDeviceState(["scene":node])
+    def sceniId = deviceIdNode(child.deviceNetworkId)
+    parent.setDeviceState(this, ["scene":sceniId])
 }
 
 void componentOff(child) {
-    setSwitchState("off", child)
+    // Only change the state to off, there is not action to actually be performed.
+    child.sendEvent(name: "switch", value: "off")
 }
 
 void componentRefresh(child){
     if (logEnable) log.info "received refresh request from ${child.displayName} - ignored"
-}
-
-def setSwitchState(value, child) {
-    if (value == "on") {
-        child.runInMillis(400, off)
-    } else {
-        unschedule(child.off)
-    }
-    child.sendEvent(name: "switch", value: value)
-}
-
-def autoOff(child) {
-    child.sendEvent(name: "switch", value: "off")
 }

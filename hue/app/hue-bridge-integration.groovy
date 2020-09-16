@@ -1087,7 +1087,7 @@ def setHueProperty(child, name, value) {
         case "ct":
             sendChildEvent(child, "colortemperature", Math.round(((500 - value) * (4500 / 347)) + 2000 ))
             break;
-        case "a(ny|ll)_on":
+        case ~/(a(ny|ll)_on)|scene/:
             child.setHueProperty(name, value)
             break;
         case "colormode":
@@ -1107,7 +1107,6 @@ def setHueProperty(child, name, value) {
 // Component Dimmer delegates
 
 void componentOn(child) {
-    def node = deviceIdNode(child.deviceNetworkId)
     setDeviceState(child, ["on": true])
 }
 
@@ -1125,6 +1124,24 @@ void componentSetLevel(child, level, duration=null){
         args["transitiontime"] = duration * 10
     }
     setDeviceState(child, args)
+}
+
+void componentStartLevelChange(child, direction) {
+    def level = 0
+    switch (direction) {
+        case "up":
+        level = 254
+        break
+        case "down":
+        level = -254
+        break
+    }
+    setDeviceState(child, ["bri_inc": level, "transitiontime": transitionTime() * 10])
+
+}
+
+void componentStopLevelChange(child) {
+    setDeviceState(child, ["bri_inc": 0])
 }
 
 def componentSetColor(child, colormap) {
