@@ -54,6 +54,12 @@ def installed() {
 }
 
 def updated() {
+
+    if (settings.autoRefresh     == null) device.updateSetting("autoRefresh", false)
+    if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 60)
+    if (settings.anyOn           == null) device.updateSetting("anyOn", true)
+    if (settings.logEnable       == null) device.updateSetting("logEnable", false)
+
     if (logEnable) log.debug "Preferences updated"
 	refresh()
 }
