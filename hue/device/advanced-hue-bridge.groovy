@@ -71,11 +71,11 @@ def updated() {
 /** Switch Commands **/
 
 def on() {
-    setDeviceState(["on":true])
+    parent.setDeviceState(this, ["on":true])
 }
 
 def off() {
-    setDeviceState(["on": false])
+    parent.setDeviceState(this, ["on": false])
 }
 
 
@@ -106,10 +106,6 @@ def setHueProperty(name, value) {
 
 def deviceIdNode(deviceNodeId) {
      parent.deviceIdNode(deviceNodeId)
-}
-
-def setDeviceState(args) {
-    parent.setDeviceState(this, args)
 }
 
 def networkIdForScene(sceneId) {
