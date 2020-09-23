@@ -23,8 +23,8 @@
       "name": "AdvancedHueGroup",
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy",
-      "required": false,
-      "version": "1.2.1"
+      "required": true,
+      "version": "1.2.2"
     },
     {
       "id": "1d0f66d0-afed-4fe6-a2c8-39619f5b8eaa",
