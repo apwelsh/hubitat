@@ -24,6 +24,9 @@
  * IN THE SOFTWARE.
  *-------------------------------------------------------------------------------------------------------------------
  **/
+
+import java.net.URLEncoder
+
 preferences {
     def allKeys=[
         "Home",      "Back",       "FindRemote",  "Select",
@@ -112,6 +115,13 @@ metadata {
                 "ChannelUp", "ChannelDown", "InputTuner", "InputAV1",      "InputHDMI1", "InputHDMI2", "InputHDMI3", "InputHDMI4"] ] ]
         
         command "reloadApps"
+
+        command "search", [[name: "Keywords*",        type: "STRING", description: "Search keywords (REQUIRED)"],
+                           [name: "Type*",            type: "ENUM",   constraints: ["movie", "tv-show", "person", "channel", "game"]],
+                           [name: "Provider ID*",     type: "NUMBER", description: "Limit to Channel"],
+                           [name: "Show Unavailable", type: "ENUM",   constraints: ["false", "true"]],
+                           [name: "TMS ID",           type: "STRING"]
+                          ]
         
         attribute "application", "string"
 //        attribute "current_app_icon_html", "string"
@@ -353,11 +363,38 @@ def reloadApps() {
     queryInstalledApps()
 }
 
+def search(String keywords, String type, Number providerId, String showUnavailable=false, String tmsId=null) {
+
+    def args = ["provider-id": providerId, 
+                "type":        type, 
+                "keyword":     keywords, 
+                "launch":      "true", 
+                "match-any":   "true"]
+
+    if (tmsId && tmsId != false) args["tms_id"] = tmsId
+    if (showUnavailable != null) args["show-unavailable"] = (showUnavailble == "true") ? "true" : "false"
+    
+    queryContent(args)
+}
 
 /**
  * Roku API Section
  * The following functions are used to communicate with the Roku RESTful API
  **/
+
+def queryContent(args) {
+    try {
+        httpPost([uri:"http://${deviceIp}:8060/search/browse",
+                  query: args, 
+                  timeout: timeout]) { response -> 
+            if (!response.isSuccess())
+            return
+        }
+    } catch (ex) {
+        logExceptionWithPowerWarning(ex)
+
+    }
+}
 
 def sendWakeUp() {
     if (state."wake-on-lan" == true) {

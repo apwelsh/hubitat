@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.3.2"
+      "version": "2.4.0"
     }
   ],
   "version": "1.2.8",
-  "releaseNotes": "Fixed Roku Connect bug that prevents removing last channel from TV"
+  "releaseNotes": "Added ability to search for content on roku."
 }
