@@ -164,7 +164,7 @@ def activateScene(scene) {
 }
 
 /*
- * Component Child Methods
+ * Component Child Methods (used to capture actions generated on scenes)
  */
 
 void componentOn(child) {
