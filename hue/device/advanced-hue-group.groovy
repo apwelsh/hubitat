@@ -201,7 +201,7 @@ void componentOn(child) {
 
 void componentOff(child) {
     // Only change the state to off, there is not action to actually be performed.
-    if (sceneMode == "switch" && sceneOff) {
+    if (sceneMode == "switch") {
         if (child.currentValue("switch") == "on") off()
     } else {
         child.sendEvent(name: "switch", value: "off")
