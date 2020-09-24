@@ -1115,8 +1115,8 @@ void componentSetLevel(child, level, duration=null){
 
 void componentStartLevelChange(child, direction) {
     def level = 0
-    if (direction = "up")   level =  254
-    if (direction = "down") level = -254
+    if (direction == "up")        level =  254
+    else if (direction == "down") level = -254
 
     setDeviceState(child, ["bri_inc": level, "transitiontime": transitionTime() * 10])
 
