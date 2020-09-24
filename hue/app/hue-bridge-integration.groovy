@@ -993,8 +993,6 @@ def getHubs() {
 }
 
 
-
-
 /*
  *
  * Device Parsers
@@ -1042,10 +1040,9 @@ def parseLights(json) {
 }
 
 def parseScenes(data) {
-    data.each { id, value -> 
-        //if (logEnable) log.debug "${id}"
-        
-    }
+    //data.each { id, value -> 
+    //    if (logEnable) log.debug "${id}"
+    //}
 }
 
 def findGroup(groupId) {
@@ -1076,31 +1073,22 @@ def setHueProperty(child, name, value) {
             sendChildEvent(child, "switch", value == true ? "on" : "off")
             break;
         case "bri":
-            sendChildEvent(child, "level", Math.round(value / 2.54))
+            sendChildEvent(child, "level", convertHBLevel(value))
             break;
         case "hue":
-            sendChildEvent(child, "hue", Math.round(value / 655.35))
+            sendChildEvent(child, "hue", convertHBHue(value))
             break;
         case "sat":
-            sendChildEvent(child, "saturation", Math.round(value / 2.54))
+            sendChildEvent(child, "saturation", convertHBSaturation(value))
             break;
         case "ct":
-            sendChildEvent(child, "colortemperature", Math.round(((500 - value) * (4500 / 347)) + 2000 ))
+            sendChildEvent(child, "colortemperature", convertHBColortemp(value))
             break;
         case ~/(a(ny|ll)_on)|scene/:
             child.setHueProperty(name, value)
             break;
         case "colormode":
-            if (value == "hs") {
-                sendChildEvent(child, "colorMode", "RGB")
-            }
-            if (value == "ct") {
-                sendChildEvent(child, "colorMode", "CT")
-            }
-            if (value == "xy") {
-                sendChildEvent(child, "colorMode", "RGB")
-            }
-            break;
+            sendChildEvent(child, "colorMode", convertHBColorMode(value))
     }
 }
 
@@ -1119,23 +1107,17 @@ void componentRefresh(child){
 }
 
 void componentSetLevel(child, level, duration=null){
-    def args = ["bri":Math.round(level * 2.54)]
-    if (duration != null) {
-        args["transitiontime"] = duration * 10
-    }
+    def args = ["bri": convertHELevel(level)]
+    if (duration != null) args["transitiontime"] = duration * 10
+    
     setDeviceState(child, args)
 }
 
 void componentStartLevelChange(child, direction) {
     def level = 0
-    switch (direction) {
-        case "up":
-        level = 254
-        break
-        case "down":
-        level = -254
-        break
-    }
+    if (direction = "up")   level =  254
+    if (direction = "down") level = -254
+
     setDeviceState(child, ["bri_inc": level, "transitiontime": transitionTime() * 10])
 
 }
@@ -1145,38 +1127,76 @@ void componentStopLevelChange(child) {
 }
 
 def componentSetColor(child, colormap) {
-    //colormap required (COLOR_MAP) - Color map settings [hue*:(0 to 100), saturation*:(0 to 100), level:(0 to 100)]
-    def hue = Math.round((colormap.hue?:device.currentValue('hue')?:0) * 655.35)
-    def saturation = Math.round((colormap.saturation?:device.currentValue('saturation')?:50) * 2.54)
-    def level = Math.round((colormap.level?:device.currentValue('level')?:100 ) * 2.54)
-    
-    def args = ["hue":hue, 
-                "sat":saturation,
-                "bri":level]
+    if (colormap.hue == null)        device.currentValue('hue')?:0
+    if (colormap.saturation == null) device.currentValue('saturation')?:50
+    if (colormap.level == null)      device.currentValue('level')?:100
+
+    def args = ["hue":convertHEHue(colormap.hue), 
+                "sat":convertHESaturation(colormap.saturation),
+                "bri":convertHELevel(colormap.level)]
+
     setDeviceState(child, args)
     
 }
+
 def componentSetHue(child, hue) {
-    //hue required (NUMBER) - Color Hue (0 to 100)
-    
-    def args = ["hue":Math.round(hue * 655.35)]
-    setDeviceState(child, args)
+    setDeviceState(child, ["hue":convertHEHue(hue)])
 }
 
 def componentSetSaturation(child, saturation) {
-    //saturation required (NUMBER) - Color Saturation (0 to 100)
-    def args = ["sat":Math.round(saturation * 2.54)]
-    setDeviceState(child, args)
+    setDeviceState(child, ["sat":convertHESaturation(saturation)])
 }
 
 def componentSetColorTemperature(child, colortemperature) {
-    //colortemperature required (NUMBER) - Color temperature in degrees Kelvin
-    //are capable of 153 (6500K) to 500 (2000K).
-    
-    def ct = Math.round(500 - ((colortemperature - 2000) / (4500 / 347)))
-    setDeviceState(child, ["ct":ct, "colormode":"ct"])
+    setDeviceState(child, ["ct":convertHEColortemp(colortemperature), "colormode":"ct"])
 }
 
 def transitionTime() {
     2
+}
+
+//
+// Utility Functions
+//
+
+private valueBetween(value, min, max) {
+    return Math.min(Math.max(value, min), max)
+}
+
+def convertHBLevel(value) {
+    Math.round(value / 2.54)
+}
+
+def convertHELevel(value) {
+    valueBetween(Math.round(value * 2.54),      1, 254)
+}
+
+def convertHBHue(value) {
+    Math.round(value / 655.35)
+}
+
+def convertHEHue(value) {
+    valueBetween(Math.round(value * 655.35),      0, 65535)
+}
+
+def convertHBSaturation(value) {
+    Math.round(value / 2.54)
+}
+
+def convertHESaturation(value) {
+    valueBetween(Math.round(value * 2.54), 0, 254)
+}
+
+def convertHBColortemp(value) {
+    Math.round(((500 - value) * (4500 / 347)) + 2000 )
+}
+
+def convertHEColortemp(value) {
+    valueBetween(Math.round(500 - ((value - 2000) / (4500 / 347))), 153, 500)
+}
+
+def convertHBColorMode(value) {
+    if (value == "hs") return "RGB" 
+    if (value == "ct") return "CT"
+    if (value == "xy") return "RGB"
 }

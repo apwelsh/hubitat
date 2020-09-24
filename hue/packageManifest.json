@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.1.1"
+      "version": "1.1.2"
     }
   ],
   "drivers": [
@@ -35,6 +35,6 @@
       "version": "1.1.3"
     }
   ],
-  "releaseNotes": "Initial implementation of my Advance Hue Integration for Hubitat.  Why is it 'Advanced'?  Because you can create momentary switches for any/all scenes defined and managed by Hue.  This driver supports startLevelChange and stopLevelChange for lights, and rooms."
+  "releaseNotes": "Fixed a parsing bug in setColor methods that was incorrectly handling values of 0 (zero) in the colormap.  You can now set Pure RED as a color"
 
 }
