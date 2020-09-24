@@ -26,6 +26,9 @@
  **/
 
 preferences {
+    input name: "sceneMode", type: "enum", defaultValue: "trigger", title: "Scene Child Device Behavior", options:["trigger", "switch"], description: "If set to switch, the scene can be used to turn off this group. Only one scene can be on at any one time."
+    if (sceneMode == "switch")
+        input name: "sceneOff", type: "bool", defaultValue: false, title: "Track Scene State", description: "If enabled, any change to this group will turn off all child scenes." 
     input name: "autoRefresh", type: "bool", defaultValue: false, title: "Auto Refresh",        description: "Should this device support automatic refresh" 
     if (autoRefresh)
         input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
@@ -74,45 +77,55 @@ def updated() {
 
 def on() {
     parent.componentOn(this)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 def off() {
     parent.componentOff(this)
+    if (sceneMode == "switch") allOff()
 }
 
 /** ColorControl Commands **/
 
 def setColor(colormap) {
     parent.componentSetColor(this, colormap)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
+
 def setHue(hue) {
     parent.componentSetHue(this, hue)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 def setSaturation(saturation) {
     parent.componentSetSaturation(this, saturation)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 /** ColorTemperature Commands **/
 
 def setColorTemperature(colortemperature) {
     parent.componentSetColorTemperature(this, colortemperature)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 /** SwitchLevel Commands **/
 
 def setLevel(level, duration=null) {
     parent.componentSetLevel(this, level, duration)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 /** ChangeLevel Commands **/
 
 def startLevelChange(direction) {
     parent.componentStartLevelChange(this, direction)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 def stopLevelChange() {
     parent.componentStopLevelChange(this)
+    if (sceneMode == "switch" && sceneOff) allOff()
 }
 
 /** Refresh Commands **/
@@ -134,9 +147,9 @@ def setHueProperty(name, value) {
     switch (name) {
         case "scene":
         def child = getChildDevice(networkIdForScene(value))
-        child.sendEvent(name: "switch", value: "on")
+        exclusiveOn(child)
         child.unschedule()
-        child.runInMillis(400, "off")
+        if (sceneMode == "trigger") child.runInMillis(400, "off")
         break;
         case "any_on":
         if (anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
@@ -163,6 +176,20 @@ def activateScene(scene) {
     }
 }
 
+def allOff() {
+    getChildDevices().findAll { it.currentValue("switch") == "on" }
+                     .each { it.sendEvent(name: "switch", value: "off") }
+}
+
+def exclusiveOn(child) {
+    def dni = child.deviceNetworkId
+    log.debug "Attempting to turn on device id: ${dni}"
+    childDevices.each { 
+        def value = (it.deviceNetworkId == dni) ? "on" : "off"
+        log.debug "device ${it} should be ${value}"
+        if (it.currentValue("switch") != value) it.sendEvent(name: "switch", value: value) }
+}
+
 /*
  * Component Child Methods (used to capture actions generated on scenes)
  */
@@ -174,7 +201,11 @@ void componentOn(child) {
 
 void componentOff(child) {
     // Only change the state to off, there is not action to actually be performed.
-    child.sendEvent(name: "switch", value: "off")
+    if (sceneMode == "switch" && sceneOff) {
+        if (child.currentValue("switch") == "on") off()
+    } else {
+        child.sendEvent(name: "switch", value: "off")
+    }
 }
 
 void componentRefresh(child){
