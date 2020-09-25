@@ -1,9 +1,11 @@
 /**
- * Advanced Philips Hue Bridge Integration application
+ * AdvancedHueGroup
  * Download: https://github.com/apwelsh/hubitat
  * Description:
- * This is a parent application for locating your Philips Hue Bridges, and installing
- * the Advanced Hue Bridge Controller application
+ * This is a child device for the Advanced Hue Bridge Integeration app.  This device is used to manage hue zones and rooms
+ * as color lights.  The key difference between this and the built-in hueGroup device is that this device supports the
+ * refresh capability -- if enabled -- to allow for fast device refresh, and to act as the parent device for the
+ * AdvancedHueScene device.
  *-------------------------------------------------------------------------------------------------------------------
  * Copyright 2020 Armand Peter Welsh
  * 
@@ -22,1181 +24,194 @@
  * IN THE SOFTWARE.
  *-------------------------------------------------------------------------------------------------------------------
  **/
-definition(
-    name:"Advanced Hue Bridge Integration",
-    namespace: "apwelsh",
-    author: "Armand Welsh",
-    description: "Find and install your Philips Hue Bridge systems",
-    category: "Convenience",
-    //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
-    iconUrl: "",
-    iconX2Url: "",
-    iconX3Url: ""
-)
-    
+
 preferences {
-	page(name: "mainPage")
-    page(name: "bridgeDiscovery", title: "Device Discovery", content: "bridgeDiscovery", refreshTimeout:10)
-    page(name: "addDevice", title: "Add Hue Bridge", content: "addDevice")
-	page(name: "bridgeBtnPush", title:"Linking with your Hue", content:"bridgeLinking", refreshTimeout:5)
-    page(name: "configurePDevice")
-    page(name: "findLights", title: "Light Discovery Started!", content: "findLights", refreshTimeout:10)
-    page(name: "addLights", title: "Add Light")
-    page(name: "findGroups", title: "Group Discovery Started!", content: "findGroups", refreshTimeout:10)
-    page(name: "addGroups", title: "Add Group")
-    page(name: "findScenes", title: "Scene Discovery Started!", content: "findScenes", refreshTimeout:10)
-    page(name: "addScenes", title: "Add Scene")
+
+
+    input name: "defaultScene", type: "string", defaultValue: "", title: "Default Scene", options:scenes, description: "Enter a scene name or number as define by the Hue Bridge to activate when this group is turned on."
+    input name: "sceneMode", type: "enum", defaultValue: "trigger", title: "Scene Child Device Behavior", options:["trigger", "switch"], description: "If set to switch, the scene can be used to turn off this group. Only one scene can be on at any one time."
+    if (sceneMode == "switch")
+        input name: "sceneOff", type: "bool", defaultValue: false, title: "Track Scene State", description: "If enabled, any change to this group will turn off all child scenes." 
+    input name: "autoRefresh", type: "bool", defaultValue: false, title: "Auto Refresh",        description: "Should this device support automatic refresh" 
+    if (autoRefresh)
+        input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
+    input name: "anyOn",       type: "bool", defaultValue: true,  title: "ANY on or ALL on",    description: "When ebabled, the group is considered on when any light is on"
+    input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
 
 }
 
-def mainPage(params=[:]) {
-    
-    if (!state) {
-        return dynamicPage(name: "mainPage", title: "Advanced Hue Bridge Integration", nextPage: null, uninstall: true, install: true) {
-            section {
-                paragraph "Hit Done to to install the Hue Bridge Integration.\nRe-open to setup."
-            }
-        }
-    } 
-    if (!state.bridgeHost) {
-        return bridgeDiscovery()
-    }
-
-    def hub = getHubs().find { it.value.mac == selectedDevice }?.value
-    if (params[nextPage]=="bridgeBtnPush") {
-        return bridgeLinking()
-    }
-    
-    def title
-    if (selectedDevice) {
-        discoveredHubs()[selectedDevice]
-        title=discoveredHubs()[selectedDevice]
-    } else {
-        title="Find Bridges"
-    }
-
-    def uninstall = (state.bridgehost) ? false : true
-    
-    return dynamicPage(name: "mainPage", title: "Manage your linked Hue Bridge", nextPage: null, uninstall: uninstall, install: true) {
-        if (selectedDevice == null) {
-            section("Setup"){
-                paragraph """ To begin, select Find Bridges to start searching for your Hue Bride."""
-                href "bridgeDiscovery", title:"Find Bridges", description:""//, params: [pbutton: i]
-            }
-        } else {
-            section("Configure"){
-                
-                href "findLights", title:"Find Lights", description:""
-                href "findGroups", title:"Find Groups", description:""
-                href "findScenes", title:"Find Scenes", description:""
-                href "bridgeDiscovery", title:title, description:"", state:selectedDevice? "complete" : null //, params: [nextPage: "bridgeBtnPush"]
-
-            // getChildDevices().sort({ a, b -> a["deviceNetworkId"] <=> b["deviceNetworkId"] }).each {
-                    //if(it.typeName == "Advanced Hue Bridge"){
-                    //    href "configurePDevice", title:"$it.label", description:"", params: [did: it.deviceNetworkId]
-                    //}
-
-                //}
-            }
-            section("Options") {
-                input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
-            }
-        }
-    }
-}
-
-def bridgeDiscovery(params=[:]) {
-	if (logEnable) log.debug "Searching for Hub additions and updates"
-	def hubs = discoveredHubs()
-    
-	int deviceRefreshCount = !state.deviceRefreshCount ? 0 : state.deviceRefreshCount as int
-	state.deviceRefreshCount = deviceRefreshCount + 1
-	def refreshInterval = 10
-    
-	def options = hubs ?: []
-	def numFound = options.size() ?: 0
-
-	if ((numFound == 0 && state.deviceRefreshCount > 30) || params.reset == "true") {
-    //	if (logEnable) log.trace "Cleaning old device memory"
-    	//clearDiscoveredHubs()
-        state.deviceRefreshCount = 0
-    	ssdpSubscribe()
-    }
-
-
-	//bridge discovery request every 5th refresh, retry discovery
-	if((deviceRefreshCount % 3) == 0) {
-		ssdpDiscover()
-	}
-
-    def uninstall = state.bridgehost ? false : true
-    def nextPage = selectedDevice ? "bridgeBtnPush" : null
-    
-	return dynamicPage(name:"bridgeDiscovery", title:"Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
-		section("Please wait while we discover your Hue Bridge. Note that you must first configure your Hue Bridge and Lights using the Philips Hue application. Discovery can take five minutes or more, so sit back and relax, the page will reload automatically! Select your Hue Bridge below once discovered.") {
-			input "selectedDevice", "enum", required:false, title:"Select Hue Bridge (${numFound} found)", multiple:false, options:options, submitOnChange: true
-		}
-	}
-}
-
-def bridgeLinking() {
-    ssdpUnsubscribe()
-    
-	int linkRefreshcount = !state.linkRefreshcount ? 0 : state.linkRefreshcount as int
-	state.linkRefreshcount = linkRefreshcount + 1
-	def refreshInterval = 3
-
-	def nextPage = ""
-	def title = "Linking with your Hue"
-    def paragraphText
-    
-	if (selectedDevice) {
-		paragraphText = "Press the button on your Hue Bridge to setup a link. "
+metadata {
+    definition (name:      "AdvancedHueGroup", 
+                namespace: "apwelsh", 
+                author:    "Armand Welsh", 
+                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy") {
         
-        def hub = getHubForMac(selectedDevice)
-        if (hub?.username) { //if discovery worked
-            if (logEnable) log.debug "Hub linking completed for ${hub.name}"
-            return addDevice(hub)
-        }
-        if (hub?.networkAddress) {
-            state.bridgeHost = hub.networkAddress
-        }
-
-        if (hub) {
-            if((linkRefreshcount % 2) == 0 && !state.username) {
-                requestHubAccess(selectedDevice)
-            }
-        }
-
-    } else {
-    	paragraphText = "You haven't selected a Hue Bridge, please Press \"Done\" and select one before clicking next."
-    }
-
-    def uninstall = state.bridgehost ? false : true
-    
-	return dynamicPage(name:"bridgeBtnPush", title:title, nextPage:nextPage, refreshInterval:refreshInterval, uninstsall: uninstall) {
-		section("") {
-			paragraph """${paragraphText}"""
-		}
-	}
-}
-
-def addDevice(device) {
-    def sectionText = "Linking to your hub was a success! Please click 'Next'!\r\n"
-    def title = "Success"
-    def dni = deviceNetworkId(device.mac)
-    
-    def d
-    if (device) {
-        d = getChildDevices()?.find {
-            it.deviceNetworkId == dni
-        }
-        state.bridgeHost = "${device.networkAddress}:${device.deviceAddress}"
-        state.username = "${device.username}"
-        getHubStatus()
-    }
-
-    if (!d && device != null) {
-        if (logEnable) log.debug "Creating Hue Bridge device with dni: ${dni}"
-        try {
-            addChildDevice("apwelsh", "AdvancedHueBridge", dni, null, ["label": device.name])
-        } catch (ex) {
-            if (ex.message =~ "A device with the same device network ID exists.*") {
-                sectionText = "Cannot add hub.  A device with the same device network ID already exists."
-                title = "Problem detected"
-                state.remove("bridgeHost")
-            }
-        }
-    }
+        capability "Light"
+        capability "ChangeLevel"
+        capability "Switch"
+        capability "SwitchLevel"
+        capability "Actuator"
+        capability "ColorControl"
+        capability "ColorMode"
+        capability "ColorTemperature"
+        capability "Refresh"
         
-    
-    return dynamicPage(name:"addDevice", title:title, nextPage:"mainPage") {
-        section() {
-            paragraph sectionText
-        }
-    }    
+        command "activateScene", [[name: "Scene Identitier*", type: "STRING", description: "Enter a scene name or the scene number as defined by the Hue Bridge"]]
+    }
 }
-
-def findLights(params){
-    enumerateLights()
-    
-    def installed = getInstalledLights().collect { it.label }
-    def dnilist = getInstalledLights().collect { it.deviceNetworkId }
-
-// TODO:
-    def options = [:]
-    def lights = state.lights
-    if (lights) {
-        lights.each {key, value ->
-            // def lights = value.lights ?: []
-            // if ( lights.size()  == 0 ) return
-            if ( dnilist.find { it == networkIdForLight(key) }) return
-            options["${key}"] = "${value.name} (${value.type})"
-        }
-    }
-
-    def numFound = options.size()
-    def refreshInterval = numFound == 0 ? 30 : 120
-    def nextPage = selectedLights ? "addLights" : null
-
-	return dynamicPage(name:"findLights", title:"Light Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval) {
-		section("""Let's find some groups.""") {
-			input "selectedLights", "enum", required:false, title:"Select additional lights to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-            if (!installed.isEmpty()) {
-                paragraph "Previously added Hue Lights"
-                paragraph "[${installedLights.join(', ')}]"
-            }
-		}
-	}
-
-}
-
-def addLights(params){
-
-    if (!selectedLights)
-        return findLights()
-    
-    def subject = selectedLights.size == 1 ? "Light" : "Lights"
-    
-    def title = ""
-    def sectionText = ""
-    
-    def appId = app.getId()
-    def lights = selectedLights.collect { it }
-    
-    selectedLights.each { lightId -> 
-        def name = state.lights[lightId].name
-        def dni = networkIdForLight(lightId)
-        def type = bulbTypeForLight(lightId)
-        try {
-            
-            // addChildDevice("apwelsh", "AdvancedHueGroup", dni, null, ["label": "${name}"])
-            def child = addChildDevice("hubitat", "Generic Component ${type}", "${dni}",
-            [label: "${name}", isComponent: false, name: "AdvancedHueBulb"])
-            child.updateSetting("txtEnable", false)
-            lights.remove(lightId)
-            
-        } catch (ex) {
-            if (ex.message =~ "A device with the same device network ID exists.*") {
-                sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Light [${name}]"""
-            } else {
-                sectionText += """\nFailed to add light [${name}]; see logs for details"""
-                if (logEnable) log.error "${ex}"
-            }
-        }
-    }
-    
-    if (lights.size() == 0)
-        app.removeSetting("selectedLights")
-    
-    if (!sectionText) {
-        title = "Adding ${subject} to Hubitat"
-        sectionText = """Added ${subject}"""
-    } else {
-        title = "Failed to add ${subject}"
-    }
-    
-	return dynamicPage(name:"addLights", title:title, nextPage:"mainPage") {
-		section() {
-            paragraph sectionText
-		}
-	}
-
-}
-
-def findGroups(params){
-    enumerateGroups()
-    
-    def installed = getInstalledGroups().collect { it.label }
-    def dnilist = getInstalledGroups().collect { it.deviceNetworkId }
-
-    def options = [:]
-    def groups = state.groups
-    if (groups) {
-        groups.each {key, value ->
-            def lights = value.lights ?: []
-            if ( lights.size()  == 0 ) return
-            if ( dnilist.find { it == networkIdForGroup(key) }) return
-            options["${key}"] = "${value.name} (${value.type})"
-        }
-    }
-
-    def numFound = options.size()
-    def refreshInterval = numFound == 0 ? 30 : 120
-    def nextPage = selectedGroups ? "addGroups" : null
-
-	return dynamicPage(name:"findGroups", title:"Group Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval) {
-		section("""Let's find some groups.""") {
-			input "selectedGroups", "enum", required:false, title:"Select additional rooms / zones to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-            if (!installed.isEmpty()) {
-                paragraph "Previously added Hue Groups"
-                paragraph "[${installedGroups.join(', ')}]"
-            }
-		}
-	}
-
-}
-
-def addGroups(params){
-
-    if (!selectedGroups)
-        return findGroups()
-    
-    def subject = selectedGroups.size == 1 ? "Group" : "Groups"
-    
-    def title = ""
-    def sectionText = ""
-    
-    def appId = app.getId()
-    def groups = selectedGroups.collect { it }
-    
-    selectedGroups.each { groupId -> 
-        def name = state.groups[groupId].name
-        def dni = networkIdForGroup(groupId)
-        try {
-            
-            addChildDevice("apwelsh", "AdvancedHueGroup", dni, null, ["label": "${name}"])
-            
-            groups.remove(groupId)
-            
-        } catch (ex) {
-            if (ex.message =~ "A device with the same device network ID exists.*") {
-                sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Group [${name}]"""
-            } else {
-                sectionText += """\nFailed to add group [${name}]; see logs for details"""
-                if (logEnable) log.error "${ex}"
-            }
-        }
-    }
-    
-    if (groups.size() == 0)
-        app.removeSetting("selectedGroups")
-    
-    if (!sectionText) {
-        title = "Adding ${subject} to Hubitat"
-        sectionText = """Added Groups"""
-    } else {
-        title = "Failed to add Group"
-    }
-    
-	return dynamicPage(name:"addGroups", title:title, nextPage:"mainPage") {
-		section() {
-            paragraph sectionText
-		}
-	}
-
-}
-
-def findScenes(params){
-    enumerateScenes()
-    
-    def groupOptions = [:]
-    getInstalledGroups().each { groupOptions[deviceIdNode(it.deviceNetworkId)] = it.label }
-    
-    def options = [:]
-    def scenes
-    def group
-    def installed
-    def dnilist
-    if (selectedGroup) {
-        group = getChildDevice(networkIdForGroup(selectedGroup))
-        if (group) {
-            installed = group.getChildDevices().collect { it.label }
-            dnilist = group.getChildDevices()?.collect { it.deviceNetworkId }
-        }
-        scenes = state.scenes?.findAll { it.value.type == "GroupScene" && it.value.group == selectedGroup }
-    }    
-    if (scenes) {
-        scenes.each {key, value ->
-            def groupName = groupOptions."${selectedGroup}"
-            def lights = value.lights ?: []
-            if ( lights.size()  == 0 ) return
-            if ( dnilist.find { it == networkIdForScene(selectedGroup, key) } ) return
-            options["${key}"] = "${value.name} (${value.type} [${groupName}])"
-        }
-    }
-
-    def numFound = options.size()
-    def refreshInterval = numFound == 0 ? 30 : 120
-    
-    def nextPage = selectedGroup && selectedScenes ? "addScenes" : null
-
-	return dynamicPage(name:"findScenes", title:"Scene Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval) {
-		section("""Let's find some scenes.  Please click the ""Refresh Scene Discovery"" Button if you aren't seeing your Scenes.""") {
-            input "selectedGroup",  "enum", required:true,  title:"Select the group to add scenes to (${groupOptions.size()} installed)", multiple:false, options:groupOptions, submitOnChange: true
-            if (selectedGroup) {
-                input "selectedScenes", "enum", required:false, title:"Select additional scenes to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-                if (installed && !installed.isEmpty()) {
-                    paragraph "Previously added Hue Scenes for ${group.label}"
-                    paragraph "[${installed.join(', ')}]"
-                }
-            }
-		}
-	}
-
-}
-
-
-def addScenes(params){
-
-    if (!selectedScenes)
-        return findScenes()
-    
-    def group = getChildDevice(networkIdForGroup(selectedGroup))
-    
-    def subject = selectedScenes.size == 1 ? "Scene" : "Scenes"
-    
-    def title = ""
-    def sectionText = ""
-    
-    def appId = app.getId()
-    def scenes = selectedScenes.collect { it }
-    
-    selectedScenes.each { sceneId -> 
-        def name = "${group.label} - ${state.scenes[sceneId].name}"
-        def dni = networkIdForScene(selectedGroup, sceneId)
-        try {
-            
-            // group.addChildDevice("apwelsh", "AdvancedHueScene", "${dni}", ["label": "${name}"])
-            def child = group.addChildDevice("hubitat", "Generic Component Switch", "${dni}",
-            [label: "${name}", isComponent: false, name: "AdvancedHueScene"])
-            child.updateSetting("txtEnable", false)
-            scenes.remove(sceneId)
-            
-        } catch (ex) {
-            if (ex.message =~ "A device with the same device network ID exists.*") {
-                sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Scene [${name}]"""
-            } else {
-                sectionText += """\nFailed to add scene [${name}]; see logs for details"""
-                log.error "${ex}"
-            }
-        }
-    }
-    
-    if (scenes.size() == 0)
-        app.removeSetting("selectedScenes")
-    
-    if (!sectionText) {
-        title = "Adding ${subject} to Hubitat"
-        sectionText = """Added Scenes"""
-    } else {
-        title = "Failed to add Scene"
-    }
-
-	return dynamicPage(name:"addScenes", title:title, nextPage:"mainPage") {
-		section() {
-            paragraph sectionText
-		}
-	}
-
-}
-
-
-
-// Life Cycle Functions
 
 def installed() {
-    state.bridgeRefreshCount = 0
-    state.bulbRefreshCoun    = 0
-    state.inBulbDiscovery    = 0
-    ssdpSubscribe()
-    ssdpDiscover()
-}
-
-def uninstalled() {
-    unsubscribe()
-    getChildDevices().each {
-        deleteChildDevice(it.deviceNetworkId)
-    }
+    parent.getDeviceState(this)
+    updated()
 }
 
 def updated() {
-    unsubscribe()
+
+    if (settings.autoRefresh     == null) device.updateSetting("autoRefresh", false)
+    if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 60)
+    if (settings.anyOn           == null) device.updateSetting("anyOn", true)
+    if (settings.logEnable       == null) device.updateSetting("logEnable", false)
+
+    if (logEnable) log.debug "Preferences updated"
+    parent.getDeviceState(this)
+}
+
+/** Switch Commands **/
+
+def on() {
+    parent.componentOn(this)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+def off() {
+    parent.componentOff(this)
+    if (sceneMode == "switch") allOff()
+}
+
+/** ColorControl Commands **/
+
+def setColor(colormap) {
+    parent.componentSetColor(this, colormap)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+def setHue(hue) {
+    parent.componentSetHue(this, hue)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+def setSaturation(saturation) {
+    parent.componentSetSaturation(this, saturation)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+/** ColorTemperature Commands **/
+
+def setColorTemperature(colortemperature) {
+    parent.componentSetColorTemperature(this, colortemperature)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+/** SwitchLevel Commands **/
+
+def setLevel(level, duration=null) {
+    parent.componentSetLevel(this, level, duration)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+/** ChangeLevel Commands **/
+
+def startLevelChange(direction) {
+    parent.componentStartLevelChange(this, direction)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+def stopLevelChange() {
+    parent.componentStopLevelChange(this)
+    if (sceneMode == "switch" && sceneOff) allOff()
+}
+
+/** Refresh Commands **/
+def refresh() {
+    parent.getDeviceState(this)
+}
+
+def resetRefreshSchedule() {
     unschedule()
-    initialize()
-}
-
-def initialize() {
-    ssdpDiscover()
-    runEvery5Minutes("ssdpDiscover")    
-}
-
-def subscribe() {
-    // Add message subscriptions for devices, if needed
+    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events    
 }
 
 
-/*
- * SSDP Device Discover
- */
-
-void ssdpSubscribe() {
-    subscribe(location, "ssdpTerm.upnp:rootdevice", ssdpHandler)
+def parse(String description) {
+    if (logEnable) log.debug "parse(${description}) called"
 }
 
-void ssdpUnsubscribe() {
-    unsubscribe(ssdpHandler)
-}
-
-
-void ssdpDiscover() {
-    sendHubCommand(new hubitat.device.HubAction("lan discovery upnp:rootdevice", hubitat.device.Protocol.LAN))
-
-}
-
-def ssdpHandler(evt) {
-    def description = evt.description
-    def parsedEvent = parseLanMessage(description)    
-    def ssdpPath = parsedEvent.ssdpPath
-    
-    // The Hue bridge publishes the device information in /description.xml, so if this ssdpPath does not match, skip this device.
-    if (ssdpPath != "/description.xml")
-        return
-    
-    def hub = evt?.hubId
-    if (parsedEvent.networkAddress) {
-        parsedEvent << ["hub":hub, 
-                        "networkAddress": convertHexToIP(parsedEvent.networkAddress),
-                        "deviceAddress": convertHexToInt(parsedEvent.deviceAddress)]
-
-        def ssdpUSN = parsedEvent.ssdpUSN.toString()
-
-        def hubs = getHubs()    
-        if (!hubs."${ssdpUSN}") {
-            verifyDevice(parsedEvent)
-        } else {
-            updateDevice(parsedEvent)
-        }
-    }
-}
-
-void updateDevice(parsedEvent) {
-    def ssdpUSN = parsedEvent.ssdpUSN.toString()
-    def hubs = getHubs()
-    def device = hubs["${ssdpUSN}"]
-
-    if (device.networkAddress != parsedEvent.networkAddress || device.deviceAddress != parsedEvent.deviceAddress) {
-        device << ["networkAddress": parsedEvent.networkAddress,
-                   "deviceAddress": parsedEvent.deviceAddress]
-        
-        if (logEnable) log.debug "Discovered hub address update: ${device.name}"
-    }
-}
-
-void verifyDevice(parsedEvent) {
-    def ssdpPath = parsedEvent.ssdpPath
-    
-    // The Hue bridge publishes the device information in /description.xml, so if this ssdpPath does not match, skip this device.
-    if (ssdpPath != "/description.xml")
-        return
-    
-    // Using the httpGet method, and arrow function, perform the validation check w/o the need for a callback function.
-    httpGet("http://${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}${ssdpPath}") { response ->
-        if (!response.isSuccess()) {return}
-
-        def data = response.data
-        if (data) {
-            def device = data.device
-            def model = device.modelName
-            def ssdpUSN = "${parsedEvent.ssdpUSN.toString()}"
-
-            if (logEnable) log.debug "Identified model: ${model}"
-            if (model =~ 'Philips hue bridge.*') {
-                def hubId = "${parsedEvent.mac}"[-6..-1]
-                def name = "${device.friendlyName}".replaceAll(~/\(.*\)/, "(${hubId})")
-
-                parsedEvent << ["url":"${data.URLBase}", 
-                                "name":"${name}", "serialNumber":"${device.serialNumber}"]
-
-                def hubs = getHubs()
-                hubs << ["${ssdpUSN}": parsedEvent]
-                if (logEnable) log.debug "Discovered new hub: ${name}"
-            }
-        }
-
-    }
-}
-
-/*
- *
- * Hue Hub API Integration Functions
- *
- */
-
-private requestHubAccess(mac) {
-    def device = getHubForMac(mac)
-    def deviceType = "{\"devicetype\": \"AdvanceHueBridgeLink#Hubitat\"}"
-    
-    asynchttpPost(requestHubAccessHandler,
-                  [uri: "http://${device.networkAddress}/api",
-                   contentType: "application/json",
-                   requestContentType: "application/json",
-                   body: deviceType], [device: device])
-
-}
-
-def requestHubAccessHandler(response, args) {
-    def status = response.getStatus();
-    if (status < 200 || status >= 300)
-        return
-    
-    def data = response.getJson()
-
-    if (data) {
-        if (data.error?.description) {
-            if (logEnable) log.error "${data.error.description[0]}"
-        } else if (data.success) {
-            if (data.success.username) {
-                def device = getHubForMac(args.device.mac)
-                device << [username: "${data.success.username[0]}"]
-                if (logEnable) log.debug "Obtained credentials: ${device}"
-            } else {
-                log.error "Problem with hub linking.  Received response: ${data}"
-            }
-        } else {
-            if (logEnable) log.error $data
-        }
-
-    }
-}
-private getHubStatus() {
-    
-    def url = "http://${state.bridgeHost}/api/${state.username}/"
-
-    httpGet([uri: url,
-             contentType: "application/json",
-             requestContentType: "application/json"]) { response -> 
-        if (!response.isSuccess()) { return }
-        
-        def data = response.data
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) log.error "${data.error.description[0]}"
-            } else {
-                parseStatus(data)
-            }
-        }
-
-    }
-}
-
-private enumerateGroups() {
-    
-    def url = "http://${state.bridgeHost}/api/${state.username}/groups"
-    //if (logEnable) log.debug "${url}"
-    
-    httpGet([uri: url,
-            contentType: "application/json",
-            requestContentType: "application/json"]) { response -> 
-        if (!response.isSuccess()) { return }
-        
-        def data = response.data
-        log.info "data: ${data}"
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) log.error "${data.error.description[0]}"
-            } else {
-                if (data) state.groups = data
-                parseGroups(data)
-            }
-        }
-
-    }
-
-}
-
-private enumerateScenes() {
-    
-    def url = "http://${state.bridgeHost}/api/${state.username}/scenes"
-    //if (logEnable) log.debug "${url}"
-    
-    httpGet([uri: url,
-             contentType: "application/json",
-             requestContentType: "application/json"]) { response -> 
-        if (!response.isSuccess()) { return }
-
-        def data = response.data
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) log.error "${data.error.description[0]}"
-            } else {
-                if (data) state.scenes = data
-                parseScenes(data)
-            }
-        }
-
-    }
-
-}
-
-private enumerateLights() {
-    
-    def url = "http://${state.bridgeHost}/api/${state.username}/lights"
-    //if (logEnable) log.debug "${url}"
-    
-    httpGet([uri: url,
-             contentType: "application/json",
-             requestContentType: "application/json"]) { response ->
-        if (!response.isSuccess()) { return }
-
-        def data = response.data
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) log.error "${data.error.description[0]}"
-            } else {
-                if (data) state.lights = data
-                parseLights(data)
-            }
-        }
-    }
-
-}
-
-def setDeviceState(child, deviceState) {
-
-    def deviceNetworkId = child.device.deviceNetworkId
-    def hubId = deviceIdHub(deviceNetworkId)
-    def type
-    def node
-    def action="action"
-
-    if ( deviceNetworkId =~ "hue\\-[0-9A-F]{12}" ) {
-        type = "groups"
-        node = "0"
-    } else if ("${hubId}" != "${app.getId()}") {
-        log.warn "Received setDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
-        return
-    } else {
-        type = deviceIdType(deviceNetworkId)
-        node = deviceIdNode(deviceNetworkId)
-        if (type == "lights")
-            action = "state"
-    }
-
-    // Disabling scheduled refreshes for hub.
-    def hub = getChildDeviceForMac(selectedDevice)
-    hub.resetRefreshSchedule()
-
-    def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/${action}"
-    if (logEnable) log.debug "URL: ${url}"
-    if (logEnable) log.debug "args: ${deviceState}"
-    httpPut([uri: url,
-             contentType: "application/json",
-             requestContentType: "application/json", 
-             body: deviceState]) { response ->
-        
-        if (!response.isSuccess()) { return }
-        
-        def data = response.data
-        if (data) {
-            //    if (logEnable) log.info data
-            data.each { 
-                if (it.error?.description) {
-                    if (logEnable) log.error "set state: ${it.error.description[0]}"
-                    
-                }
-                if (it.success) {
-                    it.success.each { key, value ->
-
-                        def result = key.split('/')
-                        def nid
-                        switch (result[1]) {
-                            case "groups":  nid=networkIdForGroup(result[2]); break;
-                            case "lights":  nid=networkIdForLight(result[2]); break;
-                            case "scenes":  nid=networkIdForScene(result[2]); break;
-                            default:
-                                if (logEnable) log.warn "Unhandled device state handler repsonse: ${result}"
-                                return;
-                        }
-                        def device = type == "groups" && node == "0" ? child : getChildDevice(nid)
-                        setHueProperty(device, result[4],value)
-                        hub.runIn(1, "autoRefresh", [overwrite: true, misfire:"ignore"])
-
-                    }
-                }
-            }
-        }
-    }
-}
-
-
-def getDeviceState(child) {
-
-    def deviceNetworkId = child.device.deviceNetworkId
-    def hubId = deviceIdHub(deviceNetworkId)
-    def type
-    def node
-
-    if ( deviceNetworkId =~ "hue\\-[0-9A-F]{12}" ) {
-        type = "groups"
-        node = "0"
-    } else if ("${hubId}" != "${app.getId()}") {
-        log.warn "Received getDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
-        return
-    } else {
-        type = deviceIdType(deviceNetworkId)
-        node = deviceIdNode(deviceNetworkId)
-    }
-    def url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
-    if (logEnable) log.debug "URL: ${url}"
-    httpGet([uri: url,
-             contentType: "application/json",
-             requestContentType: "application/json"]) { response ->
-        
-        if (!response.isSuccess()) { return }
-        
-        def data = response.data
-        if (data) {
-            if (logEnable) log.info data  // temporary until lights are added, and all groups/all lights
-            if ( data.error ) {
-                if (logEnable) log.error "${it.error.description[0]}"
-                return
-            }
-            if (node) {
-                if (logEnable) log.info "Parsing response: $data for $node" // temporary
-                if (type == "groups") child.resetRefreshSchedule()
-                data.state.each { key, value -> setHueProperty(child, key,value) }
-                data.action.each { key, value -> setHueProperty(child, key, value) }
-            } else {
-                if (logEnable) log.info it  // temporary to catch unknown result state
-            }
-        }
-
-    }
-}
-
-
-
-/*
- *
- * Private helper functions
- *
- */
-
-private networkIdForGroup(id) {
-    "hueGroup:${app.getId()}/${id}"
-}
-
-private networkIdForLight(id) {
-    def type=bulbTypeForLight(id)
-    "hueBulb${type}:${app.getId()}/${id}"
-}
-private networkIdForScene(groupId,sceneId) {
-    "hueScene:${app.getId()}/${groupId}/${sceneId}"
-}
-
-private bulbTypeForLight(id) {
-
-    def type=state.lights[id]?.type
-    switch (type) {
-        case "Dimmable light":
-            return "Dimmer"
-        case "Extended color light":
-            return "RGBW"
-        case "Color temperature light":
-            return "CT"
-        default:
-            return "RGB"
-    }
-}
-
-private getInstalledLights() {
-    getChildDevices().findAll { it.deviceNetworkId =~ /hueBulb\w*:.*/ }
-}
-
-private getInstalledGroups() {
-    getChildDevices().findAll { it.deviceNetworkId =~ /hueGroup:.*/ }
-}
-
-private getInstalledScenes() {
-    getChildDevices().findAll { it.deviceNetworkId =~ /hueScene:.*/ }
-}
-
-
-private String deviceIdType(deviceNetworkId) {
-    switch (deviceNetworkId) {
-        case ~/hueGroup:.*/:    "groups"; break
-        case ~/hueScene:.*/:    "scenes"; break
-        case ~/hueBulb\w*:.*/:  "lights"; break
-    }
-}
-
-private String deviceIdNode(deviceNetworkId) {
-    deviceNetworkId.replaceAll(~/.*\//,"")
-}
-
-private String deviceIdHub(deviceNetworkId) {
-    deviceNetworkId.replaceAll(~/.*\:/,"").replaceAll(~/\/.*/,"")
-}
-
-
-private String convertHexToIP(hex) {
-	[hubitat.helper.HexUtils.hexStringToInt(hex[0..1]),
-     hubitat.helper.HexUtils.hexStringToInt(hex[2..3]),
-     hubitat.helper.HexUtils.hexStringToInt(hex[4..5]),
-     hubitat.helper.HexUtils.hexStringToInt(hex[6..7])].join(".")
-}
-
-private Integer convertHexToInt(hex) {
-    hubitat.helper.HexUtils.hexStringToInt(hex)
-}
-
-private String convertIPtoHex(ipAddress) { 
-    String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
-    return hex
-}
-
-/*
- *
- * Hub Device Utility Functions
- *
- */
-
-def deviceNetworkId(mac) {
-    mac ? "hue-${mac}" : null
-}
-
-private getHubForNetworkId(deviceNetworkId) {
-    getHubs().find { it.value.deviceNetworkId == deviceNetworkId }   
-}
-
-private getChildDeviceForMac(mac) {
-    //getChildDevices()?.find {it.deviceNetworkId == deviceNetworkId(mac)  }    
-    getChildDevice(deviceNetworkId(mac))
-}
-
-private clearDiscoveredHubs() {
-    state.hubs = getHubs().findAll { getChildDeviceForMac(it.value.mac) != null }
-}
-
-Map discoveredHubs() {
-	def vhubs = getHubs()
-	def map = [:]
-    vhubs.each {
-		def value = "${it.value?.name}"
-		def key = "${it.value?.mac}"
-		map["${key}"] = value
-	}
-	map
-}
-
-def getSelectedHub() {
-    getHubs().find{ key, value -> value.mac == selectedDevice}?.value
-}
-
-def getHubForMac(mac) {
-    getHubs().find{ key, value -> value.mac == mac}?.value
-}
-
-def getHubs() {
-    state.hubs = state.hubs ?: [:]
-}
-
-
-/*
- *
- * Device Parsers
- *
- */
-
-def parseStatus(data) {
-
-    def groups = data.groups
-    def lights = data.lights
-    def scenes = data.scenes
-    
-    if (groups) parseGroups(groups)
-    if (lights) parseLights(lights)
-    if (scenes) parseScenes(scenes)
-    
-}
-
-def parseGroups(json) {
-    def hub=getChildDeviceForMac(selectedDevice)
-    json.each { id, data -> 
-        // Add code to update all installed groups state
-        def group = getChildDevice(networkIdForGroup(id))
-        if (group) {
-            if (logEnable) log.info "Parsing response: $data for $id" // temporary
-            group.resetRefreshSchedule()
-            data.state.each  { key, value -> setHueProperty(group, key,value) }
-            data.action.each { key, value -> setHueProperty(group, key, value) }
-        }
-    }
-}
-
-def parseLights(json) {
-    def hub=getChildDeviceForMac(selectedDevice)
-    json.each { id, data -> 
-        // Add code to update all installed lights state
-        def light = getChildDevice(networkIdForLight(id))
-        if (light) {
-            if (logEnable) log.info "Parsing response: $data for $id" // temporary
-            light.unschedule()
-            data.state.each  { key, value -> setHueProperty(light, key,value) }
-            data.action.each { key, value -> setHueProperty(light, key, value) }
-        }
-    }
-}
-
-def parseScenes(data) {
-    //data.each { id, value -> 
-    //    if (logEnable) log.debug "${id}"
-    //}
-}
-
-def findGroup(groupId) {
-    if (state.groups."${groupId}") {
-        return state.groups."${groupId}"
-    } else {
-        return state.groups.find{ it.value.name == groupId }
-    }
-}
-
-def findScene(groupId, sceneId) {
-    if (state.scenes."${sceneId}") {
-        return state.scenes."${sceneId}"
-    } else {
-        return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
-    }
-}
-
-private sendChildEvent(child, name, value) {
-    child.sendEvent(name: name, value: value)
-}
-
-def setHueProperty(child, name, value) {
-    
-    // if (logEnable) log.info "setHueProperty(${name}) = ${value}"
+def setHueProperty(name, value) {
     switch (name) {
-        case "on":
-            sendChildEvent(child, "switch", value == true ? "on" : "off")
-            break;
-        case "bri":
-            sendChildEvent(child, "level", convertHBLevel(value))
-            break;
-        case "hue":
-            sendChildEvent(child, "hue", convertHBHue(value))
-            break;
-        case "sat":
-            sendChildEvent(child, "saturation", convertHBSaturation(value))
-            break;
-        case "ct":
-            sendChildEvent(child, "colortemperature", convertHBColortemp(value))
-            break;
-        case ~/(a(ny|ll)_on)|scene/:
-            child.setHueProperty(name, value)
-            break;
-        case "colormode":
-            sendChildEvent(child, "colorMode", convertHBColorMode(value))
+        case "scene":
+        def child = getChildDevice(networkIdForScene(value))
+        exclusiveOn(child)
+        child.unschedule()
+        if (sceneMode == "trigger") child.runInMillis(400, "off")
+        break;
+        case "any_on":
+        if (anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
+        break;
+        case "all_on":
+        if (!anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
+        break;
     }
 }
 
-// Component Dimmer delegates
+def deviceIdNode(deviceNodeId) {
+     parent.deviceIdNode(deviceNodeId)
+}
+
+def networkIdForScene(sceneId) {
+    parent.networkIdForScene(deviceIdNode(device.deviceNetworkId), sceneId)
+}
+
+def activateScene(scene) {
+    def sceneId = parent.findScene(deviceIdNode(device.deviceNetworkId), scene)?.key
+    if (sceneId) {
+        if (logEnable) log.info "Activate Scene: ${sceneId}"
+        parent.setDeviceState(this, ["scene": sceneId])
+    }
+}
+
+def allOff() {
+    getChildDevices().findAll { it.currentValue("switch") == "on" }
+                     .each { it.sendEvent(name: "switch", value: "off") }
+}
+
+def exclusiveOn(child) {
+    def dni = child.deviceNetworkId
+    log.debug "Attempting to turn on device id: ${dni}"
+    childDevices.each { 
+        def value = (it.deviceNetworkId == dni) ? "on" : "off"
+        log.debug "device ${it} should be ${value}"
+        if (it.currentValue("switch") != value) it.sendEvent(name: "switch", value: value) }
+}
+
+/*
+ * Component Child Methods (used to capture actions generated on scenes)
+ */
 
 void componentOn(child) {
-    setDeviceState(child, ["on": true])
+    def sceniId = deviceIdNode(child.deviceNetworkId)
+    parent.setDeviceState(this, ["scene":sceniId])
 }
 
 void componentOff(child) {
-    setDeviceState(child, ["on": false])
+    // Only change the state to off, there is not action to actually be performed.
+    if (sceneMode == "switch") {
+        if (child.currentValue("switch") == "on") off()
+    } else {
+        child.sendEvent(name: "switch", value: "off")
+    }
 }
 
 void componentRefresh(child){
-    getDeviceState(child)
+    if (logEnable) log.info "received refresh request from ${child.displayName} - ignored"
 }
 
-void componentSetLevel(child, level, duration=null){
-    def args = ["bri": convertHELevel(level)]
-    if (duration != null) args["transitiontime"] = duration * 10
-    
-    setDeviceState(child, args)
-}
-
-void componentStartLevelChange(child, direction) {
-    def level = 0
-    if (direction == "up")        level =  254
-    else if (direction == "down") level = -254
-
-    setDeviceState(child, ["bri_inc": level, "transitiontime": transitionTime() * 10])
-
-}
-
-void componentStopLevelChange(child) {
-    setDeviceState(child, ["bri_inc": 0])
-}
-
-def componentSetColor(child, colormap) {
-    if (colormap.hue == null)        device.currentValue('hue')?:0
-    if (colormap.saturation == null) device.currentValue('saturation')?:50
-    if (colormap.level == null)      device.currentValue('level')?:100
-
-    def args = ["hue":convertHEHue(colormap.hue), 
-                "sat":convertHESaturation(colormap.saturation),
-                "bri":convertHELevel(colormap.level)]
-
-    setDeviceState(child, args)
-    
-}
-
-def componentSetHue(child, hue) {
-    setDeviceState(child, ["hue":convertHEHue(hue)])
-}
-
-def componentSetSaturation(child, saturation) {
-    setDeviceState(child, ["sat":convertHESaturation(saturation)])
-}
-
-def componentSetColorTemperature(child, colortemperature) {
-    setDeviceState(child, ["ct":convertHEColortemp(colortemperature), "colormode":"ct"])
-}
-
-def transitionTime() {
-    2
-}
-
-//
-// Utility Functions
-//
-
-private valueBetween(value, min, max) {
-    return Math.min(Math.max(value, min), max)
-}
-
-def convertHBLevel(value) {
-    Math.round(value / 2.54)
-}
-
-def convertHELevel(value) {
-    valueBetween(Math.round(value * 2.54),      1, 254)
-}
-
-def convertHBHue(value) {
-    Math.round(value / 655.35)
-}
-
-def convertHEHue(value) {
-    valueBetween(Math.round(value * 655.35),      0, 65535)
-}
-
-def convertHBSaturation(value) {
-    Math.round(value / 2.54)
-}
-
-def convertHESaturation(value) {
-    valueBetween(Math.round(value * 2.54), 0, 254)
-}
-
-def convertHBColortemp(value) {
-    Math.round(((500 - value) * (4500 / 347)) + 2000 )
-}
-
-def convertHEColortemp(value) {
-    valueBetween(Math.round(500 - ((value - 2000) / (4500 / 347))), 153, 500)
-}
-
-def convertHBColorMode(value) {
-    if (value == "hs") return "RGB" 
-    if (value == "ct") return "CT"
-    if (value == "xy") return "RGB"
-}

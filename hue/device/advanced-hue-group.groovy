@@ -26,6 +26,9 @@
  **/
 
 preferences {
+
+    input name: "defaultScene", type: "string", defaultValue: "", title: "Default Scene", options:scenes, description: "Enter a scene name or number as define by the Hue Bridge to activate when this group is turned on."
+
     input name: "sceneMode", type: "enum", defaultValue: "trigger", title: "Scene Child Device Behavior", options:["trigger", "switch"], description: "If set to switch, the scene can be used to turn off this group. Only one scene can be on at any one time."
     if (sceneMode == "switch")
         input name: "sceneOff", type: "bool", defaultValue: false, title: "Track Scene State", description: "If enabled, any change to this group will turn off all child scenes." 
@@ -76,8 +79,12 @@ def updated() {
 /** Switch Commands **/
 
 def on() {
-    parent.componentOn(this)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    if (!(defaultScene?:"").trim().isEmpty()) {
+        activateScene(defaultScene)
+    } else {
+        parent.componentOn(this)
+        if (sceneMode == "switch" && sceneOff) allOff()
+    }
 }
 
 def off() {
