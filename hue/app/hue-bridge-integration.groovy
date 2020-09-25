@@ -51,7 +51,7 @@ preferences {
 
 def mainPage(params=[:]) {
     
-    if (!state) {
+    if (app.getInstallationState() == "INCOMPLETE") {
         return dynamicPage(name: "mainPage", title: "Advanced Hue Bridge Integration", nextPage: null, uninstall: true, install: true) {
             section {
                 paragraph "Hit Done to to install the Hue Bridge Integration.\nRe-open to setup."
@@ -99,7 +99,7 @@ def mainPage(params=[:]) {
                 //}
             }
             section("Options") {
-                input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
+                input name: "logEnable",   type: "bool", defaultValue: true, title: "Enable debug logging"
             }
         }
     }
@@ -186,6 +186,8 @@ def addDevice(device) {
     def title = "Success"
     def dni = deviceNetworkId(device.mac)
     
+    if (logEnable) log.info "Adding Bridge device with DNI: ${dni}"
+
     def d
     if (device) {
         d = getChildDevices()?.find {
@@ -501,9 +503,7 @@ def addScenes(params){
 // Life Cycle Functions
 
 def installed() {
-    state.bridgeRefreshCount = 0
-    state.bulbRefreshCoun    = 0
-    state.inBulbDiscovery    = 0
+    app.updateSetting("logEnable", true)
     ssdpSubscribe()
     ssdpDiscover()
 }
@@ -891,7 +891,7 @@ private networkIdForScene(groupId,sceneId) {
 }
 
 private bulbTypeForLight(id) {
-
+    if (!state.lights) return null
     def type=state.lights[id]?.type
     switch (type) {
         case "Dimmable light":
