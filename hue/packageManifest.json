@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -24,7 +24,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy",
       "required": true,
-      "version": "1.4.1"
+      "version": "1.4.2"
     },
     {
       "id": "1d0f66d0-afed-4fe6-a2c8-39619f5b8eaa",
@@ -35,6 +35,6 @@
       "version": "1.1.3"
     }
   ],
-  "releaseNotes": "Fixed a parsing bug in setColor methods that was incorrectly handling values of 0 (zero) in the colormap.  You can now set Pure RED as a color. Added ability to track scenes, and control scene devices as toggle, or triggers.  Can now add a default scene to groups, so that when a group is turned on, the scene will be activated."
+  "releaseNotes": "Fixed a parsing bug in setColor methods that was incorrectly handling values of 0 (zero) in the colormap.  You can now set Pure RED as a color. Added ability to track scenes, and control scene devices as toggle, or triggers.  Can now add a default scene to groups, so that when a group is turned on, the scene will be activated. Added optimistic switch setting to turning on a group when a scene is activated and added informational logging for all actions"
 
 }
