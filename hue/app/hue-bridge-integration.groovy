@@ -698,7 +698,7 @@ private enumerateGroups() {
         if (!response.isSuccess()) { return }
         
         def data = response.data
-        log.info "data: ${data}"
+        if (debug) log.debug "enumerateGroups: ${data}"
         if (data) {
             if (data.error?.description) {
                 if (logEnable) log.error "${data.error.description[0]}"
