@@ -29,6 +29,7 @@ preferences {
         input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
     input name: "anyOn",       type: "bool", defaultValue: true,  title: "ANY on or ALL on",    description: "When ebabled, the group is considered on when any light is on"
     input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable informational logging"
+    input name: "debug",       type: "bool", defaultValue: false, title: "Enable debug logging"
 
 }
 
@@ -82,7 +83,7 @@ def off() {
 
 
 def refresh() {
-    if (logEnable) log.trace "Bridge (${this}) refreshing"
+    if (debug) log.debug "Bridge (${this}) refreshing"
     parent.getDeviceState(this)
     parent.getHubStatus()
 }
