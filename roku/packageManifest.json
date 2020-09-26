@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.4.0"
+      "version": "2.4.1"
     }
   ],
   "version": "1.2.8",
-  "releaseNotes": "Added ability to search for content on roku."
+  "releaseNotes": "Added ability to search for content on roku.  Reworked the on/off parsing logic order to work with DEV mode apps."
 }

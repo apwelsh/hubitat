@@ -239,26 +239,31 @@ def iconPathForApp(String netId) {
  void componentOn(child) {
     def appId = appIdForNetworkId(child.deviceNetworkId)
 
-    if (appId ==~ /^\d+$/ ) {
-        launchApp(appId)
-    } else if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
+    if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
-    } else {
+    } else if (isValidKey(appId)) {
         // Key presses are actually button events, and do not keep state, this implements a momentary state of on while the event is being sent.
         child.sendEvent(name: "switch", value: "on")
         this.keyPress(appId)
         child.sendEvent(name: "switch", value: "off")
+    } else {
+        launchApp(appId)
     }
 }
 
 void componentOff(child) {
     if (child.currentValue("switch") == "off")
         return
+
     def appId = appIdForNetworkId(child.deviceNetworkId)
     if (appId ==~ /^(AV1|Tuner|hdmi\d|\d+)$/)
         home()
-    else
+    else if (isValidKey(appId)) {
         child.sendEvent(name: "switch", value: "off")
+    } else {
+        home()
+    }
+
 }
 
 void componentRefresh(cd){
