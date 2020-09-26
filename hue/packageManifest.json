@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.3.3",
+  "version": "1.3.4",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.1.7"
+      "version": "1.1.8"
     }
   ],
   "drivers": [
@@ -32,9 +32,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy",
       "required": true,
-      "version": "1.1.3"
+      "version": "1.1.4"
     }
   ],
-  "releaseNotes": "Fixed a parsing bug in setColor methods that was incorrectly handling values of 0 (zero) in the colormap.  You can now set Pure RED as a color. Added ability to track scenes, and control scene devices as toggle, or triggers.  Can now add a default scene to groups, so that when a group is turned on, the scene will be activated. Added optimistic switch setting to turning on a group when a scene is activated and added informational logging for all actions"
+  "releaseNotes": "Fixed a parsing bug in setColor methods that was incorrectly handling values of 0 (zero) in the colormap.  You can now set Pure RED as a color. Added ability to track scenes, and control scene devices as toggle, or triggers.  Can now add a default scene to groups, so that when a group is turned on, the scene will be activated. Added optimistic switch setting to turning on a group when a scene is activated and added informational logging for all actions.  Fixed a bug the causes the Hub device state to flip-flop between on/off states when hub reports off even though it is on."
 
 }

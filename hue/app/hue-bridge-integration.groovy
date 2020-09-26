@@ -853,7 +853,7 @@ def getDeviceState(child) {
         
         def data = response.data
         if (data) {
-            if (debug) log.info "Received data: ${data}"  // temporary until lights are added, and all groups/all lights
+            if (debug) log.info "getDeviceState received data: ${data}"  // temporary until lights are added, and all groups/all lights
             if ( data.error ) {
                 if (logEnable) log.error "${it.error.description[0]}"
                 return
@@ -924,6 +924,7 @@ private String deviceIdType(deviceNetworkId) {
         case ~/hueGroup:.*/:    "group"; break
         case ~/hueScene:.*/:    "scene"; break
         case ~/hueBulb\w*:.*/:  "light"; break
+        case ~/hue\-\w+/:         "hub"; break
     }
 }
 
@@ -1067,7 +1068,7 @@ def findScene(groupId, sceneId) {
     }
 }
 
-private sendChildEvent(child, name, value) {
+def sendChildEvent(child, name, value) {
     
     // Supress repetative updates, this reduces the load on the event bus.
     if (child.device.currentValue(name) == value) return
@@ -1087,7 +1088,10 @@ private sendChildEvent(child, name, value) {
 }
 
 def setHueProperty(child, name, value) {
+    def type = deviceIdType(child.device.deviceNetworkId)?:"device"
 
+    if (type == "hub" && !(name ==~~ /(a(ny|ll)_on)/)) return
+    
     switch (name) {
         case "on":
             sendChildEvent(child, "switch", value == true ? "on" : "off")
@@ -1188,7 +1192,7 @@ def convertHBLevel(value) {
 }
 
 def convertHELevel(value) {
-    valueBetween(Math.round(value * 2.54),      1, 254)
+    valueBetween(Math.round(value * 2.54), 1, 254)
 }
 
 def convertHBHue(value) {
@@ -1196,7 +1200,7 @@ def convertHBHue(value) {
 }
 
 def convertHEHue(value) {
-    valueBetween(Math.round(value * 655.35),      0, 65535)
+    valueBetween(Math.round(value * 655.35), 0, 65535)
 }
 
 def convertHBSaturation(value) {

@@ -28,7 +28,7 @@ preferences {
     if (autoRefresh)
         input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
     input name: "anyOn",       type: "bool", defaultValue: true,  title: "ANY on or ALL on",    description: "When ebabled, the group is considered on when any light is on"
-    input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable debug logging"
+    input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable informational logging"
 
 }
 
@@ -56,7 +56,7 @@ def installed() {
 def updated() {
 
     if (settings.autoRefresh     == null) device.updateSetting("autoRefresh", false)
-    if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 60)
+    if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 30)
     if (settings.anyOn           == null) device.updateSetting("anyOn", true)
     if (settings.logEnable       == null) device.updateSetting("logEnable", false)
 
@@ -71,16 +71,18 @@ def updated() {
 /** Switch Commands **/
 
 def on() {
+    if (logEnable) log.info "Bridge (${this}) turning on"
     parent.setDeviceState(this, ["on":true])
 }
 
 def off() {
+    if (logEnable) log.info "Bridge (${this}) turning off"
     parent.setDeviceState(this, ["on": false])
 }
 
 
 def refresh() {
-    if (logEnable) log.trace "Executing 'refresh'"
+    if (logEnable) log.trace "Bridge (${this}) refreshing"
     parent.getDeviceState(this)
     parent.getHubStatus()
 }
@@ -96,12 +98,9 @@ def resetRefreshSchedule() {
 }
 
 def setHueProperty(name, value) {
-    
-    switch (name) {
-        case "any_on":
-        sendEvent(name: "switch", value: value ? "on" : "off")
-        break;
-    }
+    if (name == (anyOn?"any_on":"all_on")) {
+        parent.sendChildEvent(this, "switch", value ? "on" : "off")
+    } 
 }
 
 def deviceIdNode(deviceNodeId) {
