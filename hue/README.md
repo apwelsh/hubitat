@@ -13,8 +13,6 @@ The functionality is very limited at this time.
    - The main app will install an instance of this device after the app successfully pairs the hue bridge.
  - [Advance Hue Group Child Device](device/advanced-hue-group.groovy)
    - All imported Hue Groups will use this device to manage the group.  This device depends on the parent app to operate. The initial version of this device supports all color light control capabilities, and the ability to activate any hue scene by scene ID or scene name (as identified in the hue bridge).
-- [Advance Hue Scene Child Device](device/advanced-hue-scene.groovy)
-   - All imported Hue Scenes will use this device to manage the scene.  This device depends on the parent app and the group device to operate. The initial version of this device supports the ability to activate a scene using the on button.  This is device does not maintain state, as Hue does not maintain state.
 
 **Not yet implemented** 
 Hue Lights (RGB, CT and Dimmable) are not yet available.
