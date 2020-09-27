@@ -26,8 +26,8 @@ The functionality is very limited at this time, but I believe this system alread
    - All imported Hue Ligts will use one of the matching Hubitat component drivers.  Hue lights are installed as individual lights, now as child devices or another device.
    - Use `Generic Component Dimmer` for dimmable lights
    - Use `Generic Component CT` for color temperature adjustable lights
-   - Use `Generic Component RGB` for extended color lights
-   - Use `Generic Component RGBW` for all other lights
+   - Use `Generic Component RGBW` for extended color lights
+   - Use `Generic Component RGB` for all other lights
  - Hue Scenes Device `Generic Hubitat Device`
    - One of the key features of this integration, is the ability to use and manage Hue scenes.   This device is the a switch devices used to active a hue scene.
    - Use `Generic Component Switch` for switching on hue scenes.
