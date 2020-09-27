@@ -7,7 +7,7 @@ The functionality is very limited at this time.
 
 ## Features
 
- - [Advanced Hue Bridge Integration App](app/hue-bridge-integration.grooby)
+ - [Advanced Hue Bridge Integration App](app/hue-bridge-integration.groovy)
    - This is the main component.  Like the native application, this is the app that you will use to link the Hue bridge to your HE system.  All drivers in this project are 100% dependent upon this app.
  - [Advanced Hue Bridge Child Device](device/advanced-hue-bridge.groovy)
    - The main app will install an instance of this device after the app successfully pairs the hue bridge.
