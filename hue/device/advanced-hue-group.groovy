@@ -144,12 +144,18 @@ def stopLevelChange() {
 
 /** Refresh Commands **/
 def refresh() {
+    if (debug) log.debug "Bridge (${this}) refreshing"
     parent.getDeviceState(this)
+}
+
+def autoRefresh() {
+    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    refresh()
 }
 
 def resetRefreshSchedule() {
     unschedule()
-    if (autoRefresh) schedule("0/${refreshInterval} * * * * ?", refresh) // Move the schedule to avoid redundant refresh events    
+    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
 }
 
 def setHueProperty(name, value) {
