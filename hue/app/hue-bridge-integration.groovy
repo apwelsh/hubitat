@@ -865,7 +865,6 @@ def getDeviceState(child) {
                     data.state.remove("on")
                     data.action.remove("on")
                 }
-                log.debug "New Values: ${data}"
                 data.state.each { key, value -> setHueProperty(child, key,value) }
                 data.action.each { key, value -> setHueProperty(child, key, value) }
             } else {
