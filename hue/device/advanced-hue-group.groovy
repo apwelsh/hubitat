@@ -64,13 +64,16 @@ def installed() {
 
 def updated() {
 
-    if (settings.autoRefresh     == null) device.updateSetting("autoRefresh", false)
+    if (settings.autoRefresh     == null) device.updateSetting("autoRefresh",     false)
     if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 60)
-    if (settings.anyOn           == null) device.updateSetting("anyOn", true)
-    if (settings.logEnable       == null) device.updateSetting("logEnable", false)
+    if (settings.anyOn           == null) device.updateSetting("anyOn",           true)
+    if (settings.logEnable       == null) device.updateSetting("logEnable",       false)
+    if (settings.sceneMode       == null) device.updateSetting("sceneMode",       "trigger")
+    if (settings.sceneOff        == null) device.updateSetting("sceneOff",        false)
 
     if (logEnable) log.debug "Preferences updated"
     parent.getDeviceState(this)
+    resetRefreshSchedule()
 }
 
 /** Switch Commands **/
@@ -149,13 +152,13 @@ def refresh() {
 }
 
 def autoRefresh() {
-    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefesh) runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
     refresh()
 }
 
 def resetRefreshSchedule() {
     unschedule()
-    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefresh) runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
 }
 
 def setHueProperty(name, value) {

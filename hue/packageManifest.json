@@ -24,7 +24,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy",
       "required": true,
-      "version": "1.4.4"
+      "version": "1.4.5"
     },
     {
       "id": "1d0f66d0-afed-4fe6-a2c8-39619f5b8eaa",
@@ -35,6 +35,6 @@
       "version": "1.1.4"
     }
   ],
-  "releaseNotes": "Fixed a parsing bug in setColor methods that was incorrectly handling values of 0 (zero) in the colormap.  You can now set Pure RED as a color. Added ability to track scenes, and control scene devices as toggle, or triggers.  Can now add a default scene to groups, so that when a group is turned on, the scene will be activated. Added optimistic switch setting to turning on a group when a scene is activated and added informational logging for all actions.  Fixed a bug the causes the Hub device state to flip-flop between on/off states when hub reports off even though it is on.  Hue hub started reporting the on/off state of groups as always off.  This updates the groups to get on/off state from the any_on and all_on only for groups on a refresh event.  Updated the group auto-refresh to allow intervals of more than 60 seconds."
+  "releaseNotes": "Fixed Debug logging for app where an erroneous debug log message was being recorded for every refresh.  Fixed auto-refresh bug introduced with the fix for the on/off flip-flop issue."
 
 }
