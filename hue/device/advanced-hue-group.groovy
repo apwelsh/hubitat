@@ -73,7 +73,8 @@ def updated() {
 
     if (logEnable) log.debug "Preferences updated"
     parent.getDeviceState(this)
-    resetRefreshSchedule()
+    refresh()
+    
 }
 
 /** Switch Commands **/
@@ -149,6 +150,7 @@ def stopLevelChange() {
 def refresh() {
     if (debug) log.debug "Bridge (${this}) refreshing"
     parent.getDeviceState(this)
+    resetRefreshSchedule()
 }
 
 def autoRefresh() {

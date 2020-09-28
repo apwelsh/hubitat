@@ -86,16 +86,17 @@ def refresh() {
     if (debug) log.debug "Bridge (${this}) refreshing"
     parent.getDeviceState(this)
     parent.getHubStatus()
+    resetRefreshSchedule()
 }
 
 def autoRefresh() {
-    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefresh) runIn(refreshInterval?:60, autoRefresh, [overwrite: true, misfire:"ignore"])
     refresh()
 }
 
 def resetRefreshSchedule() {
     unschedule()
-    runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefresh) runIn(refreshInterval?:60, autoRefresh, [overwrite: true, misfire:"ignore"])
 }
 
 def setHueProperty(name, value) {

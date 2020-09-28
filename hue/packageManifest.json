@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.3.9",
+  "version": "1.3.10",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -24,7 +24,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy",
       "required": true,
-      "version": "1.4.6"
+      "version": "1.4.7"
     },
     {
       "id": "1d0f66d0-afed-4fe6-a2c8-39619f5b8eaa",
@@ -32,7 +32,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy",
       "required": true,
-      "version": "1.1.4"
+      "version": "1.1.5"
     }
   ],
   "releaseNotes": "Fixed Debug logging for app where an erroneous debug log message was being recorded for every refresh.  Fixed auto-refresh bug introduced with the fix for the on/off flip-flop issue."
