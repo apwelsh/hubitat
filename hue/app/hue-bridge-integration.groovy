@@ -853,18 +853,23 @@ def getDeviceState(child) {
         
         def data = response.data
         if (data) {
-            if (debug) log.info "getDeviceState received data: ${data}"  // temporary until lights are added, and all groups/all lights
+            if (debug) log.debug "getDeviceState received data: ${data}"  // temporary until lights are added, and all groups/all lights
             if ( data.error ) {
                 if (logEnable) log.error "${it.error.description[0]}"
                 return
             }
             if (node) {
                 child = getChildDevice(deviceNetworkId)
-                if (type == "groups") child.resetRefreshSchedule()
+                if (type == "groups") {
+                    child.resetRefreshSchedule()
+                    data.state.remove("on")
+                    data.action.remove("on")
+                }
+                log.debug "New Values: ${data}"
                 data.state.each { key, value -> setHueProperty(child, key,value) }
                 data.action.each { key, value -> setHueProperty(child, key, value) }
             } else {
-                if (debug) log.info "Received unknown response: ${it}"  // temporary to catch unknown result state
+                if (debug) log.debug "Received unknown response: ${it}"  // temporary to catch unknown result state
             }
         }
 
@@ -1024,8 +1029,10 @@ def parseGroups(json) {
         // Add code to update all installed groups state
         def group = getChildDevice(networkIdForGroup(id))
         if (group) {
-            if (debug) log.info "Parsing response: $data for $id" // temporary
+            if (debug) log.debug "Parsing response: $data for $id" // temporary
             group.resetRefreshSchedule()
+            data.state.remove("on")
+            data.action.remove("on")
             data.state.each  { key, value -> setHueProperty(group, key,value) }
             data.action.each { key, value -> setHueProperty(group, key, value) }
         }
@@ -1038,7 +1045,7 @@ def parseLights(json) {
         // Add code to update all installed lights state
         def light = getChildDevice(networkIdForLight(id))
         if (light) {
-            if (debug) log.info "Parsing response: $data for $id" // temporary
+            if (debug) log.debug "Parsing response: $data for $id" // temporary
             light.unschedule()
             data.state.each  { key, value -> setHueProperty(light, key,value) }
             data.action.each { key, value -> setHueProperty(light, key, value) }

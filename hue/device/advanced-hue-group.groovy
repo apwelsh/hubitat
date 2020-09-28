@@ -153,21 +153,15 @@ def resetRefreshSchedule() {
 }
 
 def setHueProperty(name, value) {
-    switch (name) {
-        case "scene":
+    if (name == (anyOn?"any_on":"all_on")) {
+        parent.sendChildEvent(this, "switch", value ? "on" : "off")
+    } else if (name == "scene") {
         def child = getChildDevice(networkIdForScene(value))
         exclusiveOn(child)
         if (child) {
             child.unschedule()
             if (sceneMode == "trigger") child.runInMillis(400, "off")
         }
-        break;
-        case "any_on":
-        if (anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
-        break;
-        case "all_on":
-        if (!anyOn) sendEvent(name: "switch", value: value ? "on" : "off")
-        break;
     }
 }
 
@@ -192,7 +186,7 @@ def activateScene(scene) {
 
 def allOff() {
     getChildDevices().findAll { it.currentValue("switch") == "on" }.each { 
-        it.sendEvent(name: "switch", value: "off") 
+        parent.sendChildEvent(it, name: "switch", value: "off") 
         if (logEnable) log.info "Scene (${it}) turned off"
     }
 }
@@ -200,10 +194,10 @@ def allOff() {
 def exclusiveOn(child) {
     if (child) {
         def dni = child.device.deviceNetworkId
-        childDevices.each { 
+        getChildDevices().each { 
             def value = (it.deviceNetworkId == dni) ? "on" : "off"
             if (it.device.currentValue("switch") != value) {
-                it.sendEvent(name: "switch", value: value) 
+                parent.sendChildEvent(it, name: "switch", value: value) 
                 if (logEnable) log.info "Scene (${it.label}) turned ${value}"
             }
         }
@@ -229,7 +223,7 @@ void componentOff(child) {
     if (sceneMode == "switch") {
         if (child.currentValue("switch") == "on") off()
     } else {
-        child.sendEvent(name: "switch", value: "off")
+        parent.sendChildEvent(child, name: "switch", value: "off")
     }
 }
 
