@@ -152,13 +152,13 @@ def refresh() {
 }
 
 def autoRefresh() {
-    if (autoRefesh) runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefesh) runIn(refreshInterval?:60, autoRefresh, [overwrite: true, misfire:"ignore"])
     refresh()
 }
 
 def resetRefreshSchedule() {
     unschedule()
-    if (autoRefresh) runIn(refreshInterval, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefresh) runIn(refreshInterval?:60, autoRefresh, [overwrite: true, misfire:"ignore"])
 }
 
 def setHueProperty(name, value) {
