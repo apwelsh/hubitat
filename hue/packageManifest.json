@@ -35,6 +35,6 @@
       "version": "1.1.5"
     }
   ],
-  "releaseNotes": "Fixed Debug logging for app where an erroneous debug log message was being recorded for every refresh.  Fixed auto-refresh bug introduced with the fix for the on/off flip-flop issue."
+  "releaseNotes": "Fixes a bug that prevented Scene child devices trun turning off, and managing the exclusive on state.  Now, turning on a scene, will turn off all other scenes in the same group once again."
 
 }

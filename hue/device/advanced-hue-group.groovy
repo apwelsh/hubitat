@@ -197,7 +197,7 @@ def activateScene(scene) {
 
 def allOff() {
     getChildDevices().findAll { it.currentValue("switch") == "on" }.each { 
-        parent.sendChildEvent(it, name: "switch", value: "off") 
+        parent.sendChildEvent(it, "switch", "off") 
         if (logEnable) log.info "Scene (${it}) turned off"
     }
 }
@@ -208,7 +208,7 @@ def exclusiveOn(child) {
         getChildDevices().each { 
             def value = (it.deviceNetworkId == dni) ? "on" : "off"
             if (it.device.currentValue("switch") != value) {
-                parent.sendChildEvent(it, name: "switch", value: value) 
+                parent.sendChildEvent(it, "switch", value) 
                 if (logEnable) log.info "Scene (${it.label}) turned ${value}"
             }
         }
@@ -234,7 +234,7 @@ void componentOff(child) {
     if (sceneMode == "switch") {
         if (child.currentValue("switch") == "on") off()
     } else {
-        parent.sendChildEvent(child, name: "switch", value: "off")
+        parent.sendChildEvent(child, "switch", "off")
     }
 }
 
