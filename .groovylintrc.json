@@ -1,0 +1,11 @@
+{
+    "extends": "recommended",
+    "rules": {
+        "BlockStartsWithBlankLine": {
+            "enabled": false
+        },
+        "LineLength": {
+            "enabled": false
+        }
+    }
+}

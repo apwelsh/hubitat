@@ -8,52 +8,107 @@
  * AdvancedHueScene device.
  *-------------------------------------------------------------------------------------------------------------------
  * Copyright 2020 Armand Peter Welsh
- * 
- * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
- * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the 'Software'), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
  * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
  *
- * The above copyright notice and this permission notice shall be included in all copies or substantial portions of 
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
  * the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO 
- * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
  * IN THE SOFTWARE.
  *-------------------------------------------------------------------------------------------------------------------
  **/
 
+import groovy.transform.Field
+
+@Field static final String  SCENE_MODE_TRIGGER       = 'trigger'
+@Field static final String  SCENE_MODE_SWITCH        = 'switch'
+
+@Field static final Boolean DEFAULT_SCENE            = ''
+@Field static final String  DEFAULT_SCENE_MODE       = 'trigger'
+@Field static final Boolean DEFAULT_SCENE_OFF        = false
+@Field static final Boolean DEFAULT_AUTO_REFRESH     = false
+@Field static final Number  DEFAULT_REFRESH_INTERVAL = 60
+@Field static final Boolean DEFAULT_ANY_ON           = true
+@Field static final Boolean DEFAULT_LOG_ENABLE       = false
+
+@Field static final Map     EVENT_SWITCH_ON          = [name: 'switch', value: 'on']
+@Field static final Map     EVENT_SWITCH_OFF         = [name: 'switch', value: 'off']
+
+@Field static final Map     SCHEDULE_NON_PERSIST     = [overwrite: true, misfire:'ignore']
+
 preferences {
-    input name: "defaultScene", type: "string", defaultValue: "", title: "Default Scene", options:scenes, description: "Enter a scene name or number as define by the Hue Bridge to activate when this group is turned on."
-    input name: "sceneMode", type: "enum", defaultValue: "trigger", title: "Scene Child Device Behavior", options:["trigger", "switch"], description: "If set to switch, the scene can be used to turn off this group. Only one scene can be on at any one time."
-    if (sceneMode == "switch")
-        input name: "sceneOff", type: "bool", defaultValue: false, title: "Track Scene State", description: "If enabled, any change to this group will turn off all child scenes." 
-    input name: "autoRefresh", type: "bool", defaultValue: false, title: "Auto Refresh",        description: "Should this device support automatic refresh" 
-    if (autoRefresh)
-        input name: "refreshInterval", type: "number", defaultValue: 60, title: "Refresh Inteval", description: "Number of seconds to refresh the group state" 
-    input name: "anyOn",       type: "bool", defaultValue: true,  title: "ANY on or ALL on",    description: "When ebabled, the group is considered on when any light is on"
-    input name: "logEnable",   type: "bool", defaultValue: false, title: "Enable informational logging"
+
+    input name:         'defaultScene',
+          type:         'string',
+          defaultValue: DEFAULT_SCENE,
+          title:        'Default Scene',
+          description:  'Enter a scene name or number as define by the Hue Bridge to activate when this group is turned on.'
+
+    input name:         'sceneMode',
+          type:         'enum',
+          defaultValue: DEFAULT_SCENE_MODE,
+          title:        'Scene Child Device Behavior',
+          options:      [SCENE_MODE_TRIGGER, SCENE_MODE_SWITCH],
+          description:  'If set to switch, the scene can be used to turn off this group. Only one scene can be on at any one time.'
+
+    if (sceneMode == SCENE_MODE_SWITCH) {
+        input name:         'sceneOff',
+              type:         'bool',
+              defaultValue: DEFAULT_SCENE_OFF,
+              title:        'Track Scene State',
+              description:  'If enabled, any change to this group will turn off all child scenes.'
+    }
+
+    input name:         'autoRefresh',
+          type:         'bool',
+          defaultValue: DEFAULT_AUTO_REFRESH,
+          title:        'Auto Refresh',
+          description:  'Should this device support automatic refresh'
+
+    if (autoRefresh) {
+        input name:         'refreshInterval',
+              type:         'number',
+              defaultValue: DEFAULT_REFRESH_INTERVAL,
+              title:        'Refresh Inteval',
+              description:  'Number of seconds to refresh the group state'
+    }
+
+    input name:         'anyOn',
+          type:         'bool',
+          defaultValue: DEFAULT_ANY_ON,
+          title:        'ANY on or ALL on',
+          description:  'When ebabled, the group is considered on when any light is on'
+
+    input name:         'logEnable',
+          type:         'bool',
+          defaultValue: DEFAULT_LOG_ENABLE,
+          title:        'Enable informational logging'
 }
 
 metadata {
-    definition (name:      "AdvancedHueGroup", 
-                namespace: "apwelsh", 
-                author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy") {
-        
-        capability "Light"
-        capability "ChangeLevel"
-        capability "Switch"
-        capability "SwitchLevel"
-        capability "Actuator"
-        capability "ColorControl"
-        capability "ColorMode"
-        capability "ColorTemperature"
-        capability "Refresh"
-        
-        command "activateScene", [[name: "Scene Identitier*", type: "STRING", description: "Enter a scene name or the scene number as defined by the Hue Bridge"]]
+    definition (name:      'AdvancedHueGroup',
+                namespace: 'apwelsh',
+                author:    'Armand Welsh',
+                importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy') {
+
+        capability 'Light'
+        capability 'ChangeLevel'
+        capability 'Switch'
+        capability 'SwitchLevel'
+        capability 'Actuator'
+        capability 'ColorControl'
+        capability 'ColorMode'
+        capability 'ColorTemperature'
+        capability 'Refresh'
+
+        command 'activateScene', [[name: 'Scene Identitier*', type: 'STRING', description: 'Enter a scene name or the scene number as defined by the Hue Bridge']]
     }
 }
 
@@ -64,157 +119,154 @@ def installed() {
 
 def updated() {
 
-    if (settings.autoRefresh     == null) device.updateSetting("autoRefresh",     false)
-    if (settings.refreshInterval == null) device.updateSetting("refreshInterval", 60)
-    if (settings.anyOn           == null) device.updateSetting("anyOn",           true)
-    if (settings.logEnable       == null) device.updateSetting("logEnable",       false)
-    if (settings.sceneMode       == null) device.updateSetting("sceneMode",       "trigger")
-    if (settings.sceneOff        == null) device.updateSetting("sceneOff",        false)
+    if (settings.scene           == null) { device.updateSetting('scene',           DEFAULT_SCENE) }
+    if (settings.sceneMode       == null) { device.updateSetting('sceneMode',       DEFAULT_SCENE_MODE) }
+    if (settings.sceneOff        == null) { device.updateSetting('sceneOff',        DEFAULT_SCENE_OFF) }
+    if (settings.autoRefresh     == null) { device.updateSetting('autoRefresh',     DEFAULT_AUTO_REFRESH) }
+    if (settings.refreshInterval == null) { device.updateSetting('refreshInterval', DEFAULT_REFRESH_INTERVAL) }
+    if (settings.anyOn           == null) { device.updateSetting('anyOn',           DEFAULT_ANY_ON) }
+    if (settings.logEnable       == null) { device.updateSetting('logEnable',       DEFAULT_LOG_ENABLE) }
 
-    if (logEnable) log.debug "Preferences updated"
+    if (logEnable) { log.debug 'Preferences updated' }
     parent.getDeviceState(this)
     refresh()
-    
+
 }
 
 /** Switch Commands **/
 
-def on() {
-    if (logEnable) log.info "Group (${this}) turning on"
-    if (!(defaultScene?:"").trim().isEmpty()) {
-        if (logEnable) log.info "Using scene to turn on group (${this})"
+void on() {
+    if (logEnable) { log.info "Group (${this}) turning on" }
+    if (defaultScene?.trim()) {
+        if (logEnable) { log.info "Using scene to turn on group (${this})" }
         activateScene(defaultScene)
     } else {
         parent.componentOn(this)
-        if (sceneMode == "switch" && sceneOff) allOff()
+        attributeChanged()
     }
 }
 
-def off() {
-    if (logEnable) log.info "Group (${this}) turning off"
+void off() {
+    if (logEnable) { log.info "Group (${this}) turning off" }
     parent.componentOff(this)
-    if (sceneMode == "switch") allOff()
+    attributeChanged()
 }
 
 /** ColorControl Commands **/
 
-def setColor(colormap) {
-    if (logEnable) log.info "Setting (${this}) mapped color: ${colormap}"
+void setColor(Map colormap) {
+    if (logEnable) { log.info "Setting (${this}) mapped color: ${colormap}" }
     parent.componentSetColor(this, colormap)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
-def setHue(hue) {
-    if (logEnable) log.info "Setting (${this}) hue: ${hue}"
+void setHue(Integer hue) {
+    if (logEnable) { log.info "Setting (${this}) hue: ${hue}" }
     parent.componentSetHue(this, hue)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
-def setSaturation(saturation) {
-    if (logEnable) log.info "Setting (${this}) saturation: ${saturation}"
+void setSaturation(Integer saturation) {
+    if (logEnable) { log.info "Setting (${this}) saturation: ${saturation}" }
     parent.componentSetSaturation(this, saturation)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
 /** ColorTemperature Commands **/
 
-def setColorTemperature(colortemperature) {
-    if (logEnable) log.info "Setting (${this}) color temp: ${colortemperature}"
+void setColorTemperature(Integer colortemperature) {
+    if (logEnable) { log.info "Setting (${this}) color temp: ${colortemperature}" }
     parent.componentSetColorTemperature(this, colortemperature)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
 /** SwitchLevel Commands **/
 
-def setLevel(level, duration=null) {
-    if (logEnable) log.info "Setting (${this}) level: ${level}"
+void setLevel(Integer level, Integer duration=null) {
+    if (logEnable) { log.info "Setting (${this}) level: ${level}" }
     parent.componentSetLevel(this, level, duration)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
 /** ChangeLevel Commands **/
 
-def startLevelChange(direction) {
-    if (logEnable) log.info "Starting (${this}) level change: ${direction}"
+void startLevelChange(String direction) {
+    if (logEnable) { log.info "Starting (${this}) level change: ${direction}" }
     parent.componentStartLevelChange(this, direction)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
-def stopLevelChange() {
-    if (logEnable) log.info "Stopping (${this}) level change"
+void stopLevelChange() {
+    if (logEnable) { log.info "Stopping (${this}) level change" }
     parent.componentStopLevelChange(this)
-    if (sceneMode == "switch" && sceneOff) allOff()
+    attributeChanged()
 }
 
 /** Refresh Commands **/
-def refresh() {
-    if (debug) log.debug "Bridge (${this}) refreshing"
+void refresh() {
+    if (debug) { log.debug "Bridge (${this}) refreshing" }
     parent.getDeviceState(this)
     resetRefreshSchedule()
 }
 
-def autoRefresh() {
-    if (autoRefesh) runIn(refreshInterval?:60, autoRefresh, [overwrite: true, misfire:"ignore"])
-    refresh()
-}
-
-def resetRefreshSchedule() {
+void resetRefreshSchedule() {
     unschedule()
-    if (autoRefresh) runIn(refreshInterval?:60, autoRefresh, [overwrite: true, misfire:"ignore"])
+    if (autoRefresh) { runIn(refreshInterval ?: DEFAULT_REFRESH_INTERVAL, refresh, SCHEDULE_NON_PERSIST) }
 }
 
-def setHueProperty(name, value) {
-    if (name == (anyOn?"any_on":"all_on")) {
-        parent.sendChildEvent(this, "switch", value ? "on" : "off")
-    } else if (name == "scene") {
-        def child = getChildDevice(networkIdForScene(value))
-        exclusiveOn(child)
-        if (child) {
-            child.unschedule()
-            if (sceneMode == "trigger") child.runInMillis(400, "off")
-        }
+void attributeChanged() {
+    if (sceneMode == 'switch' && sceneOff) { allOff() }
+}
+
+void setHueProperty(Map args) {
+    if (args.name == (anyOn ? 'any_on' : 'all_on')) {
+        parent.sendChildEvent(this, args.value ? EVENT_SWITCH_ON : EVENT_SWITCH_OFF)
+    } else if (args.name == 'scene') {
+        sceneEnabled(args.value)
     }
 }
 
-def deviceIdNode(deviceNodeId) {
-     parent.deviceIdNode(deviceNodeId)
+void sceneEnabled(String sceneId) {
+    String groupId = parent.deviceIdNode(device.deviceNetworkId)
+    def scene = getChildDevice(parent.networkIdForScene(groupId, sceneId))
+    exclusiveOn(scene)
+    if (scene) {
+        scene.unschedule()
+        if (sceneMode == SCENE_MODE_TRIGGER) { scene.runInMillis(400, 'off') }
+    }
 }
 
-def networkIdForScene(sceneId) {
-    parent.networkIdForScene(deviceIdNode(device.deviceNetworkId), sceneId)
-}
-
-def activateScene(scene) {
-    if (logEnable) log.info "Attempting to activate scene: ${scene}"
-    def sceneId = parent.findScene(deviceIdNode(device.deviceNetworkId), scene)?.key
+void activateScene(String scene) {
+    if (logEnable) { log.info "Attempting to activate scene: ${scene}" }
+    String sceneId = parent.findScene(parent.deviceIdNode(device.deviceNetworkId), scene)?.key
     if (sceneId) {
-        if (logEnable) log.info "Activating scene with Hue Scene ID: ${sceneId}"
-        parent.setDeviceState(this, ["scene": sceneId])
+        if (logEnable) { log.info "Activating scene with Hue Scene ID: ${sceneId}" }
+        parent.setDeviceState(this, ['scene': sceneId])
     } else {
-        if (logEnable) log.warning "Cannot locate Hue scene ${scene}; verify the scene id or name is correct."
+        if (logEnable) { log.warning "Cannot locate Hue scene ${scene}; verify the scene id or name is correct." }
     }
 }
 
-def allOff() {
-    getChildDevices().findAll { it.currentValue("switch") == "on" }.each { 
-        parent.sendChildEvent(it, "switch", "off") 
-        if (logEnable) log.info "Scene (${it}) turned off"
+void allOff() {
+    childDevices.findAll { scene -> scene.currentValue('switch') == 'on' }.each { scene ->
+        parent.sendChildEvent(scene, EVENT_SWITCH_OFF)
+        log.info "Scene ($child) turned off"
     }
 }
 
-def exclusiveOn(child) {
+void exclusiveOn(def child) {
     if (child) {
-        def dni = child.device.deviceNetworkId
-        getChildDevices().each { 
-            def value = (it.deviceNetworkId == dni) ? "on" : "off"
-            if (it.device.currentValue("switch") != value) {
-                parent.sendChildEvent(it, "switch", value) 
-                if (logEnable) log.info "Scene (${it.label}) turned ${value}"
+        String dni = child.device.deviceNetworkId
+        childDevices.each { scene ->
+            Map event = (scene.deviceNetworkId == dni) ? EVENT_SWITCH_ON : EVENT_SWITCH_OFF
+            if (scene.currentValue('switch') != event.value) {
+                parent.sendChildEvent(scene, event)
+                log.info "Scene (${scene}) turned ${event.value}"
             }
         }
     }
-    if (!(device.currentValue("switch") == "on")) {
-        parent.sendChildEvent(this, "switch", "on")
+    if (!(device.currentValue('switch') == 'on')) {
+        parent.sendChildEvent(this, EVENT_SWITCH_ON)
     }
 }
 
@@ -222,22 +274,22 @@ def exclusiveOn(child) {
  * Component Child Methods (used to capture actions generated on scenes)
  */
 
-void componentOn(child) {
-    if (logEnable) log.info "Scene (${child}) turning on"
-    def sceniId = deviceIdNode(child.deviceNetworkId)
-    parent.setDeviceState(this, ["scene":sceniId])
+void componentOn(def child) {
+    if (logEnable) { log.info "Scene (${child}) turning on" }
+    String sceniId = parent.deviceIdNode(child.deviceNetworkId)
+    parent.setDeviceState(this, ['scene':sceniId])
 }
 
-void componentOff(child) {
-    if (logEnable) log.info "Scene (${child}) turning off"
+void componentOff(def child) {
+    if (logEnable) { log.info "Scene (${child}) turning off" }
     // Only change the state to off, there is not action to actually be performed.
-    if (sceneMode == "switch") {
-        if (child.currentValue("switch") == "on") off()
+    if (sceneMode == 'switch') {
+        if (child.currentValue('switch') == 'on') off()
     } else {
-        parent.sendChildEvent(child, "switch", "off")
+        parent.sendChildEvent(child, EVENT_SWITCH_OFF)
     }
 }
 
-void componentRefresh(child){
-    if (logEnable) log.info "Received refresh request from ${child.displayName} - ignored"
+void componentRefresh(def child) {
+    if (logEnable) { log.info "Received refresh request from ${child.displayName} - ignored" }
 }

@@ -11,14 +11,14 @@
  * Copyright 2020 Armand Peter Welsh
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
+ * documentation files (the 'Software'), to deal in the Software without restriction, including without limitation 
  * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
  * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
  *
  * The above copyright notice and this permission notice shall be included in all copies or substantial portions of 
  * the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO 
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO 
  * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
@@ -26,28 +26,28 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 preferences {
-    input name: "idleText",     
-          type: "bool", title: "Idle Message",   
-          description: "Show Idle message when timer is done", 
+    input name: 'idleText',     
+          type: 'bool', title: 'Idle Message',   
+          description: 'Show Idle message when timer is done', 
           defaultValue: false
-	input name: "logEnable",    
-          type: "bool", title: "Logging",        
-          description: "Enable debug logging", 
+    input name: 'logEnable',    
+          type: 'bool', title: 'Logging',        
+          description: 'Enable debug logging', 
           defaultValue: false
 }
 
 metadata {
-    definition (name:      "Timer Device", 
-                namespace: "apwelsh", 
-                author:    "Armand Welsh", 
-                importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/timer-device.groovy") {
-		
-        capability "TimedSession"
-        capability "Sensor"
-        capability "PushableButton"
+    definition (name:      'Timer Device', 
+                namespace: 'apwelsh', 
+                author:    'Armand Welsh', 
+                importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/timer-device.groovy') {
         
-        attribute  "display", "string"
-        attribute  "switch",  "string"
+        capability 'TimedSession'
+        capability 'Sensor'
+        capability 'PushableButton'
+        
+        attribute  'display', 'string'
+        attribute  'switch',  'string'
     }
 }
 
@@ -61,7 +61,7 @@ def updated() {
 }
 
 def installed() {
-    sendEvent(name: "numberOfButtons", value: 1)
+    sendEvent(name: 'numberOfButtons', value: 1)
     setTimeRemaining(0)
 }
 
@@ -70,8 +70,8 @@ def installed() {
  **/
 
 def cancel() {
-    if (logEnable) log.info "Canceling timer"
-    setStatus("canceled")
+    if (logEnable) log.info 'Canceling timer'
+    setStatus('canceled')
     setTimeRemaining(0)
 }
 
@@ -79,9 +79,9 @@ def pause() {
     if (state.alerttime) {
         setTimeRemaining(((state.alerttime - now()) / 1000) as int)
         unschedule()
-        state.remove("refreshInterval")
-        setStatus("paused")
-        if (logEnable) log.info "Timer paused"
+        state.remove('refreshInterval')
+        setStatus('paused')
+        if (logEnable) log.info 'Timer paused'
         
     }
 }
@@ -99,9 +99,9 @@ def scheduleTimerEvent(secondsRemaining) {
     }
     
     if (((state.refreshInterval?:0) as int) != refreshInterval) {
-        def t = refreshInterval == 1 ? "*" : new Date().getSeconds() % refreshInterval
+        def t = refreshInterval == 1 ? '*' : new Date().getSeconds() % refreshInterval
         unschedule(timerEvent)
-        schedule("${t}/${refreshInterval} * * * * ?", timerEvent, [misfire: "ignore", overwrite: false])
+        schedule("${t}/${refreshInterval} * * * * ?', timerEvent, [misfire: 'ignore", overwrite: false])
         state.refreshInterval = refreshInterval
         if (logEnable) log.info "Changed timer update frequency to every ${refreshInterval} second(s)"
     }
@@ -124,33 +124,33 @@ def setTimeRemaining(seconds) {
     def mins = (seconds / 60) as int
     def secs = (seconds.intValue() % 60) as int
     if (hours > 0) {
-        remaining = String.format("%d:%02d:%02d", hours, mins, secs)
+        remaining = String.format('%d:%02d:%02d', hours, mins, secs)
     } else {
-        remaining = String.format("%02d:%02d", mins, secs)
+        remaining = String.format('%02d:%02d', mins, secs)
     }
     
-    sendEvent(name: "timeRemaining", value: seconds)
-    sendEvent(name: "display", value: remaining)
+    sendEvent(name: 'timeRemaining', value: seconds)
+    sendEvent(name: 'display', value: remaining)
 }
 
 def start() {
-    if (logEnable) log.info "Timer started"
-    setStatus("running")
+    if (logEnable) log.info 'Timer started'
+    setStatus('running')
     unschedule()
     
-    def timeRemaining = (device.latestValue("timeRemaining") as int)
-    runIn(timeRemaining, timerDone,[overwrite:false, misfire: "ignore"])
+    def timeRemaining = (device.latestValue('timeRemaining') as int)
+    runIn(timeRemaining, timerDone,[overwrite:false, misfire: 'ignore'])
     state.alerttime = now() + (timeRemaining * 1000)
 
     def refreshInterval = 1
     state.refreshInterval = refreshInterval
-    schedule("* * * * * ?", timerEvent, [misfire: "ignore", overwrite: false])
+    schedule('* * * * * ?', timerEvent, [misfire: 'ignore', overwrite: false])
 }
 
 def stop() {
     unschedule()
     setTimeRemaining(0)
-    if (logEnable) log.info "Timer stopped"
+    if (logEnable) log.info 'Timer stopped'
 }
 
 /**
@@ -158,7 +158,7 @@ def stop() {
  **/
 
 def push() {
-    sendEvent(name: "pushed", value: 1, isStateChange: true)
+    sendEvent(name: 'pushed', value: 1, isStateChange: true)
 }
 
 /**
@@ -166,29 +166,29 @@ def push() {
  **/
 
 def setStatus(status) {
-    sendEvent(name: "sessionStatus", value: status, isStateChange: true)
+    sendEvent(name: 'sessionStatus', value: status, isStateChange: true)
     switch (status) {
-        case "running":
-        case "paused":
-            sendEvent(name: "switch", value: "on")
+        case 'running':
+        case 'paused':
+            sendEvent(name: 'switch', value: 'on')
             break;
         default:
-            sendEvent(name: "switch", value: "off")
+            sendEvent(name: 'switch', value: 'off')
     }
 }
 
 def resetDisplay() {
-    sendEvent(name: "display", value: idleText ? "idle" : "--:--")
+    sendEvent(name: 'display', value: idleText ? 'idle' : '--:--')
 }
 
 def timerDone() {
     if (state.alerttime) {
-        state.remove("alerttime")
-        state.remove("refreshInterval")
+        state.remove('alerttime')
+        state.remove('refreshInterval')
         unschedule()
-        if (device.currentValue('sessionStatus') != "canceled") {
-            sendEvent(name: "timeRemaining", value: seconds)
-            setStatus("stopped")
+        if (device.currentValue('sessionStatus') != 'canceled') {
+            sendEvent(name: 'timeRemaining', value: seconds)
+            setStatus('stopped')
         }
         runIn(1, resetDisplay)
         push()

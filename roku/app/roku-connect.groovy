@@ -12,14 +12,14 @@
  * Copyright 2020 Armand Peter Welsh
  * 
  * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated 
- * documentation files (the "Software"), to deal in the Software without restriction, including without limitation 
+ * documentation files (the 'Software'), to deal in the Software without restriction, including without limitation 
  * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, 
  * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
  *
  * The above copyright notice and this permission notice shall be included in all copies or substantial portions of 
  * the Software.
  *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO 
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO 
  * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
  * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF 
  * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
@@ -28,24 +28,24 @@
  **/
 
 definition(
-    name: "Roku Connect",
-    namespace: "apwelsh",
-    author: "Armand Welsh (apwelsh)",
-    description: "Roku Device Integration",
-    category: "Convenience",
-    //importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
+    name: 'Roku Connect',
+    namespace: 'apwelsh',
+    author: 'Armand Welsh (apwelsh)',
+    description: 'Roku Device Integration',
+    category: 'Convenience',
+    //importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy',
     iconUrl: "",
     iconX2Url: "",
     iconX3Url: ""
 )
 
 preferences {
-	page(name: "mainPage")
-    page(name: "deviceDiscovery", title: "Device Discovery", refreshTimeout:10)
-    page(name: "addSelectedDevices")
-    page(name: "configureDevice")
-    page(name: "changeName")
-    page(name: "manageApp")
+    page(name: 'mainPage')
+    page(name: 'deviceDiscovery', title: 'Device Discovery', refreshTimeout:10)
+    page(name: 'addSelectedDevices')
+    page(name: 'configureDevice')
+    page(name: 'changeName')
+    page(name: 'manageApp')
 }
 
 /*
@@ -73,7 +73,7 @@ def updated() {
 
 def initialize() {
     ssdpDiscover()
-    runEvery5Minutes("ssdpDiscover")    
+    runEvery5Minutes('ssdpDiscover')    
 }
 
 def subscribe() {
@@ -88,27 +88,27 @@ def subscribe() {
 def mainPage() {
 
     if (!state) {
-        return dynamicPage(name: "mainPage", title: "Roku Connect", uninstall: true, install: true) {
+        return dynamicPage(name: 'mainPage', title: 'Roku Connect', uninstall: true, install: true) {
             section {
-                paragraph "Hit Done to to install the Roku Connect Integration.\nRe-open to setup."
+                paragraph 'Hit Done to to install the Roku Connect Integration.\nRe-open to setup.'
             }
         }
     } else {
-        app.removeSetting("deviceNetworkId")
-        app.removeSetting("selectedDevice")
-        app.removeSetting("selectedApps")
-        return dynamicPage(name: "mainPage", title: "Manage your Roku connected devices", uninstall: true, install: true) {
+        app.removeSetting('deviceNetworkId')
+        app.removeSetting('selectedDevice')
+        app.removeSetting('selectedApps')
+        return dynamicPage(name: 'mainPage', title: 'Manage your Roku connected devices', uninstall: true, install: true) {
             section(){
-                href "deviceDiscovery", title:"Discover New Devices", description:""
+                href 'deviceDiscovery', title:'Discover New Devices', description:""
             }
-            section("Installed Devices"){
-                getChildDevices().sort({ a, b -> a["label"] <=> b["label"] }).each {
+            section('Installed Devices'){
+                getChildDevices().sort({ a, b -> a['label'] <=> b['label'] }).each {
                     def desc = it.label != it.name ? it.name : ""
-                    href "configureDevice", title:"${deviceLabel(it)}", description:desc, params: [netId: it.deviceNetworkId]
+                    href 'configureDevice', title:"${deviceLabel(it)}", description:desc, params: [netId: it.deviceNetworkId]
                 }
             }
-            section("Options") {
-                input name: "logEnable",   type: "bool", defaultValue: true, title: "Enable logging"
+            section('Options') {
+                input name: 'logEnable',   type: 'bool', defaultValue: true, title: 'Enable logging'
             }
 
         }
@@ -117,7 +117,7 @@ def mainPage() {
     
 }
 def deviceDiscovery() {
-	if (logEnable) log.debug "Searching for Hub additions and updates"
+    if (logEnable) log.debug 'Searching for Hub additions and updates'
     def refreshInterval = 30
     
     // Make sure we initiate a new search for Roku devices.
@@ -131,27 +131,27 @@ def deviceDiscovery() {
     if (discovered) {
         discovered.each {key, value ->
             if (installed.find { it == value.mac }) return
-            options["${key}"] = "${value.name}"
+            options["${key}'] = '${value.name}"
         }
     }
 
     def numFound = options.size() ?: 0
         
     def uninstall = false
-    def nextPage = selectedDevices ? "addSelectedDevices" : null
+    def nextPage = selectedDevices ? 'addSelectedDevices' : null
     
-	return dynamicPage(name:"deviceDiscovery", title:"Discovery Started!", nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
-		section("Please wait while we discover your Roku devices.  Discovery can take a few minutes, so sit back and relax. The page will reload automatically! Select your Roku below once discovered.") {
-			input "selectedDevices", "enum", required:false, title:"Select Roku Devices to install (${numFound} found)", multiple:true, options:options, submitOnChange: true
-		}
-	}    
+    return dynamicPage(name:'deviceDiscovery', title:'Discovery Started!', nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
+        section('Please wait while we discover your Roku devices.  Discovery can take a few minutes, so sit back and relax. The page will reload automatically! Select your Roku below once discovered.') {
+            input 'selectedDevices', 'enum', required:false, title:"Select Roku Devices to install (${numFound} found)", multiple:true, options:options, submitOnChange: true
+        }
+    }    
 }
 
 def addSelectedDevices() {
     if (!selectedDevices)
         return deviceDiscovery()
     
-    def subject = selectedDevices.size == 1 ? "device" : "devices"
+    def subject = selectedDevices.size == 1 ? 'device' : 'devices'
     def title = ""
     def sectionText = ""
     
@@ -164,15 +164,15 @@ def addSelectedDevices() {
         def dni = state.discovered[rokuId].mac
         try {
             
-            def child = addChildDevice("apwelsh", "Roku TV", dni, ["name": "${name}", "label": "${name}"])
-            child.updateSetting("deviceIp", state.discovered[rokuId].networkAddress)
-            child.updateSetting("autoManage", true)
-            child.updateSetting("manageApps", false)
-            child.updateSetting("manageApps", false)
+            def child = addChildDevice('apwelsh', 'Roku TV', dni, ['name': "${name}', 'label': '${name}"])
+            child.updateSetting('deviceIp', state.discovered[rokuId].networkAddress)
+            child.updateSetting('autoManage', true)
+            child.updateSetting('manageApps', false)
+            child.updateSetting('manageApps', false)
             devices.remove(rokuId)
             
         } catch (ex) {
-            if (ex.message =~ "A device with the same device network ID exists.*") {
+            if (ex.message =~ 'A device with the same device network ID exists.*') {
                 sectionText = """\nA device with the same device network ID (${dni}) already exists; cannot add Group [${name}]"""
             } else {
                 sectionText += """\nFailed to add group [${name}]; see logs for details"""
@@ -182,7 +182,7 @@ def addSelectedDevices() {
     }
 
     if (devices.size() == 0)
-        app.removeSetting("selectedDevices")
+        app.removeSetting('selectedDevices')
     
     if (!sectionText) {
         title = "Adding ${deviceCount} Roku ${subject} to Hubitat"
@@ -191,25 +191,25 @@ def addSelectedDevices() {
         title = "Failed to add Roku ${subject}"
     }
     
-	return dynamicPage(name:"addSelectedDevices", title:title, nextPage:null) {
-		section() {
+    return dynamicPage(name:'addSelectedDevices', title:title, nextPage:null) {
+        section() {
             paragraph sectionText
-		}
-	}
+        }
+    }
 
 }
 
 def configureDevice(params) {
-    app.removeSetting("applicationNetworkId")
+    app.removeSetting('applicationNetworkId')
     
-    def networkId = params?.netId ?: settings["deviceNetworkId"]
+    def networkId = params?.netId ?: settings['deviceNetworkId']
     if (!networkId) return mainPage()
     
     def child = getChildDevice(networkId)
     if (!child)
         return mainPage()
     
-    app.updateSetting("deviceNetworkId", networkId)
+    app.updateSetting('deviceNetworkId', networkId)
     
     def rokuApps = child.getInstalledApps()
     def installedApps = child.getChildDevices().collect { it.deviceNetworkId}.findAll { it =~ /^.*\-\d+$/ }
@@ -236,11 +236,11 @@ def configureDevice(params) {
     app.updateSetting("${networkId}_selectedApps", selectedApps)   
     
     def label = (deviceLabel(child)?:"").trim()
-    def newLabel = (settings["${networkId}_label"]?:"").trim()
+    def newLabel = (settings["${networkId}_label']?:'").trim()
     if (newLabel != "" && label != newLabel) {
         renameChildDevice(this, networkId, newLabel)
         child.getChildDevices().findAll { deviceLabel(it)?.startsWith("${label}") }.each {
-            renameChildDevice(child, it.deviceNetworkId, deviceLabel(it).replace("${label}", "${newLabel}"))
+            renameChildDevice(child, it.deviceNetworkId, deviceLabel(it).replace("${label}', '${newLabel}"))
         }
         
         label = newLabel
@@ -248,21 +248,21 @@ def configureDevice(params) {
     
     app.removeSetting("${networkId}_label")
 
-    return dynamicPage(name:"configureDevice", title:"Configure device", nextPage:null) {
+    return dynamicPage(name:'configureDevice', title:'Configure device', nextPage:null) {
         section() {
-            paragraph "Use this section to configure your Roku device settings"
-            input "${networkId}_label", "text", title: "Device name", defaultValue:label, submitOnChange: true
+            paragraph 'Use this section to configure your Roku device settings'
+            input "${networkId}_label', 'text', title: 'Device name", defaultValue:label, submitOnChange: true
         }
         
-        section("Add / Remove Applications") {
-            //href "appDiscovery", title:"Add/Remove Roku Apps", description:"", params: params
-            input "${networkId}_selectedApps", "enum", title: "Select Apps to use as switch devices, unlselect Apps to remove the switch device", required: flase, multiple: true, options: rokuApps, submitOnChange: true
+        section('Add / Remove Applications') {
+            //href 'appDiscovery', title:'Add/Remove Roku Apps', description:"", params: params
+            input "${networkId}_selectedApps', 'enum', title: 'Select Apps to use as switch devices, unlselect Apps to remove the switch device", required: flase, multiple: true, options: rokuApps, submitOnChange: true
         }
         
-        section("Manage installed apps") {
-            child.getChildDevices().sort({ a, b -> a["label"] <=> b["label"] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
+        section('Manage installed apps') {
+            child.getChildDevices().sort({ a, b -> a['label'] <=> b['label'] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
                 def desc = it.label != it.name ? it.name : ""
-                href "manageApp", title:"<img src='${child.iconPathForApp(it.deviceNetworkId)}' style='width:auto; height:1em'/> ${desc}", description:"", params: [netId: networkId, appId: it.deviceNetworkId]
+                href 'manageApp', title:"<img src='${child.iconPathForApp(it.deviceNetworkId)}' style='width:auto; height:1em'/> ${desc}', description:'", params: [netId: networkId, appId: it.deviceNetworkId]
                 
             }
         }
@@ -270,10 +270,10 @@ def configureDevice(params) {
 }
 
 def manageApp(params) {
-    def networkId = params?.netId ?: settings["deviceNetworkId"]
-    def appId     = params?.appId ?: settings["applicationNetworkId"]
+    def networkId = params?.netId ?: settings['deviceNetworkId']
+    def appId     = params?.appId ?: settings['applicationNetworkId']
     if (!networkId || !appId) {
-        app.removeSetting("applicationNetworkId")
+        app.removeSetting('applicationNetworkId')
         return configureDevice()
     }
     
@@ -283,11 +283,11 @@ def manageApp(params) {
         return mainPage()
     
     // track state to backup to.
-    app.updateSetting("deviceNetworkId", networkId)
+    app.updateSetting('deviceNetworkId', networkId)
 
     def device = child.getChildDevice(appId)
     def label = (deviceLabel(device)?:"").trim()   
-    def newLabel = (settings["${appId}_label"]?:"").trim()
+    def newLabel = (settings["${appId}_label']?:'").trim()
 
     if (newLabel != "" && label != newLabel) { 
         renameChildDevice(child, appId, newLabel)
@@ -295,10 +295,10 @@ def manageApp(params) {
     }
     app.removeSetting("${appId}_label")
 
-    return dynamicPage(name: "manageApp", title:"Manage Installed Apps for ${deviceLabel(child)}", nextPage:null) {
+    return dynamicPage(name: 'manageApp', title:"Manage Installed Apps for ${deviceLabel(child)}", nextPage:null) {
         section() {
             paragraph "Use this section to set the ${device.name} application name for ${deviceLabel(child)}"
-            input "${appId}_label", "text", title: "Application name", defaultValue:label, submitOnChange: true
+            input "${appId}_label', 'text', title: 'Application name", defaultValue:label, submitOnChange: true
             paragraph "<img src='${child.iconPathForApp(appId)}'/>"
 
         }    
@@ -311,7 +311,7 @@ def manageApp(params) {
  */
 
 void ssdpSubscribe() {
-    subscribe(location, "ssdpTerm.roku:ecp", ssdpHandler)
+    subscribe(location, 'ssdpTerm.roku:ecp', ssdpHandler)
 }
 
 void ssdpUnsubscribe() {
@@ -320,7 +320,7 @@ void ssdpUnsubscribe() {
 
 
 void ssdpDiscover() {
-    sendHubCommand(new hubitat.device.HubAction("lan discovery roku:ecp", hubitat.device.Protocol.LAN))
+    sendHubCommand(new hubitat.device.HubAction('lan discovery roku:ecp', hubitat.device.Protocol.LAN))
 }
 
 def ssdpHandler(event) {
@@ -330,9 +330,9 @@ def ssdpHandler(event) {
     
     def roku = parsedEvent?.ssdpUSN.replaceAll(~/.*\:/,"")
     if (parsedEvent.networkAddress) {
-        parsedEvent << ["roku":roku, 
-                        "networkAddress": convertHexToIP(parsedEvent.networkAddress),
-                        "deviceAddress": convertHexToInt(parsedEvent.deviceAddress)]
+        parsedEvent << ['roku':roku, 
+                        'networkAddress': convertHexToIP(parsedEvent.networkAddress),
+                        'deviceAddress': convertHexToInt(parsedEvent.deviceAddress)]
 
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
         
@@ -365,8 +365,8 @@ private verifyDevice(event) {
             def hubId = "${event.mac}"[-6..-1]
             def name = "${device.friendlyName} (${hubId})"
 
-            event << ["url":"${data.URLBase}", 
-                            "name":"${name}", "serialNumber":"${device.serialNumber}"]
+            event << ['url':"${data.URLBase}", 
+                            'name':"${name}', 'serialNumber':'${device.serialNumber}"]
 
             def discovered = getDiscovered()
             discovered << ["${ssdpUSN}": event]
@@ -383,15 +383,15 @@ private updateDevice(event) {
 
     if (roku.networkAddress != event.networkAddress || roku.deviceAddress != event.deviceAddress) {
         def oldAddress = roku.deviceAddress
-        roku << ["networkAddress": event.networkAddress,
-                   "deviceAddress": event.deviceAddress]
+        roku << ['networkAddress': event.networkAddress,
+                   'deviceAddress': event.deviceAddress]
         
         if (logEnable) log.debug "Detected roku address update: ${device.name} from ${oldAddress} to ${event.deviceAddress}"
     }
     
     def child = getChildDevice(roku.mac)
     if (child) {
-        child.updateSetting("deviceIp", roku.networkAddress)
+        child.updateSetting('deviceIp', roku.networkAddress)
     } else {
         cleanupOrphans(roku.mac)
     }
@@ -429,10 +429,10 @@ def renameChildDevice(parent, networkId, name) {
  */
 
 private String convertHexToIP(hex) {
-	[hubitat.helper.HexUtils.hexStringToInt(hex[0..1]),
+    [hubitat.helper.HexUtils.hexStringToInt(hex[0..1]),
      hubitat.helper.HexUtils.hexStringToInt(hex[2..3]),
      hubitat.helper.HexUtils.hexStringToInt(hex[4..5]),
-     hubitat.helper.HexUtils.hexStringToInt(hex[6..7])].join(".")
+     hubitat.helper.HexUtils.hexStringToInt(hex[6..7])].join('.')
 }
 
 private Integer convertHexToInt(hex) {

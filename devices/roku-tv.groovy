@@ -6,10 +6,10 @@
 
 metadata {
     definition (
-        name:      "Roku TV", 
-        namespace: "apwelsh", 
-        author:    "Armand Welsh", 
-        importUrl: "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy") {
+        name:      'Roku TV', 
+        namespace: 'apwelsh', 
+        author:    'Armand Welsh', 
+        importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy') {
 
         /*
 
