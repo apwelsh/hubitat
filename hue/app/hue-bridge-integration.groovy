@@ -821,6 +821,7 @@ void setDeviceState(def child, Map deviceState) {
                         return
                 }
                 def device = type == 'groups' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
+                //log.debug "(${device}) Received command response: ${it.success}"
                 setHueProperty(device, [name: result[4], value: value])
                 hub.runInMillis(500, 'refresh', [overwrite: true, misfire:'ignore'])
 
@@ -1088,6 +1089,7 @@ void sendChildEvent(def child, Map event) {
 
     // Log a message that the value was updated
     if (event.name == 'switch') {
+        String type = deviceIdType(child.device.deviceNetworkId) ?: 'device'
         child.log.info "${type} ($child) turned ${event.value}"
     } else {
         child.log.info "Set ($child) ${event.name}: ${event.value}"
@@ -1158,13 +1160,13 @@ void componentStopLevelChange(def child) {
 }
 
 void componentSetColor(def child, Map colormap) {
-    if (colormap?.hue == null)        { device.currentValue('hue') ?: 0 }
-    if (colormap?.saturation == null) { device.currentValue('saturation') ?: 50 }
-    if (colormap?.level == null)      { device.currentValue('level') ?: 100 }
+    if (colormap?.hue == null)        { colormap.hue        = child.currentValue('hue') ?: 0 }
+    if (colormap?.saturation == null) { colormap.saturation = child.currentValue('saturation') ?: 50 }
+    if (colormap?.level == null)      { colormap.level      = child.currentValue('level') ?: 100 }
 
-    Map args = ['hue': convertHEHue(colormap.hue),
-                'sat': convertHESaturation(colormap.saturation),
-                'bri': convertHELevel(colormap.level)]
+    Map args = ['hue': convertHEHue(colormap.hue as int),
+                'sat': convertHESaturation(colormap.saturation as int),
+                'bri': convertHELevel(colormap.level as int)]
 
     setDeviceState(child, args)
 
