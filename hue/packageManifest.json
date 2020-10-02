@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.2.0"
+      "version": "1.2.1"
     }
   ],
   "drivers": [
@@ -35,6 +35,6 @@
       "version": "1.2.0"
     }
   ],
-  "releaseNotes": "Refactor source to implement best practices on code implementation, and simplify some logic.  Possible performance improvments."
+  "releaseNotes": "Refactor source to implement best practices on code implementation, and simplify some logic.  Possible performance improvments. Fixed a colormap translation bug."
 
 }
