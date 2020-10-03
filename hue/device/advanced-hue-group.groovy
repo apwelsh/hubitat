@@ -250,7 +250,7 @@ void activateScene(String scene) {
 void allOff() {
     childDevices.findAll { scene -> scene.currentValue('switch') == 'on' }.each { scene ->
         parent.sendChildEvent(scene, EVENT_SWITCH_OFF)
-        log.info "Scene ($child) turned off"
+        log.info "Scene ($scene) turned off"
     }
 }
 

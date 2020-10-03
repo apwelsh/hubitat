@@ -803,26 +803,25 @@ void setDeviceState(def child, Map deviceState) {
 
         if (!response.success) { return }
 
-        response.data?.each {
-            if (it.error?.description) {
-                if (debug) { log.error "set state: ${it.error.description[0]}" }
+        response.data?.each { item ->
+            if (item.error?.description) {
+                if (debug) { log.error "set state: ${item.error.description[0]}" }
 
             }
-            it.success?.each { key, value ->
-
-                def result = key.split('/')
+            item.success?.each { key, value ->
+                List result = key.split('/')
+                type = result[1].replaceFirst('.$', '')
                 String nid
-                switch (result[1]) {
-                    case 'groups':  nid = networkIdForGroup(result[2]); break
-                    case 'lights':  nid = networkIdForLight(result[2]); break
-                    case 'scenes':  nid = networkIdForScene(result[2]); break
+                switch (type) {
+                    case 'group':  nid = networkIdForGroup(result[2]); break
+                    case 'light':  nid = networkIdForLight(result[2]); break
+                    case 'scene':  nid = networkIdForScene(result[2]); break
                     default:
                         if (logEnable) { log.warn "Unhandled device state handler repsonse: ${result}" }
                         return
                 }
-                def device = type == 'groups' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
-                //log.debug "(${device}) Received command response: ${it.success}"
-                setHueProperty(device, [name: result[4], value: value])
+                def device = type == 'group' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
+                setHueProperty(device, [(result[3]): [(result[4]): value]])
                 hub.runInMillis(500, 'refresh', [overwrite: true, misfire:'ignore'])
 
             }
@@ -869,9 +868,7 @@ void getDeviceState(def child) {
                     data.state.remove('on')
                     data.action.remove('on')
                 }
-                
-                data.state.each  { key, value -> setHueProperty(child, [name: key, value: value]) }
-                data.action.each { key, value -> setHueProperty(child, [name: key, value: value]) }
+                setHueProperty(child, [state: data.state, action: data.action])
             } else {
                 if (debug) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
             }
@@ -1036,8 +1033,7 @@ void parseGroups(json) {
             group.resetRefreshSchedule()
             data.state.remove('on')
             data.action.remove('on')
-            data.state.each  { key, value -> setHueProperty(group, [name: key, value: value]) }
-            data.action.each { key, value -> setHueProperty(group, [name: key, value: value]) }
+            setHueProperty(group, [state: data.state, action: data.action])
         }
     }
 }
@@ -1049,8 +1045,7 @@ void parseLights(json) {
         if (light) {
             if (debug) { log.debug "Parsing response: $data for $id" } // temporary
             light.unschedule()
-            data.state.each  { key, value -> setHueProperty(light, [name: key, value: value]) }
-            data.action.each { key, value -> setHueProperty(light, [name: key, value: value]) }
+            setHueProperty(light, [state: data.state, action: data.action])
         }
     }
 }
@@ -1099,30 +1094,32 @@ void sendChildEvent(def child, Map event) {
 void setHueProperty(def child, Map args) {
     String type = deviceIdType(child.device.deviceNetworkId) ?: 'device'
 
-    if (type == 'hub' && !(name ==~~ /(a(ny|ll)_on)/)) { return }
+    Map state = args.state
 
-    switch (args.name) {
-        case 'on':
-            sendChildEvent(child, [name: 'switch', value: args.value == true ? 'on' : 'off'])
-            break;
-        case 'bri':
-            sendChildEvent(child, [name: 'level', value: convertHBLevel(args.value)])
-            break;
-        case 'hue':
-            sendChildEvent(child, [name: 'hue', value: convertHBHue(args.value)])
-            break;
-        case 'sat':
-            sendChildEvent(child, [name: 'saturation', value: convertHBSaturation(args.value)])
-            break;
-        case 'ct':
-            sendChildEvent(child, [name: 'colortemperature', value: convertHBColortemp(args.value)])
-            break;
-        case ~/(a(ny|ll)_on)|scene/:
-            child.setHueProperty(args)
-            break;
-        case 'colormode':
-            sendChildEvent(child, [name: 'colorMode', value: convertHBColorMode(args.value)])
+    if (type ==~ /group|hub/) {
+        // Groups report any_on and all_on in state
+        if (state) {
+            if (state['any_on']) { child.setHueProperty([name: 'any_on', value: state.any_on]) }
+            if (state['all_on']) { child.setHueProperty([name: 'all_on', value: state.all_on]) }
+        }
+        // Groups report all other values in action
+        state = args.action
+    }    
+
+    if (state) {
+        if (type == 'group' && state.scene) {
+            child.setHueProperty([name: "scene", value: state.scene])
+            return
+        }
     }
+
+
+    if (state.containsKey('on'))        { sendChildEvent(child, [name: 'switch',           value: state.on  ? 'on' : 'off']) }
+    if (state.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel(state.bri)]) }
+    if (state.containsKey('hue'))       { sendChildEvent(child, [name: 'hue',              value: convertHBHue(state.hue)]) }
+    if (state.containsKey('sat'))       { sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(state.sat)]) }
+    if (state.containsKey('ct'))        { sendChildEvent(child, [name: 'colortemperature', value: convertHBColortemp(state.ct)]) }
+    if (state.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(state.colormode)]) }
 }
 
 // Component Dimmer delegates
