@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.3.2
+ * Version 2.5.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -25,78 +25,49 @@
  *-------------------------------------------------------------------------------------------------------------------
  **/
 
+import groovy.transform.Field
 import java.net.URLEncoder
 
-preferences {
-    def allKeys=[
-        'Home',      'Back',       'FindRemote',  'Select',
-        'Up',        'Down',       'Left',        'Right',
-        'Play',      'Rev',        'Fwd',         'InstantReplay',
-        'Info',      'Search',     'Backspace',   'Enter',
-        'VolumeUp',  'VolumeDown', 'VolumeMute',
-        'Power',     'PowerOff',   'ChannelUp',   'ChannelDown'
-        ]
-    def keys=[]
-    def installedKeys=[:]
-    try {
-        allKeys.each { key ->
-            def netId = networkIdForApp(key)
-            if (getChildDevice(netId)) {
-                installedKeys[netId] = key
-            } else {
-                keys.add(key)
-            }
-        }
-    } catch (ex) {}
+@Field static final String  REFRESH_UNIT_SECONDS = 'Seconds'
+@Field static final String  REFRESH_UNIT_MINUTES = 'Minutes'
 
-    def apps=[:]
-    def installed=[:]
-    try {
-        if (deviceIp && (!autoManage || !manageApps)) {
-            getInstalledApps().each { netId, appName ->
-                if (getChildDevice(netId)) {
-                    installed[netId] = appName
-                } else {
-                    apps[netId] = appName
-                }
-            }
-        }
-    } catch (ex) {}
+@Field static final String  DEFAULT_REFRESH_UNITS    = 'Minutes'
+@Field static final Integer DEFAULT_REFRESH_INTERVAL = 5
+@Field static final Boolean DEFAULT_APP_REFRESH      = false
+@Field static final String  DEFAULT_APP_UNITS        = 'Seconds'
+@Field static final Integer DEFAULT_APP_INTERVAL     = 1
+@Field static final Boolean DEFAULT_AUTO_MANAGE      = true
+@Field static final Boolean DEFAULT_MANAGE_APPS      = true
+@Field static final Integer DEFAULT_HDMI_PORTS       = 3
+@Field static final Boolean DEFAULT_INPUT_AV         = false
+@Field static final Boolean DEFAULT_INPUT_TUNER      = false
+@Field static final Boolean DEFAULT_LOG_ENABLE       = false
+@Field static final Integer DEFAULT_TIMEOUT          = 10
 
-    if (!parent)
-        input name: 'deviceIp',        type: 'text',   title: 'Device IP', required: true
-    input name: 'timeout',         type: 'number', title: 'Communcation timeout', required: true, defaultValue: 10, range: 1..60, description: 'The maximum number of seconds to wait for a roku instruction to complete.  Defaults to 10 seconds.  For fast networks, set to a lower time for better hub performance when your device is offline.'
-    if (deviceIp) {
-        input name: 'refreshUnits',    type: 'enum',   title: 'Refresh interval measured in Minutes, or Seconds', options:['Minutes','Seconds'], defaultValue: 'Minutes', required: true
-        input name: 'refreshInterval', type: 'number', title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: 5, required: true
-        input name: 'appRefresh',      type: 'bool',   title: 'Refresh current application status seperate from TV status.', defaultValue: false, required: true
-        if (appRefresh) {
-            input name: 'appUnits',    type: 'enum',   title: 'Refresh interval measured in Minutes, or Seconds', options:['Minutes','Seconds'], defaultValue: 'Seconds', required: true
-            input name: 'appInterval', type: 'number', title: 'Refresh the current application at least every n seconds.', range: 1..59, defaultValue: 30, required: true        
-        }
-        input name: 'autoManage',      type: 'bool',   title: 'Enable automatic management of child devices', defaultValue: true, required: true
-        if (autoManage?:true == true) {
-            input name: 'manageApps',      type: 'bool',   title: 'Auto-manage Roku Applications', defaultValue: true, required: true
-            input name: 'hdmiPorts',       type: 'enum',   title: 'Number of HDMI inputs', options:['0','1','2','3','4'], defaultValue: '3', required: true
-            input name: 'inputAV',         type: 'bool',   title: 'Enable AV Input', defaultValue: false, required: true
-            input name: 'inputTuner',      type: 'bool',   title: 'Enable Tuner Input', defaultValue: false, required: true
-        }
-        input name: 'createChildKey',  type: 'enum',   title: 'Select a key to add a child switch for, and save changes to add the child button for the selected key', options:keys, required: false
-        input name: 'deleteChildKey',  type: 'enum',   title: 'Remove Roku Remote Control Key', options: installedKeys, required: false
-        if ((autoManage?:true == false || manageApps?:true == false) && !parent) {
-            input name: 'createChildApp',     type: 'enum',   title: 'Add Roku App', options: apps, required: false
-            input name: 'deleteChildApp',     type: 'enum',   title: 'Remove Roku App', options: installed, required: false
+@Field static final Integer LIMIT_REFRESH_INTERVAL_MAX = 59
+@Field static final Integer LIMIT_REFRESH_INTERVAL_MAN = 1
+@Field static final Integer LIMIT_APP_INTERVAL_MAX     = 59
+@Field static final Integer LIMIT_APP_INTERVAL_MIN     = 1
+@Field static final Integer LIMIT_TIMEOUT_MIN          = 1
 
-        }
-    }
-    input name: 'logEnable',       type: 'bool',   title: 'Enable debug logging', defaultValue: true, required: true
-}
+@Field static final String  SETTING_REFRESH_UNITS   = 'refreshUnits'
+@Field static final String SETTING_REFRESH_INTERVAL = 'refreshInterval'
+@Field static final String SETTING_APP_REFRESH      = 'appRefresh'
+@Field static final String  SETTING_APP_UNITS       = 'appUnits'
+@Field static final String SETTING_APP_INTERVAL     = 'appInterval'
+@Field static final String SETTING_AUTO_MANAGE      = 'autoManage'
+@Field static final String SETTING_MANAGE_APPS      = 'manageApps'
+@Field static final String SETTING_HDMI_PORTS       = 'hdmiPorts'
+@Field static final String SETTING_INPUT_AV         = 'inputAV'
+@Field static final String SETTING_INPUT_TUNER      = 'inputTuner'
+@Field static final String SETTING_LOG_ENABLE       = 'logEnable'
+@Field static final String SETTING_TIMEOUT          = 'timeout'
 
 metadata {
     definition (
-        name:      'Roku TV', 
-        namespace: 'apwelsh', 
-        author:    'Armand Welsh', 
+        name:      'Roku TV',
+        namespace: 'apwelsh',
+        author:    'Armand Welsh',
         importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy') {
         
         capability 'TV'
@@ -128,6 +99,72 @@ metadata {
     }
 }
 
+preferences {
+    List allKeys=[
+        'Home',      'Back',       'FindRemote',  'Select',
+        'Up',        'Down',       'Left',        'Right',
+        'Play',      'Rev',        'Fwd',         'InstantReplay',
+        'Info',      'Search',     'Backspace',   'Enter',
+        'VolumeUp',  'VolumeDown', 'VolumeMute',
+        'Power',     'PowerOff',   'ChannelUp',   'ChannelDown'
+        ]
+    List keys=[]
+    Map installedKeys=[:]
+    try {
+        allKeys.each { key ->
+            String netId = networkIdForApp(key)
+            if (getChildDevice(netId)) {
+                installedKeys[netId] = key
+            } else {
+                keys.add(key)
+            }
+        }
+    } catch (ex) {}
+
+    Map apps=[:]
+    Map installed=[:]
+    try {
+        if (deviceIp && (!autoManage || !manageApps)) {
+            getInstalledApps().each { netId, appName ->
+                if (getChildDevice(netId)) {
+                    installed[netId] = appName
+                } else {
+                    apps[netId] = appName
+                }
+            }
+        }
+    } catch (ex) {}
+
+    if (!parent) {
+        input name: 'deviceIp',        type: 'text',   title: 'Device IP', required: true
+    }
+    input name: 'timeout',         type: 'number', title: 'Communcation timeout', required: true, defaultValue: DEFAULT_TIMEOUT, range: 1..60, description: 'The maximum number of seconds to wait for a roku instruction to complete.  Defaults to 10 seconds.  For fast networks, set to a lower time for better hub performance when your device is offline.'
+    if (deviceIp) {
+        input name: 'refreshUnits',    type: 'enum',   title: 'Refresh interval measured in Minutes, or Seconds', options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_REFRESH_UNITS, required: true
+        input name: 'refreshInterval', type: 'number', title: "Refresh the status at least every n ${refreshUnits}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: DEFAULT_REFRESH_INTERVAL, required: true
+        input name: 'appRefresh',      type: 'bool',   title: 'Refresh current application status seperate from TV status.', defaultValue: DEFAULT_APP_REFRESH, required: true
+        if (appRefresh) {
+            input name: 'appUnits',    type: 'enum',   title: 'Refresh interval measured in Minutes, or Seconds', options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_APP_UNITS, required: true
+            input name: 'appInterval', type: 'number', title: 'Refresh the current application at least every n seconds.', range: 1..59, defaultValue: DEFAULT_APP_INTERVAL, required: true        
+        }
+        input name: 'autoManage',      type: 'bool',   title: 'Enable automatic management of child devices', defaultValue: DEFAULT_AUTO_MANAGE, required: true
+        if (autoManage?:true == true) {
+            input name: 'manageApps',      type: 'bool',   title: 'Auto-manage Roku Applications', defaultValue: DEFAULT_MANAGE_APPS, required: true
+            input name: 'hdmiPorts',       type: 'enum',   title: 'Number of HDMI inputs', options:['0','1','2','3','4'], defaultValue: DEFAULT_HDMI_PORTS, required: true
+            input name: 'inputAV',         type: 'bool',   title: 'Enable AV Input', defaultValue: DEFAULT_INPUT_AV, required: true
+            input name: 'inputTuner',      type: 'bool',   title: 'Enable Tuner Input', defaultValue: DEFAULT_INPUT_TUNER, required: true
+        }
+        input name: 'createChildKey',  type: 'enum',   title: 'Select a key to add a child switch for, and save changes to add the child button for the selected key', options:keys, required: false
+        input name: 'deleteChildKey',  type: 'enum',   title: 'Remove Roku Remote Control Key', options: installedKeys, required: false
+        if ((autoManage?:true == false || manageApps?:true == false) && !parent) {
+            input name: 'createChildApp',     type: 'enum',   title: 'Add Roku App', options: apps, required: false
+            input name: 'deleteChildApp',     type: 'enum',   title: 'Remove Roku App', options: installed, required: false
+
+        }
+    }
+    input name: 'logEnable',       type: 'bool',   title: 'Enable debug logging', defaultValue: DEFAULT_LOG_ENABLE, required: true
+}
+
 /**
  * Hubitat DTH Lifecycle Functions
  **/
@@ -136,32 +173,33 @@ def installed() {
     updated()
 }
 
+
 def updated() {
 
     // Default unset values
-    if (settings.refreshUnits    == null) device.updateSetting('refreshUnits',   'Minutes')
-    if (settings.refreshInterval == null) device.updateSetting('refreshInterval', 5       )
-    if (settings.appRefresh      == null) device.updateSetting('appRefresh',      false   )
-    if (settings.appUnits        == null) device.updateSetting('appUnits',       'Minutes')
-    if (settings.appInterval     == null) device.updateSetting('appInterval',     1       )
-    if (settings.autoManage      == null) device.updateSetting('autoManage',      true    )
-    if (settings.manageApps      == null) device.updateSetting('manageApps',      true    )
-    if (settings.hdmiPorts       == null) device.updateSetting('hdmiPorts',       3       )
-    if (settings.inputAV         == null) device.updateSetting('inputAV',         false   )
-    if (settings.inputTuner      == null) device.updateSetting('inputTuner',      false   )
-    if (settings.logEnable       == null) device.updateSetting('logEnable',       false   )
-    if (settings.timeout         == null) device.updateSetting('timeout',         10      )
+    if (settings.refreshUnits    == null) device.updateSetting(SETTING_REFRESH_UNITS,    DEFAULT_REFRESH_UNITS)
+    if (settings.refreshInterval == null) device.updateSetting(SETTING_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL)
+    if (settings.appRefresh      == null) device.updateSetting(SETTING_APP_REFRESH,      DEFAULT_APP_REFRESH)
+    if (settings.appUnits        == null) device.updateSetting(SETTING_APP_UNITS,        DEFAULT_APP_UNITS)
+    if (settings.appInterval     == null) device.updateSetting(SETTING_APP_INTERVAL,     DEFAULT_APP_INTERVAL)
+    if (settings.autoManage      == null) device.updateSetting(SETTING_AUTO_MANAGE,      DEFAULT_AUTO_MANAGE)
+    if (settings.manageApps      == null) device.updateSetting(SETTING_MANAGE_APPS,      DEFAULT_MANAGE_APPS)
+    if (settings.hdmiPorts       == null) device.updateSetting(SETTING_HDMI_PORTS,       DEFAULT_HDMI_PORTS)
+    if (settings.inputAV         == null) device.updateSetting(SETTING_INPUT_AV,         DEFAULT_INPUT_AV)
+    if (settings.inputTuner      == null) device.updateSetting(SETTING_INPUT_TUNER,      DEFAULT_INPUT_TUNER)
+    if (settings.logEnable       == null) device.updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE)
+    if (settings.timeout         == null) device.updateSetting(SETTING_TIMEOUT,          DEFAULT_TIMEOUT)
 
     // Override out-of-bounds values
-    if (settings.refreshInterval  > 59  ) device.updateSetting('refreshInterval', 59      )
-    if (settings.refreshInterval  < 1   ) device.updateSetting('refreshInterval', 1       )
-    if (settings.appInterval      > 59  ) device.updateSetting('appInterval',     59      )
-    if (settings.appInterval      < 1   ) device.updateSetting('appInterval',     1       )
-    if (settings.timeout          < 1   ) device.updateSetting('timeout',         1       )
+    if (settings.refreshInterval  > 59  ) device.updateSetting(SETTING_REFRESH_INTERVAL, LIMIT_REFRESH_INTERVAL_MAX)
+    if (settings.refreshInterval  < 1   ) device.updateSetting(SETTING_REFRESH_INTERVAL, LIMIT_REFRESH_INTERVAL_MAN)
+    if (settings.appInterval      > 59  ) device.updateSetting(SETTING_APP_INTERVAL,     LIMIT_APP_INTERVAL_MAX)
+    if (settings.appInterval      < 1   ) device.updateSetting(SETTING_APP_INTERVAL,     LIMIT_APP_INTERVAL_MIN)
+    if (settings.timeout          < 1   ) device.updateSetting(SETTING_TIMEOUT,          LIMIT_TIMEOUT_MIN)
 
     if (logEnable) log.debug 'Preferences updated'
     if (deviceIp) {
-        def mac = getMACFromIP(deviceIp)
+        String mac = getMACFromIP(deviceIp)
         if (state.deviceMac != mac) {
             if (logEnable) log.debug "Updating Mac from IP: ${mac}"
             state.deviceMac = mac
@@ -169,44 +207,44 @@ def updated() {
     }
     unschedule()
     if (deviceIp && refreshInterval > 0) {
-        if (refreshUnits == 'Seconds') {            
+        if (refreshUnits == REFRESH_UNIT_SECONDS) {            
             schedule("0/${refreshInterval} * * * * ?", refresh)
         } else {
             schedule("${new Date().format('s')} 0/${refreshInterval} * * * ?", refresh)
         }
     }
     if (appRefresh && appInterval > 0) {
-        if (appUnits == 'Seconds') {            
+        if (appUnits == REFRESH_UNIT_SECONDS) {            
             schedule("0/${appInterval} * * * * ?", refresh)
         } else {
             schedule("${new Date().format('s')} 0/${appInterval} * * * ?", refresh)
         }
     }
     if (createChildKey) {
-        def key=createChildKey
-        def text=createChildKey.replaceAll( ~ /([A-Z])/, ' $1').trim()
-        device.updateSetting('createChildKey', [value: "', type:'enum"])
+        String key=createChildKey
+        String text=createChildKey.replaceAll( ~ /([A-Z])/, ' $1').trim()
+        device.updateSetting('createChildKey', [value: '', type:'enum'])
         updateChildApp(networkIdForApp(key), text)
     }
     if (deleteChildKey) {
-        def netId=deleteChildKey
-        device.updateSetting('deleteChildKey', [value: "', type:'enum"])
+        String netId=deleteChildKey
+        device.updateSetting('deleteChildKey', [value: '', type:'enum'])
         deleteChildAppDevice(netId)
     }
 
     if (createChildApp) {
-        def netId=createChildApp
-        device.updateSetting('createChildApp', [value: "', type:'enum"])
+        String netId=createChildApp
+        device.updateSetting('createChildApp', [value: '', type:'enum'])
         if (autoManage==false || manageApps==false) {
-            def apps=getInstalledApps()
-            def appName=apps[netId]
+            Map apps=getInstalledApps()
+            String appName=apps[netId]
             if (appName && netId)
                 updateChildApp(netId, appName)
         }
     }
     if (deleteChildApp) {
-        def netId=deleteChildApp
-        device.updateSetting('deleteChildApp', [value: "', type:'enum"])
+        String netId=deleteChildApp
+        device.updateSetting('deleteChildApp', [value: '', type:'enum'])
         if (autoManage==false || manageApps==false) {
             deleteChildAppDevice(netId)
         }
@@ -214,21 +252,15 @@ def updated() {
 
 }
 
-/**
- * Event Parsers
- **/
-def parse(String description) {
-}
-
-def networkIdForApp(String appId) {
+String networkIdForApp(String appId) {
     return "${device.deviceNetworkId}-${appId}"    
 }
 
-def appIdForNetworkId(String netId) {
+String appIdForNetworkId(String netId) {
     return netId.replaceAll(~/.*\-/,"")
 }
 
-def iconPathForApp(String netId) {
+String iconPathForApp(String netId) {
     return "http://${deviceIp}:8060/query/icon/${appIdForNetworkId(netId)}"    
 }
     
@@ -237,7 +269,7 @@ def iconPathForApp(String netId) {
  */
 
  void componentOn(child) {
-    def appId = appIdForNetworkId(child.deviceNetworkId)
+    String appId = appIdForNetworkId(child.deviceNetworkId)
 
     if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
@@ -252,10 +284,9 @@ def iconPathForApp(String netId) {
 }
 
 void componentOff(child) {
-    if (child.currentValue('switch') == 'off')
-        return
+    if (child.currentValue('switch') == 'off') { return }
 
-    def appId = appIdForNetworkId(child.deviceNetworkId)
+    String appId = appIdForNetworkId(child.deviceNetworkId)
     if (appId ==~ /^(AV1|Tuner|hdmi\d|\d+)$/)
         home()
     else if (isValidKey(appId)) {
@@ -266,118 +297,114 @@ void componentOff(child) {
 
 }
 
-void componentRefresh(cd){
-    if (logEnable) log.info "received refresh request from ${cd.displayName} - ignored"
-    //if ("${device.currentValue('refresh')}' == 'idle") {
-    //    queryCurrentApp()
-    //}
+void componentRefresh(child){
+    if (logEnable) { log.info "received refresh request from ${child.displayName} - ignored" }
 }
     
 /*
  * Device Capability Interface Functions
  */
 
-def on() {
-    if (device.currentValue('switch') == 'off')
-        sendWakeUp()
+void on() {
+    if (device.currentValue('switch') == 'off') { sendWakeUp() }
     sendEvent(name: 'switch', value: 'on')
     keyPress('Power')
 }
 
-def off() {
+void off() {
     sendEvent(name: 'switch', value: 'off')
     keyPress('PowerOff')
 }
 
-def home() {
+void home() {
     keyPress('Home')
 }
 
-def channelUp() {
+void channelUp() {
     keyPress('ChannelUp')
 }
 
-def channelDown() {
+void channelDown() {
     keyPress('ChannelDown')
 }
 
-def volumeUp() {
+void volumeUp() {
     keyPress('VolumeUp')
 }
 
-def volumeDown() {
+void volumeDown() {
     keyPress('VolumeDown')
 }
 
-def setVolume(level) {
+void setVolume(Integer level) {
     log.trace 'set volume not supported by Roku'
 }
 
-def unmute() {
+void unmute() {
     keyPress('VolumeMute')
 }
 
-def mute() {
+void mute() {
     keyPress('VolumeMute')
 }
 
-def poll() {
-    if (logEnable)  log.trace 'Executing 'poll''
-    if (appRefresh) queryCurrentApp
+void poll() {
+    if (logEnable)  { log.trace 'Executing \'poll\'' }
+    if (appRefresh) { queryCurrentApp }
     refresh()
 }
 
-def refresh() {
-    if (logEnable) log.trace 'Executing 'refresh''
+void refresh() {
+    if (logEnable) { log.trace 'Executing \'refresh\'' }
     queryDeviceState()
-    if (!appRefresh) queryCurrentApp()
-    if (autoManage)  queryInstalledApps()
+    if (!appRefresh) { queryCurrentApp() }
+    if (autoManage)  { queryInstalledApps() }
 }
 
 /**
  * Custom DTH Command interface functions
  **/
 
-def input_AV1() {
+void input_AV1() {
     keyPress('InputAV1')
 }
 
-def input_Tuner() {
+void input_Tuner() {
     keyPress('InputTuner')
 }
 
-def input_hdmi1() {
+void input_hdmi1() {
     keyPress('InputHDMI1')
 }
 
-def input_hdmi2() {
+void input_hdmi2() {
     keyPress('InputHDMI2')
 }
 
-def input_hdmi3() {
+void input_hdmi3() {
     keyPress('InputHDMI3')
 }
 
-def input_hdmi4() {
+void input_hdmi4() {
     keyPress('InputHDMI4')
 }
 
-def reloadApps() {
+void reloadApps() {
     sendEvent(name: 'refresh', value: 'reload-apps')
     purgeInstalledApps()
     queryInstalledApps()
 }
 
-def search(String keywords, String type, Number providerId, String showUnavailable=false, String tmsId=null) {
+void search(String keywords, String type, Number providerId, String showUnavailable=false, String tmsId=null) {
 
-    def args = ['provider-id': providerId, 
+    Map args = ['provider-id': providerId, 
                 'type':        type, 
                 'keyword':     keywords, 
                 'launch':      'true', 
                 'match-any':   'true']
 
-    if (tmsId && tmsId != false) args['tms_id'] = tmsId
-    if (showUnavailable != null) args['show-unavailable'] = (showUnavailble == 'true') ? 'true' : 'false'
+    if (tmsId && tmsId != false) { args['tms_id'] = tmsId }
+    if (showUnavailable != null) { args['show-unavailable'] = (showUnavailble == 'true') ? 'true' : 'false' }
     
     queryContent(args)
 }
@@ -387,13 +414,12 @@ def search(String keywords, String type, Number providerId, String showUnavailab
  * The following functions are used to communicate with the Roku RESTful API
  **/
 
-def queryContent(args) {
+void queryContent(Map args) {
     try {
         httpPost([uri:"http://${deviceIp}:8060/search/browse",
                   query: args, 
                   timeout: timeout]) { response -> 
-            if (!response.isSuccess())
-            return
+            if (!response.isSuccess()) { return }
         }
     } catch (ex) {
         logExceptionWithPowerWarning(ex)
@@ -401,7 +427,7 @@ def queryContent(args) {
     }
 }
 
-def sendWakeUp() {
+void sendWakeUp() {
     if (state.'wake-on-lan' == true) {
         sendHubCommand(new hubitat.device.HubAction (
             "wake on lan ${state.deviceMac}",
@@ -412,18 +438,15 @@ def sendWakeUp() {
     }
 }
 
-def queryDeviceState() {
+void queryDeviceState() {
     sendEvent(name: 'refresh', value: 'device-info')
     try {
         httpGet([uri:"http://${deviceIp}:8060/query/device-info", timeout: timeout]) { response -> 
-            if (!response.isSuccess())
-            return
+            if (!response.isSuccess()) { return }
 
             def body = response.data
             parsePowerState(body)
             parseState(body)
-
-
         }
     } catch (ex) {
         logExceptionWithPowerWarning(ex)
@@ -432,27 +455,29 @@ def queryDeviceState() {
     sendEvent(name: 'refresh', value: 'idle')
 }
 
-private def parseState(body) {
+private void parseState(body) {
     
-    if (body['supports-wake-on-wlan'] == 'true' || !(body['network-type'] == 'wifi')) 
-        setState('wake-on-lan', true)
+    if (body['supports-wake-on-wlan'] == 'true' || !(body['network-type'] == 'wifi')) { 
+        setState('wake-on-lan', true) 
+    }
     
-    if (body['supports-find-remote'] == 'true' && body['find-remote-is-possible'] == 'true')
-        setState('supports-find-remote', true)
+    if (body['supports-find-remote'] == 'true' && body['find-remote-is-possible'] == 'true') { 
+        setState('supports-find-remote', true) 
+    }
     
     ['serial-number', 'vendor-name', 'device-id', 'model-name', 'screen-size', 'user-device-name'].each { nodeName ->
         setState(nodeName, "${body[nodeName]}")
     }
 }
 
-private def setState(key, value) {
-    if (value != "' && value != state.'${key}") {
-        state."${key}" = value
-        if (logEnabled) log.debug "Set ${key} = ${value}"
+private void setState(String key, def value) {
+    if (value && value != state[(key)]) {
+        state[(key)] = value
+        if (logEnabled) { log.debug "Set ${key} = ${value}" }
     }
 }
 
-private def isStateProperty(String key) {
+private Boolean isStateProperty(String key) {
     switch (key) {
         case 'serial-number':
         case 'vendor-name':
@@ -468,14 +493,15 @@ private def isStateProperty(String key) {
     return false
 }
 
-private def cleanState() {
-    def keys = this.state.keySet()
-    for (def key : keys) {
-        if (!isStateProperty(key)) {
-            if (logEnable) log.debug("removing ${key}")
-            this.state.remove(key)
-        }
-    }
+private void cleanState() {
+    this.state.retainAll { key, value -> isStateProperty(key) }
+    // def keys = this.state.keySet()
+    // for (def key : keys) {
+    //     if (!isStateProperty(key)) {
+    //         if (logEnable) log.debug("removing ${key}")
+    //         this.state.remove(key)
+    //     }
+    // }
 }
 
 private def parsePowerState(body) {
@@ -521,7 +547,7 @@ def queryCurrentApp() {
                 childDevices.each { child ->
                     def appName = "${child.name}"
                     def value = (currentApp.equals(appName)) ? 'on' : 'off'
-                    if ("${child.currentValue('switch')}' != '${value}") {
+                    if ("${child.currentValue('switch')}" != "${value}") {
                         child.parse([[name: 'switch', value: value, descriptionText: "${child.displayName} was turned ${value}"]])
                     }
                 }
@@ -567,7 +593,7 @@ def getInstalledApps() {
 def queryInstalledApps() {
     if (!autoManage) 
         return
-    if ("${device.currentValue('refresh')}' == 'idle") {
+    if ("${device.currentValue('refresh')}" == 'idle') {
         sendEvent(name: 'refresh', value: 'find-apps')
     }
     
@@ -608,7 +634,7 @@ def queryInstalledApps() {
         if (inputAV)    updateChildApp(networkIdForApp('AV1'), 'AV')
         if (inputTuner) updateChildApp(networkIdForApp('Tuner'), 'Antenna TV')
         if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
-            updateChildApp(networkIdForApp("hdmi${i}'), 'HDMI ${i}")
+            updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
         }
 
         if (manageApps) apps.each { netId, appName ->
