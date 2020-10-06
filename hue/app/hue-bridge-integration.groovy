@@ -624,7 +624,7 @@ void verifyDevice(parsedEvent) {
                                 'name':         "${name}",
                                 'serialNumber': "${device.serialNumber}"]
 
-                def hubs = getHubs()
+                Map hubs = getHubs()
                 hubs << ["${ssdpUSN}": parsedEvent]
                 if (logEnable) { log.debug "Discovered new hub: ${name}" }
             }
@@ -674,97 +674,85 @@ def requestHubAccessHandler(response, args) {
 
     }
 }
-void refreshHubStatus() {
 
-    def url = "http://${state.bridgeHost}/api/${state.username}/"
+Boolean getHubData(String path=null, groovy.lang.Closure handler) {
+
+    String url = "http://${state.bridgeHost}/api/${state.username}"
+    if (path) { url = "${url}/${path}" }
 
     httpGet([uri: url,
              contentType: 'application/json',
              requestContentType: 'application/json']) { response ->
-        if (!response.isSuccess()) { return }
+        
+        if (!response.isSuccess()) { return false }
 
         def data = response.data
         if (data) {
             if (data.error?.description) {
                 if (logEnable) { log.error "${data.error.description[0]}" }
+                return false
             } else {
-                parseStatus(data)
+                handler(data)
+                return true
             }
         }
 
+    } 
+}
+
+Boolean putHubData(String path=null, Map deviceState=null, groovy.lang.Closure handler) {
+
+    String url = "http://${state.bridgeHost}/api/${state.username}"
+    if (path) { url = "${url}/${path}" }
+    if (debug) { log.debug "URL: ${url}" }
+    if (debug) { log.debug "args: ${deviceState}" }
+
+    httpPut([uri: url,
+             contentType: 'application/json',
+             requestContentType: 'application/json',
+             body: deviceState]) { response ->
+
+        if (!response.success) { return false }
+
+        def data = response.data
+        if (data) {
+            if (data.error?.description) {
+                if (logEnable) { log.error "set state: ${data.error.description[0]}" }
+                return false
+            } else {
+                handler(data)
+                return true
+            }
+        }
+    }
+}
+
+
+void refreshHubStatus() {
+    getHubData() { data ->
+        parseStatus(data)
     }
 }
 
 private enumerateGroups() {
-
-    def url = "http://${state.bridgeHost}/api/${state.username}/groups"
-    //if (debug) { log.debug "${url}" }
-
-    httpGet([uri: url,
-            contentType: 'application/json',
-            requestContentType: 'application/json']) { response ->
-        if (!response.isSuccess()) { return }
-
-        def data = response.data
-        if (debug) { log.debug "enumerateGroups: ${data}" }
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) { log.error "${data.error.description[0]}" }
-            } else {
-                if (data) { state.groups = data }
-                parseGroups(data)
-            }
-        }
-
+    getHubData('groups') { data ->
+        if (data) { state.groups = data }
+        parseGroups(data)
     }
-
 }
 
 private enumerateScenes() {
-
-    def url = "http://${state.bridgeHost}/api/${state.username}/scenes"
-    //if (debug) { log.debug "${url}" }
-
-    httpGet([uri: url,
-             contentType: 'application/json',
-             requestContentType: 'application/json']) { response ->
-        if (!response.isSuccess()) { return }
-
-        def data = response.data
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) { log.error "${data.error.description[0]}" }
-            } else {
-                if (data) { state.scenes = data }
-                parseScenes(data)
-            }
-        }
-
+    getHubData('scenes') { data ->
+        if (data) { state.scenes = data }
+        parseScenes(data)
     }
-
 }
 
 private enumerateLights() {
-
-    def url = "http://${state.bridgeHost}/api/${state.username}/lights"
-    //if (debug) { log.debug "${url}" }
-
-    httpGet([uri: url,
-             contentType: 'application/json',
-             requestContentType: 'application/json']) { response ->
-        if (!response.isSuccess()) { return }
-
-        def data = response.data
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) { log.error "${data.error.description[0]}" }
-            } else {
-                if (data) { state.lights = data }
-                parseLights(data)
-            }
-        }
+    getHubData('lights') { data ->
+        if (data) { state.lights = data }
+        parseLights(data)
     }
-
 }
 
 void setDeviceState(def child, Map deviceState) {
@@ -793,22 +781,10 @@ void setDeviceState(def child, Map deviceState) {
     def hub = getChildDeviceForMac(selectedDevice)
     hub.resetRefreshSchedule()
 
-    String url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/${action}"
-    if (debug) { log.debug "URL: ${url}" }
-    if (debug) { log.debug "args: ${deviceState}" }
-    httpPut([uri: url,
-             contentType: 'application/json',
-             requestContentType: 'application/json',
-             body: deviceState]) { response ->
-
-        if (!response.success) { return }
-
-        response.data?.each { item ->
-            if (item.error?.description) {
-                if (debug) { log.error "set state: ${item.error.description[0]}" }
-
-            }
-            item.success?.each { key, value ->
+    putHubData("${type}/${node}/${action}", deviceState) { data ->
+        data.each { item ->
+        log.debug "item: ${item}"
+            item.succcess?.each { key, value ->
                 List result = key.split('/')
                 type = result[1].replaceFirst('.$', '')
                 String nid
@@ -846,37 +822,21 @@ void getDeviceState(def child) {
         type = "${deviceIdType(deviceNetworkId)}s"
         node = deviceIdNode(deviceNetworkId)
     }
-    String url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
-    if (debug) { log.debug "URL: ${url}" }
-    httpGet([uri: url,
-             contentType: 'application/json',
-             requestContentType: 'application/json']) { response ->
 
-        if (!response.success) { return }
-
-        def data = response.data
-        if (data) {
-            if (debug) { log.debug "getDeviceState received data: ${data}" }  // temporary until lights are added, and all groups/all lights
-            if ( data.error ) {
-                if (logEnable) { log.error "${it.error.description[0]}" }
-                return
+    getHubData("${type}/${node}") { data ->
+        if (node) {
+            child = getChildDevice(deviceNetworkId)
+            if (type == 'groups') {
+                child.resetRefreshSchedule()
+                data.state.remove('on')
+                data.action.remove('on')
             }
-            if (node) {
-                child = getChildDevice(deviceNetworkId)
-                if (type == 'groups') {
-                    child.resetRefreshSchedule()
-                    data.state.remove('on')
-                    data.action.remove('on')
-                }
-                setHueProperty(child, [state: data.state, action: data.action])
-            } else {
-                if (debug) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
-            }
+            setHueProperty(child, [state: data.state, action: data.action])
+        } else {
+            if (debug) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
         }
-
     }
 }
-
 
 
 /*
