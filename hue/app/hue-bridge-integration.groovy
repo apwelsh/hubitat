@@ -280,7 +280,7 @@ def addLights(Map params=[:]){
     String title = ''
     String sectionText = ''
 
-    Map lights = selectedLights.collect { it }
+    List lights = selectedLights.collect { it }
 
     selectedLights.each { lightId ->
         String name = state.lights[lightId].name
