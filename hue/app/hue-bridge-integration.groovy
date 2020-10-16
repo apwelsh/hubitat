@@ -641,7 +641,7 @@ void verifyDevice(parsedEvent) {
 
 private requestHubAccess(mac) {
     def device = getHubForMac(mac)
-    def deviceType = '{\'devicetype\': \'AdvanceHueBridgeLink#Hubitat\'}'
+    def deviceType = '{"devicetype": "AdvanceHueBridgeLink#Hubitat"}'
 
     asynchttpPost(requestHubAccessHandler,
                   [uri: "http://${device.networkAddress}/api",
@@ -655,8 +655,7 @@ def requestHubAccessHandler(response, args) {
     def status = response.getStatus();
     if (status < 200 || status >= 300) { return }
 
-    def data = response.getJson()
-
+    def data = response.json
     if (data) {
         if (data.error?.description) {
             if (logEnable) { log.error "${data.error.description[0]}" }
