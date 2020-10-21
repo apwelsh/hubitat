@@ -772,11 +772,8 @@ void setDeviceState(def child, Map deviceState) {
 
     String deviceNetworkId = child.device.deviceNetworkId
     // Establish the eventQueue for the device.
-    if (!eventQueue) {
-        eventQueue = [(deviceNetworkId): deviceState]
-    } else {
-        eventQueue[(deviceNetworkId)] = (eventQueue[(deviceNetworkId)] ?: [:]) + deviceState
-    }
+    eventQueue = eventQueue ?: [(deviceNetworkId): deviceState]
+    eventQueue[(deviceNetworkId)] = (eventQueue[(deviceNetworkId)] ?: [:]) + deviceState
 
     // If device state does not contain the value on, then determine if we must queue the state for a future call
     if (!deviceState.on && ! deviceState.scene) {
@@ -787,6 +784,7 @@ void setDeviceState(def child, Map deviceState) {
 
     Map newState = deviceState.scene ? deviceState : eventQueue[(deviceNetworkId)]
     eventQueue.remove(deviceNetworkId)
+    eventQueue = eventQueue ?: null // flush memory is list is empty, allows for garbage collection
 
     String hubId = deviceIdHub(deviceNetworkId)
     String type
