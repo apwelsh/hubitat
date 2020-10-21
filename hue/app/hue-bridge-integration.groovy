@@ -766,9 +766,28 @@ private enumerateLights() {
 
 }
 
+@Field static Map eventQueue = null
+
 void setDeviceState(def child, Map deviceState) {
 
     String deviceNetworkId = child.device.deviceNetworkId
+    // Establish the eventQueue for the device.
+    if (!eventQueue) {
+        eventQueue = [(deviceNetworkId): deviceState]
+    } else {
+        eventQueue[(deviceNetworkId)] = (eventQueue[(deviceNetworkId)] ?: [:]) + deviceState
+    }
+
+    // If device state does not contain the value on, then determine if we must queue the state for a future call
+    if (!deviceState.on && ! deviceState.scene) {
+        if ((child.device.currentValue('switch') ?: 'on') == 'off') {
+            return
+        }
+    }
+
+    Map newState = deviceState.scene ? deviceState : eventQueue[(deviceNetworkId)]
+    eventQueue.remove(deviceNetworkId)
+
     String hubId = deviceIdHub(deviceNetworkId)
     String type
     String node
@@ -798,7 +817,7 @@ void setDeviceState(def child, Map deviceState) {
     httpPut([uri: url,
              contentType: 'application/json',
              requestContentType: 'application/json',
-             body: deviceState]) { response ->
+             body: newState]) { response ->
 
         if (!response.success) { return }
 
@@ -1136,8 +1155,8 @@ void componentRefresh(child){
 }
 
 void componentSetLevel(child, level, duration=null){
-    Map args = ['bri': convertHELevel(level)]
-    if (duration != null) { args['transitiontime'] = duration * 10 }
+    Map args = ['bri': convertHELevel(level as int)]
+    if (duration != null) { args['transitiontime'] = (duration as int) * 10 }
 
     setDeviceState(child, args)
 }
@@ -1168,16 +1187,16 @@ void componentSetColor(def child, Map colormap) {
 
 }
 
-void componentSetHue(def child, Integer hue) {
-    setDeviceState(child, ['hue': convertHEHue(hue)])
+void componentSetHue(def child, hue) {
+    setDeviceState(child, ['hue': convertHEHue(hue as int)])
 }
 
-void componentSetSaturation(def child, Integer saturation) {
-    setDeviceState(child, ['sat': convertHESaturation(saturation)])
+void componentSetSaturation(def child, saturation) {
+    setDeviceState(child, ['sat': convertHESaturation(saturation as int)])
 }
 
-void componentSetColorTemperature(def child, Integer colortemperature) {
-    setDeviceState(child, ['ct': convertHEColortemp(colortemperature), 'colormode': 'ct'])
+void componentSetColorTemperature(def child, colortemperature) {
+    setDeviceState(child, ['ct': convertHEColortemp(colortemperature as int), 'colormode': 'ct'])
 }
 
 Integer transitionTime() {

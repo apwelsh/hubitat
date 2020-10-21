@@ -160,13 +160,13 @@ void setColor(Map colormap) {
     attributeChanged()
 }
 
-void setHue(Integer hue) {
+void setHue(hue) {
     if (logEnable) { log.info "Setting (${this}) hue: ${hue}" }
     parent.componentSetHue(this, hue)
     attributeChanged()
 }
 
-void setSaturation(Integer saturation) {
+void setSaturation(saturation) {
     if (logEnable) { log.info "Setting (${this}) saturation: ${saturation}" }
     parent.componentSetSaturation(this, saturation)
     attributeChanged()
@@ -174,7 +174,7 @@ void setSaturation(Integer saturation) {
 
 /** ColorTemperature Commands **/
 
-void setColorTemperature(Integer colortemperature) {
+void setColorTemperature(colortemperature) {
     if (logEnable) { log.info "Setting (${this}) color temp: ${colortemperature}" }
     parent.componentSetColorTemperature(this, colortemperature)
     attributeChanged()
@@ -182,7 +182,7 @@ void setColorTemperature(Integer colortemperature) {
 
 /** SwitchLevel Commands **/
 
-void setLevel(Integer level, Integer duration=null) {
+void setLevel(level, duration=null) {
     if (logEnable) { log.info "Setting (${this}) level: ${level}" }
     parent.componentSetLevel(this, level, duration)
     attributeChanged()
