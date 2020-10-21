@@ -5,6 +5,7 @@
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
+  "communityLink": "https://community.hubitat.com/t/release-advanced-hue-bridge-integration/51420",
   "dateReleased": "2020-01-20",
   "apps": [
     {
