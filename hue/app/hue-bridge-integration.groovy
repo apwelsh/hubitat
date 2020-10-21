@@ -1028,10 +1028,10 @@ void parseGroups(json) {
         // Add code to update all installed groups state
         def group = getChildDevice(networkIdForGroup(id))
         if (group) {
-            if (debug) { log.debug "Parsing response: $data for $id" }// temporary
+            if (debug) { log.debug "Parsing response: $data for $id" } // temporary
             group.resetRefreshSchedule()
-            data.state.remove('on')
-            data.action.remove('on')
+            if (data.state?.all_on || data.state?.any_on) data.state.remove('on')
+            if (data.state?.all_on || data.state?.any_on) data.action.remove('on')
             setHueProperty(group, [state: data.state, action: data.action])
         }
     }
