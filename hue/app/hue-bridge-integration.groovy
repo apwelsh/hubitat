@@ -50,6 +50,8 @@ definition(
 @Field static final String PAGE_FIND_SCENES = 'findScenes'
 @Field static final String PAGE_ADD_SCENES = 'addScenes'
 
+@Field static Map eventQueue = null
+
 preferences {
     page(name: PAGE_MAINPAGE)
     page(name: PAGE_BRIDGE_DISCOVERY, title: 'Device Discovery', refreshTimeout:PAGE_REFRESH_TIMEOUT)
@@ -766,7 +768,6 @@ private enumerateLights() {
 
 }
 
-@Field static Map eventQueue = null
 
 void setDeviceState(def child, Map deviceState) {
 
