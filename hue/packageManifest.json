@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.5.8",
+  "version": "1.5.9",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -15,7 +15,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.2.7"
+      "version": "1.2.8"
     }
   ],
   "drivers": [
@@ -36,6 +36,6 @@
       "version": "1.2.0"
     }
   ],
-  "releaseNotes": "Fixed group state (on/off) not updating when lights in group are updated.  Fixed bug when assigning attributes to lights directly, that prevented the assignments.  Added a queuing system to track future state of hue devices commanded while device is off, so that when the device is turned on, all queued states will be issues as a single update."
+  "releaseNotes": "Fixed a bug in handling of colorTemperature devices to use the correct attribe name.  Also added setting of color mode for any change to color devices."
 
 }
