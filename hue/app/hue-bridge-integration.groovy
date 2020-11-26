@@ -1153,7 +1153,8 @@ void componentRefresh(child){
 }
 
 void componentSetLevel(child, level, duration=null){
-    Map args = ['bri': convertHELevel(level as int)]
+    Integer heLevel = convertHELevel(level as int);
+    Map args = ['on': (heLevel > 0), 'bri': convertHELevel(heLevel)]
     if (duration != null) { args['transitiontime'] = (duration as int) * 10 }
 
     setDeviceState(child, args)
