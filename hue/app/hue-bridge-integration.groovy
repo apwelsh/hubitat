@@ -1131,11 +1131,11 @@ void setHueProperty(def child, Map args) {
 
 
     if (state.containsKey('on'))        { sendChildEvent(child, [name: 'switch',           value: state.on  ? 'on' : 'off']) }
+    if (state.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(state.colormode)]) }
     if (state.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel(state.bri)]) }
     if (state.containsKey('hue'))       { sendChildEvent(child, [name: 'hue',              value: convertHBHue(state.hue)]) }
     if (state.containsKey('sat'))       { sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(state.sat)]) }
-    if (state.containsKey('ct'))        { sendChildEvent(child, [name: 'colortemperature', value: convertHBColortemp(state.ct)]) }
-    if (state.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(state.colormode)]) }
+    if (state.containsKey('ct'))        { sendChildEvent(child, [name: 'colorTemperature', value: convertHBColortemp(state.ct)]) }
 }
 
 // Component Dimmer delegates
@@ -1177,7 +1177,8 @@ void componentSetColor(def child, Map colormap) {
     if (colormap?.saturation == null) { colormap.saturation = child.currentValue('saturation') ?: 50 }
     if (colormap?.level == null)      { colormap.level      = child.currentValue('level') ?: 100 }
 
-    Map args = ['hue': convertHEHue(colormap.hue as int),
+    Map args = ['colormode': 'hs',
+                'hue': convertHEHue(colormap.hue as int),
                 'sat': convertHESaturation(colormap.saturation as int),
                 'bri': convertHELevel(colormap.level as int)]
 
@@ -1186,15 +1187,15 @@ void componentSetColor(def child, Map colormap) {
 }
 
 void componentSetHue(def child, hue) {
-    setDeviceState(child, ['hue': convertHEHue(hue as int)])
+    setDeviceState(child, ['colormode': 'hs', 'hue': convertHEHue(hue as int)])
 }
 
 void componentSetSaturation(def child, saturation) {
-    setDeviceState(child, ['sat': convertHESaturation(saturation as int)])
+    setDeviceState(child, ['colormode': 'hs', 'sat': convertHESaturation(saturation as int)])
 }
 
 void componentSetColorTemperature(def child, colortemperature) {
-    setDeviceState(child, ['ct': convertHEColortemp(colortemperature as int), 'colormode': 'ct'])
+    setDeviceState(child, ['colormode': 'ct', 'ct': convertHEColortemp(colortemperature as int)])
 }
 
 Integer transitionTime() {
