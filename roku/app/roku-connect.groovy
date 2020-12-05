@@ -1,6 +1,6 @@
 /**
  * Roku Connect
- * Version 1.1.1
+ * Version 1.2.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is an integration app for Hubitat designed to locate, and install any/all attached Roku devices.
@@ -73,7 +73,7 @@ def updated() {
 
 def initialize() {
     ssdpDiscover()
-    runEvery5Minutes('ssdpDiscover')
+    if (autoDiscovery) { runEvery5Minutes('ssdpDiscover') }
 }
 
 /*
@@ -81,6 +81,8 @@ def initialize() {
  */
 
 def mainPage() {
+
+    if (!autoDiscovery) { unschedule('ssdpDiscover') }
 
     if (!state) {
         return dynamicPage(name: 'mainPage', title: 'Roku Connect', uninstall: true, install: true) {
@@ -103,7 +105,8 @@ def mainPage() {
                 }
             }
             section('Options') {
-                input name: 'logEnable',   type: 'bool', defaultValue: true, title: 'Enable logging'
+                input name: 'autoDiscovery', type: 'bool', defaultValue: true, title: 'Auto detect IP changes of Roku devices'
+                input name: 'logEnable',     type: 'bool', defaultValue: true, title: 'Enable logging'
             }
 
         }
@@ -117,6 +120,7 @@ def deviceDiscovery() {
     // Make sure we initiate a new search for Roku devices.
     ssdpSubscribe()
     ssdpDiscover()
+    runEvery1Minute('ssdpDiscover')
 
     def installed = getChildDevices().collect { it.deviceNetworkId }
     def discovered = getDiscovered()
