@@ -30,7 +30,7 @@ import groovy.transform.Field
 @Field static final String  SCENE_MODE_TRIGGER       = 'trigger'
 @Field static final String  SCENE_MODE_SWITCH        = 'switch'
 
-@Field static final Boolean DEFAULT_SCENE            = ''
+@Field static final String  DEFAULT_SCENE            = ''
 @Field static final String  DEFAULT_SCENE_MODE       = 'trigger'
 @Field static final Boolean DEFAULT_SCENE_OFF        = false
 @Field static final Boolean DEFAULT_AUTO_REFRESH     = false
