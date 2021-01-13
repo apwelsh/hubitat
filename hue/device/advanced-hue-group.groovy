@@ -119,13 +119,14 @@ def installed() {
 
 def updated() {
 
-    if (settings.scene           == null) { device.updateSetting('scene',           DEFAULT_SCENE) }
-    if (settings.sceneMode       == null) { device.updateSetting('sceneMode',       DEFAULT_SCENE_MODE) }
-    if (settings.sceneOff        == null) { device.updateSetting('sceneOff',        DEFAULT_SCENE_OFF) }
-    if (settings.autoRefresh     == null) { device.updateSetting('autoRefresh',     DEFAULT_AUTO_REFRESH) }
-    if (settings.refreshInterval == null) { device.updateSetting('refreshInterval', DEFAULT_REFRESH_INTERVAL) }
-    if (settings.anyOn           == null) { device.updateSetting('anyOn',           DEFAULT_ANY_ON) }
-    if (settings.logEnable       == null) { device.updateSetting('logEnable',       DEFAULT_LOG_ENABLE) }
+    if (settings.defaultScene    == false) { device.updateSetting('defaultScene',    DEFAULT_SCENE) }
+    if (settings.defaultScene    == null)  { device.updateSetting('defaultScene',    DEFAULT_SCENE) }
+    if (settings.sceneMode       == null)  { device.updateSetting('sceneMode',       DEFAULT_SCENE_MODE) }
+    if (settings.sceneOff        == null)  { device.updateSetting('sceneOff',        DEFAULT_SCENE_OFF) }
+    if (settings.autoRefresh     == null)  { device.updateSetting('autoRefresh',     DEFAULT_AUTO_REFRESH) }
+    if (settings.refreshInterval == null)  { device.updateSetting('refreshInterval', DEFAULT_REFRESH_INTERVAL) }
+    if (settings.anyOn           == null)  { device.updateSetting('anyOn',           DEFAULT_ANY_ON) }
+    if (settings.logEnable       == null)  { device.updateSetting('logEnable',       DEFAULT_LOG_ENABLE) }
 
     if (logEnable) { log.debug 'Preferences updated' }
     parent.getDeviceState(this)
