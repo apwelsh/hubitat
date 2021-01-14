@@ -204,7 +204,9 @@ def timerDone() {
             setStatus('stopped')
         }
         runIn(1, resetDisplay)
-        push()
+        if (device.currentValue('sessionStatus') != 'canceled') {
+            push()
+        }       
     }
 }
 
