@@ -76,13 +76,12 @@ def cancel() {
 }
 
 def pause() {
-    if (state.alerttime) {
+    if (device.currentValue('sessionStatus') == 'running' && state.alerttime) {
         setTimeRemaining(((state.alerttime - now()) / 1000) as int)
         unschedule()
         state.remove('refreshInterval')
         setStatus('paused')
         if (logEnable) log.info 'Timer paused'
-        
     }
 }
 
