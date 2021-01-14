@@ -76,10 +76,11 @@ def cancel() {
 }
 
 def pause() {
-    if (device.currentValue('sessionStatus') == 'running' && state.alerttime) {
+    if (state.alerttime) {
         setTimeRemaining(((state.alerttime - now()) / 1000) as int)
         unschedule()
         state.remove('refreshInterval')
+        state.remove('alerttime')
         setStatus('paused')
         if (logEnable) log.info 'Timer paused'
     }
@@ -114,7 +115,20 @@ def setTimeRemaining(seconds) {
     }
 
     if (state.alerttime) {
-        scheduleTimerEvent(seconds as int)
+
+        if (state.alerttime < now() + (seconds * 1000)) {
+            log.info "Resetting time remaining to ${seconds} seconds"
+            unschedule()
+            
+            runIn(seconds as int, timerDone,[overwrite:false, misfire: 'ignore'])
+            state.alerttime = now() + (seconds * 1000)
+
+            state.refreshInterval = 1
+            schedule('* * * * * ?', timerEvent, [misfire: 'ignore', overwrite: false])
+        } else {
+            scheduleTimerEvent(seconds as int)
+        }
+
     }
 
     def hours = (seconds / 3600) as int

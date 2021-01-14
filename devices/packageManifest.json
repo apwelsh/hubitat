@@ -11,7 +11,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/timer-device.groovy",
       "required": true,
-      "version": "1.2"
+      "version": "1.3"
     }
   ]
 }
