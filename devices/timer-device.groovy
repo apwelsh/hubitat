@@ -30,6 +30,16 @@ preferences {
           type: 'bool', title: 'Idle Message',   
           description: 'Show Idle message when timer is done', 
           defaultValue: false
+    input name: 'useDefault',
+          type: 'bool', title: 'Use default timer time',
+          description: 'Enable this switch to define a default timer time to use.'
+          defaultValue: false
+    if (useDefault) {
+        input name: 'defaultTime',
+            type: 'number', title: 'Default Timer',
+            description: 'The number of seconds to set the timer to, if not the timer is not set.'
+            defaultValue: null
+    }
     input name: 'logEnable',    
           type: 'bool', title: 'Logging',        
           description: 'Enable debug logging', 
@@ -148,10 +158,16 @@ def setTimeRemaining(seconds) {
 
 def start() {
     if (logEnable) log.info 'Timer started'
-    setStatus('running')
     unschedule()
+    def timeRemaining = (device.currentValue('timeRemaining') as int)
+    if (timeRemaining == 0 && useDefault) {
+        timeRemaining = defaultTime
+        if (logEnable) log.info "Using default time of ${timeRemaining} seconds"
+        setTimeRemaining(timeRemaining)
+    }
+
+    setStatus('running')
     
-    def timeRemaining = (device.latestValue('timeRemaining') as int)
     runIn(timeRemaining, timerDone,[overwrite:false, misfire: 'ignore'])
     state.alerttime = now() + (timeRemaining * 1000)
 
@@ -200,13 +216,13 @@ def timerDone() {
         state.remove('refreshInterval')
         unschedule()
         if (device.currentValue('sessionStatus') != 'canceled') {
-            sendEvent(name: 'timeRemaining', value: seconds)
+            sendEvent(name: 'timeRemaining', value: 0)
             setStatus('stopped')
         }
         runIn(1, resetDisplay)
         if (device.currentValue('sessionStatus') != 'canceled') {
             push()
-        }       
+        }   
     }
 }
 
