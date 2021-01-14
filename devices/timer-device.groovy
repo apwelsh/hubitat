@@ -117,7 +117,7 @@ def setTimeRemaining(seconds) {
     if (state.alerttime) {
 
         if (state.alerttime < now() + (seconds * 1000)) {
-            log.info "Resetting time remaining to ${seconds} seconds"
+            if (logEnable) log.info "Resetting time remaining to ${seconds} seconds"
             unschedule()
             
             runIn(seconds as int, timerDone,[overwrite:false, misfire: 'ignore'])
