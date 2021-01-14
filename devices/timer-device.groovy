@@ -100,7 +100,7 @@ def scheduleTimerEvent(secondsRemaining) {
     if (((state.refreshInterval?:0) as int) != refreshInterval) {
         def t = refreshInterval == 1 ? '*' : new Date().getSeconds() % refreshInterval
         unschedule(timerEvent)
-        schedule("${t}/${refreshInterval} * * * * ?', timerEvent, [misfire: 'ignore", overwrite: false])
+        schedule("${t}/${refreshInterval} * * * * ?", timerEvent, [misfire: 'ignore', overwrite: false])
         state.refreshInterval = refreshInterval
         if (logEnable) log.info "Changed timer update frequency to every ${refreshInterval} second(s)"
     }
