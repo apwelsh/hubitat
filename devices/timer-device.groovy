@@ -40,6 +40,10 @@ preferences {
             description: 'The number of seconds to set the timer to, if not the timer is not set.'
             defaultValue: null
     }
+    input name: 'cancelWhenOff',
+          type: 'bool', title: cancelWhenOff ? 'Timer will be canceled when off' : 'Timer will be stopped when off'
+          description: 'Toggle to change the behavior when the timer is turned off'
+          defaultValue: false
     input name: 'logEnable',    
           type: 'bool', title: 'Logging',        
           description: 'Enable debug logging', 
@@ -55,9 +59,9 @@ metadata {
         capability 'TimedSession'
         capability 'Sensor'
         capability 'PushableButton'
+        capability 'Switch'
         
         attribute  'display', 'string'
-        attribute  'switch',  'string'
     }
 }
 
@@ -140,7 +144,6 @@ def setTimeRemaining(seconds) {
         }
 
     }
-
     def hours = (seconds / 3600) as int
     if (hours > 0)
         seconds = seconds.intValue() % 3600 // remove the hours component
@@ -154,6 +157,12 @@ def setTimeRemaining(seconds) {
     
     sendEvent(name: 'timeRemaining', value: seconds)
     sendEvent(name: 'display', value: remaining)
+
+}
+
+
+def on() {
+    start()
 }
 
 def start() {
@@ -174,6 +183,14 @@ def start() {
     def refreshInterval = 1
     state.refreshInterval = refreshInterval
     schedule('* * * * * ?', timerEvent, [misfire: 'ignore', overwrite: false])
+}
+
+def off() {
+    if (cancelWhenOff == true) {
+        cancel()
+    } else {
+        stop()
+    }
 }
 
 def stop() {
