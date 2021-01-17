@@ -131,7 +131,7 @@ def bridgeDiscovery(Map params=[:]) {
     state.deviceRefreshCount = deviceRefreshCount + 1
     Integer refreshInterval = PAGE_REFRESH_TIMEOUT
 
-    Map options = hubs ?: []
+    Map options = hubs ?: [:]
     Integer numFound = options.size()
 
     if (!options && state.deviceRefreshCount > DEVICE_REFRESH_MAX_COUNT) {
@@ -832,7 +832,7 @@ void setDeviceState(def child, Map deviceState) {
                     case 'group':  nid = networkIdForGroup(result[2]); break
                     case 'light':  nid = networkIdForLight(result[2]); break
                     case 'scene':  nid = networkIdForScene(result[2]); break
-                    default:
+                    [default]:
                         if (logEnable) { log.warn "Unhandled device state handler repsonse: ${result}" }
                         return
                 }
