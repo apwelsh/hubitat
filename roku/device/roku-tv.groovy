@@ -50,10 +50,10 @@ import java.net.URLEncoder
 @Field static final Integer LIMIT_APP_INTERVAL_MIN     = 1
 @Field static final Integer LIMIT_TIMEOUT_MIN          = 1
 
-@Field static final String  SETTING_REFRESH_UNITS   = 'refreshUnits'
+@Field static final String SETTING_REFRESH_UNITS    = 'refreshUnits'
 @Field static final String SETTING_REFRESH_INTERVAL = 'refreshInterval'
 @Field static final String SETTING_APP_REFRESH      = 'appRefresh'
-@Field static final String  SETTING_APP_UNITS       = 'appUnits'
+@Field static final String SETTING_APP_UNITS        = 'appUnits'
 @Field static final String SETTING_APP_INTERVAL     = 'appInterval'
 @Field static final String SETTING_AUTO_MANAGE      = 'autoManage'
 @Field static final String SETTING_MANAGE_APPS      = 'manageApps'
@@ -62,6 +62,9 @@ import java.net.URLEncoder
 @Field static final String SETTING_INPUT_TUNER      = 'inputTuner'
 @Field static final String SETTING_LOG_ENABLE       = 'logEnable'
 @Field static final String SETTING_TIMEOUT          = 'timeout'
+@Field static final String SETTING_USE_POWER_ON     = 'usePowerOn'
+@Field static final String SETTING_USE_POWER_OFF    = 'usePowerOff'
+
 
 metadata {
     definition (
@@ -192,6 +195,9 @@ def updated() {
     if (settings.inputTuner      == null) device.updateSetting(SETTING_INPUT_TUNER,      DEFAULT_INPUT_TUNER)
     if (settings.logEnable       == null) device.updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE)
     if (settings.timeout         == null) device.updateSetting(SETTING_TIMEOUT,          DEFAULT_TIMEOUT)
+    if (settings.usePowerOn      == null) device.updateSetting(SETTING_USE_POWER_ON,     state.isTV ?: false)
+    if (settings.usePowerOff     == null) device.updateSetting(SETTING_USE_POWER_OFF,    state.isTV ?: false)
+   
 
     // Override out-of-bounds values
     if (settings.refreshInterval  > 59  ) device.updateSetting(SETTING_REFRESH_INTERVAL, LIMIT_REFRESH_INTERVAL_MAX)
@@ -518,6 +524,7 @@ private Boolean isStateProperty(String key) {
         case 'deviceMac':
         case 'supports-find-remote':
         case 'wake-on-lan':
+        case 'isTV':
             return true
     }
     return false
@@ -540,7 +547,7 @@ private def parsePowerState(body) {
         def mode = powerMode
         switch (mode) {
             case 'PowerOn':
-                if (this.state!='on') {
+                if (device.currentValue('switch') != 'on') {
                     sendEvent(name: 'switch', value: 'on')
                     if (appRefresh && appInterval > 0) {
                         queryCurrentApp()
@@ -552,7 +559,7 @@ private def parsePowerState(body) {
             case 'DisplayOff':
             case 'Headless':
             case 'Ready':
-                if (this.state!='off') {
+                if (device.currentValue('switch') != 'off') {
                     sendEvent(name: 'switch', value: 'off')
                     unschedule(queryCurrentApp)
                 }
@@ -700,7 +707,7 @@ private def isValidKey(key) {
         'Play',      'Rev',        'Fwd',         'InstantReplay',
         'Info',      'Search',     'Backspace',   'Enter',
         'VolumeUp',  'VolumeDown', 'VolumeMute',
-        'Power',     'PoweOn',     'PowerOff',
+        'Power',     'PowerOn',    'PowerOff',
         'ChannelUp', 'ChannelDown','InputTuner', 'InputAV1',
         'InputHDMI1','InputHDMI2', 'InputHDMI3', 'InputHDMI4' 
         ]
