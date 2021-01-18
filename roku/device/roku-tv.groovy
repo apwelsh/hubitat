@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.5.0
+ * Version 2.5.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -82,7 +82,7 @@ metadata {
         command 'keyPress', [[name:'Key Press Action', type: 'ENUM', constraints: [
                 'Home',      'Back',       'FindRemote',  'Select',        'Up',        'Down',       'Left',        'Right',
                 'Play',      'Rev',        'Fwd',         'InstantReplay', 'Info',      'Search',     'Backspace',   'Enter',
-                'VolumeUp',     'VolumeDown', 'VolumeMute',  'Power',         'PowerOff',
+                'VolumeUp',  'VolumeDown', 'VolumeMute',  'Power',         'PowerOn',   'PowerOff',
                 'ChannelUp', 'ChannelDown', 'InputTuner', 'InputAV1',      'InputHDMI1', 'InputHDMI2', 'InputHDMI3', 'InputHDMI4'] ] ]
         
         command 'reloadApps'
@@ -105,8 +105,8 @@ preferences {
         'Up',        'Down',       'Left',        'Right',
         'Play',      'Rev',        'Fwd',         'InstantReplay',
         'Info',      'Search',     'Backspace',   'Enter',
-        'VolumeUp',  'VolumeDown', 'VolumeMute',
-        'Power',     'PowerOff',   'ChannelUp',   'ChannelDown'
+        'VolumeUp',  'VolumeDown', 'VolumeMute',  'Power',
+        'PowerOn',   'PowerOff',   'ChannelUp',   'ChannelDown'
         ]
     List keys=[]
     Map installedKeys=[:]
@@ -138,6 +138,9 @@ preferences {
     if (!parent) {
         input name: 'deviceIp',        type: 'text',   title: 'Device IP', required: true
     }
+    input name: 'usePowerOn',      type: 'bool', title: 'Use Power On or Power Toggle for On', required: true, defaultValue: state.isTV ?: false, description: 'Recommend Power On, however, if Power On does not work, disable to use Power toggle'
+    input name: 'usePowerOff',     type: 'bool', title: 'Use Power Off or Power Toggle for Off', required: true, defaultValue: state.isTV ?: false, description: 'Recommend Power Off, however, if Power Off does not work, disable to use Power toggle'
+
     input name: 'timeout',         type: 'number', title: 'Communcation timeout', required: true, defaultValue: DEFAULT_TIMEOUT, range: 1..60, description: 'The maximum number of seconds to wait for a roku instruction to complete.  Defaults to 10 seconds.  For fast networks, set to a lower time for better hub performance when your device is offline.'
     if (deviceIp) {
         input name: 'refreshUnits',    type: 'enum',   title: 'Refresh interval measured in Minutes, or Seconds', options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_REFRESH_UNITS, required: true
@@ -306,14 +309,36 @@ void componentRefresh(child){
  */
 
 void on() {
-    if (device.currentValue('switch') == 'off') { sendWakeUp() }
+    
+    Boolean isOff = device.currentValue('switch') == 'off'
+    
     sendEvent(name: 'switch', value: 'on')
-    keyPress('Power')
+    if (isOff) { sendWakeUp() }
+    if (usePowerOn) {
+        keyPress('PowerOn')
+    } else {
+        queryDeviceState()
+        if (device.currentValue('switch') == 'off') {
+            keyPress('Power')
+        }
+    }
 }
 
 void off() {
+
+    Boolean isOn = device.currentValue('switch') == 'on'
+
     sendEvent(name: 'switch', value: 'off')
-    keyPress('PowerOff')
+    if (usePowerOff) {
+        keyPress('PowerOff')
+    } else {
+        queryDeviceState()
+        if (device.currentValue('switch') == 'on') {
+            keyPress('Power')
+        }
+    }
+
+
 }
 
 void home() {
@@ -467,6 +492,11 @@ private void parseState(body) {
     
     ['serial-number', 'vendor-name', 'device-id', 'model-name', 'screen-size', 'user-device-name'].each { nodeName ->
         setState(nodeName, "${body[nodeName]}")
+    }
+    if (body['is-tv'] == 'true' ) {
+        setState('isTV', true)
+    } else {
+        setState('isTV', false)
     }
 }
 
@@ -670,7 +700,7 @@ private def isValidKey(key) {
         'Play',      'Rev',        'Fwd',         'InstantReplay',
         'Info',      'Search',     'Backspace',   'Enter',
         'VolumeUp',  'VolumeDown', 'VolumeMute',
-        'Power',     'PowerOff',
+        'Power',     'PoweOn',     'PowerOff',
         'ChannelUp', 'ChannelDown','InputTuner', 'InputAV1',
         'InputHDMI1','InputHDMI2', 'InputHDMI3', 'InputHDMI4' 
         ]

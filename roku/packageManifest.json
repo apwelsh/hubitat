@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.5.0"
+      "version": "2.5.1"
     }
   ],
   "version": "1.3.1",
-  "releaseNotes": "Added ability to turn off the ssdp auto-discovery."
+  "releaseNotes": "Added ability to turn off the ssdp auto-discovery. Added ability to choose power on/off command mode."
 }
