@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.5.13",
+  "version": "1.5.14",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -15,7 +15,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.2.10"
+      "version": "1.2.11"
     }
   ],
   "drivers": [
@@ -36,6 +36,6 @@
       "version": "1.2.0"
     }
   ],
-  "releaseNotes": "Fixed a bug in handling of colorTemperature devices to use the correct attribe name.  Also added setting of color mode for any change to color devices.  Added logic to level 0 = off, and any other level = on for scene support. Fixed invalid data type bug resulting in default scene being set to false (Thanks Travis Tomka reporting and fixing it).  Fixed cannot cast [] bug when loading the app."
+  "releaseNotes": "Fixed a bug in handling of colorTemperature devices to use the correct attribe name.  Also added setting of color mode for any change to color devices.  Added logic to level 0 = off, and any other level = on for scene support. Fixed invalid data type bug resulting in default scene being set to false (Thanks Travis Tomka reporting and fixing it).  Fixed cannot cast [] bug when loading the app.  Fixed a typo introduced during reoptimization of code that prevented the app source from being installed."
 
 }

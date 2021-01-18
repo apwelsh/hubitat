@@ -832,7 +832,7 @@ void setDeviceState(def child, Map deviceState) {
                     case 'group':  nid = networkIdForGroup(result[2]); break
                     case 'light':  nid = networkIdForLight(result[2]); break
                     case 'scene':  nid = networkIdForScene(result[2]); break
-                    [default]:
+                    default:
                         if (logEnable) { log.warn "Unhandled device state handler repsonse: ${result}" }
                         return
                 }
