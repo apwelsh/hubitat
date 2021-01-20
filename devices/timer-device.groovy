@@ -144,6 +144,7 @@ def setTimeRemaining(seconds) {
         }
 
     }
+    
     def hours = (seconds / 3600) as int
     if (hours > 0)
         seconds = seconds.intValue() % 3600 // remove the hours component
@@ -168,7 +169,7 @@ def on() {
 def start() {
     if (logEnable) log.info 'Timer started'
     unschedule()
-    def timeRemaining = (device.currentValue('timeRemaining') as int)
+    def timeRemaining = (device.currentValue('timeRemaining') ?: 0 as int)
     if (timeRemaining == 0 && useDefault) {
         timeRemaining = defaultTime
         if (logEnable) log.info "Using default time of ${timeRemaining} seconds"
@@ -228,16 +229,16 @@ def resetDisplay() {
 }
 
 def timerDone() {
-    if (state.alerttime) {
+    if (device.currentValue('switch') == 'on') {
         state.remove('alerttime')
         state.remove('refreshInterval')
         unschedule()
-        if (device.currentValue('sessionStatus') != 'canceled') {
+        if (device.latestValue('sessionStatus') != 'canceled') {
             sendEvent(name: 'timeRemaining', value: 0)
             setStatus('stopped')
         }
         runIn(1, resetDisplay)
-        if (device.currentValue('sessionStatus') != 'canceled') {
+        if (device.latestValue('sessionStatus') != 'canceled') {
             push()
         }   
     }
