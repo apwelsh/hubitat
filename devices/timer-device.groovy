@@ -169,7 +169,7 @@ def on() {
 def start() {
     if (logEnable) log.info 'Timer started'
     unschedule()
-    def timeRemaining = (device.currentValue('timeRemaining') ?: 0 as int)
+    int timeRemaining = (device.currentValue('timeRemaining') ?: 0 as int)
     if (timeRemaining == 0 && useDefault) {
         timeRemaining = defaultTime
         if (logEnable) log.info "Using default time of ${timeRemaining} seconds"
