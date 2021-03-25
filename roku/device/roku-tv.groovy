@@ -65,6 +65,11 @@ import java.net.URLEncoder
 @Field static final String SETTING_USE_POWER_ON     = 'usePowerOn'
 @Field static final String SETTING_USE_POWER_OFF    = 'usePowerOff'
 
+@Field static final String MEDIA_STATE_PLAYING      = 'playing'
+@Field static final String MEDIA_STATE_PAUSED       = 'paused'
+@Field static final String MEDIA_STATE_STOPPED      = 'stopped'
+
+
 
 metadata {
     definition (
@@ -75,6 +80,7 @@ metadata {
         
         capability 'TV'
         capability 'AudioVolume'
+        capability 'MediaTransport'
         capability 'Switch'
         capability 'Polling'
         capability 'Refresh'
@@ -347,6 +353,24 @@ void off() {
 
 }
 
+void play() {
+    if (device.currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
+        keyPress('Play')
+    }
+}
+
+void pause() {
+    if (device.currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
+        keyPress('Play')
+    }
+}
+
+void stop() {
+    if (device.currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
+        keyPress('Back')
+    }
+}
+
 void home() {
     keyPress('Home')
 }
@@ -478,6 +502,22 @@ void queryDeviceState() {
             def body = response.data
             parsePowerState(body)
             parseState(body)
+            queryMediaPlayer()
+        }
+    } catch (ex) {
+        logExceptionWithPowerWarning(ex)
+
+    }
+    sendEvent(name: 'refresh', value: 'idle')
+}
+void queryMediaPlayer() {
+    sendEvent(name: 'refresh', value: 'media-info')
+    try {
+        httpGet([uri:"http://${deviceIp}:8060/query/media-player", timeout: timeout]) { response -> 
+            if (!response.isSuccess()) { return }
+
+            def body = response.data
+            parseMediaPlayer(body)
         }
     } catch (ex) {
         logExceptionWithPowerWarning(ex)
@@ -503,6 +543,20 @@ private void parseState(body) {
         setState('isTV', true)
     } else {
         setState('isTV', false)
+    }
+}
+
+private void parseMediaPlayer(body) {
+    switch (body.@state) {
+        case 'play':
+            sendEvent(name: 'transportStatus', value: MEDIA_STATE_PLAYING)
+            break;
+        case 'pause':
+            sendEvent(name: 'transportStatus', value: MEDIA_STATE_PAUSED)
+            break;
+        default:
+            sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+            break;
     }
 }
 
