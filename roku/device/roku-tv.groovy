@@ -615,6 +615,8 @@ private def parsePowerState(body) {
             case 'Ready':
                 if (device.currentValue('switch') != 'off') {
                     sendEvent(name: 'switch', value: 'off')
+                    sendEvent(name: 'transportStatus', value: 'stopped')
+                    sendEvent(name: 'application', value: 'Roku')
                     unschedule(queryCurrentApp)
                 }
                 break;
