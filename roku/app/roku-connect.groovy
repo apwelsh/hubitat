@@ -255,7 +255,7 @@ def configureDevice(params) {
         }
 
         section('Manage installed apps') {
-            child.getChildDevices().sort({ a, b -> a['label'] <=> b['label'] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
+            child.getChildDevices()?.sort({ a, b -> a['label'] <=> b['label'] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
                 def desc = it.label != it.name ? it.name : ''
                 href 'manageApp', title:"<img src='${child.iconPathForApp(it.deviceNetworkId)}' style='width:auto; height:1em'/> ${desc}", description:'', params: [netId: networkId, appId: it.deviceNetworkId]
 
@@ -380,7 +380,7 @@ private updateDevice(event) {
         roku << ['networkAddress': event.networkAddress,
                    'deviceAddress': event.deviceAddress]
 
-        if (logEnable)  { log.debug "Detected roku address update: ${device.name} from ${oldAddress} to ${event.deviceAddress}" }
+        if (logEnable)  { log.debug "Detected roku address update: ${roku.name} from ${oldAddress} to ${event.deviceAddress}" }
     }
 
     def child = getChildDevice(roku.mac)
