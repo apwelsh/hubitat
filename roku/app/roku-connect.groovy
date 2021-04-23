@@ -162,9 +162,7 @@ def addSelectedDevices() {
 
             def child = addChildDevice('apwelsh', 'Roku TV', dni, [name: name, label: name])
             child.updateSetting('deviceIp', state.discovered[rokuId].networkAddress)
-            child.updateSetting('autoManage', true)
-            child.updateSetting('manageApps', false)
-            child.updateSetting('manageApps', false)
+            child.updated()
             devices.remove(rokuId)
 
         } catch (ex) {
@@ -434,3 +432,4 @@ private Integer convertHexToInt(hex) {
 private String deviceLabel(device) {
     device?.label ?: device?.name
 }
+
