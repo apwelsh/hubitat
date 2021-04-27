@@ -53,7 +53,7 @@ import groovy.transform.Field
 
 @Field static final String SETTING_DEVICE_IP        = 'deviceIp'
 @Field static final String SETTING_REFRESH_UNITS    = 'refreshUnits'
-@Field static final String SETTING_REFRESH_INTERVAL = 'refreshInterval'
+@Field static final String SETTING_REFRESH_INTERVAL = 'refreshIntedrval'
 @Field static final String SETTING_APP_REFRESH      = 'appRefresh'
 @Field static final String SETTING_APP_UNITS        = 'appUnits'
 @Field static final String SETTING_APP_INTERVAL     = 'appInterval'
@@ -301,10 +301,7 @@ void scheduleRefresh() {
 }
 
 void scheduleQueryDeviceInfo() {
-    unschedule(queryDeviceInfo)
-    if (device.currentValue('switch') == 'off') {
-        return
-    }
+    unschedule('queryDeviceInfo)')
     if (this[SETTING_DEVICE_IP] && this[SETTING_REFRESH_INTERVAL] > 0) {
         Long delay = this[SETTING_REFRESH_INTERVAL]
         if (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES) {
@@ -315,7 +312,7 @@ void scheduleQueryDeviceInfo() {
 }
 
 void scheduleQueryMediaPlayer() {
-    unschedule(queryMediaPlayer)
+    unschedule('queryMediaPlayer)')
 
     if (device.currentValue('application', true) == 'Roku') {
         return
@@ -330,7 +327,7 @@ void scheduleQueryMediaPlayer() {
 }
 
 void scheduleQueryActiveApp() {
-    unschedule(queryActiveApp)
+    unschedule('queryActiveApp)')
     if (this[SETTING_DEVICE_IP] && this[SETTING_APP_INTERVAL] > 0) {
         Long delay = this[SETTING_APP_INTERVAL]
         if (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES) {
@@ -341,7 +338,7 @@ void scheduleQueryActiveApp() {
 }
 
 void scheduleQueryInstalledApps() {
-    unschedule(queryInstalledApps)
+    unschedule('queryInstalledApps)')
     if (this[SETTING_DEVICE_IP] && this[SETTING_INV_INTERVAL] > 0) {
         Long delay = this[SETTING_INV_INTERVAL]
         if (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES) {
@@ -802,15 +799,11 @@ private def parsePowerState(body) {
     def powerMode = body.'power-mode'?.text()
     if (powerMode != null) {
         def mode = powerMode
+        sendEvent(name: 'power', value: mode)
         switch (mode) {
             case 'PowerOn':
-                if (device.currentValue('switch') != 'on') {
-                    sendEvent(name: 'switch', value: 'on')
-                    if (this[SETTING_APP_REFRESH] && this[SETTING_APP_INTERVAL] > 0) {
-                        queryActiveApp()
-                        schedule("0/${this[SETTING_APP_INTERVAL]} * * * * ?", queryActiveApp)
-                    }
-                } 
+                sendEvent(name: 'switch', value: 'on')
+                queryActiveApp()
                 break;
             case 'PowerOff':
             case 'DisplayOff':
