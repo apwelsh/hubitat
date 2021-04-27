@@ -47,8 +47,8 @@ import groovy.transform.Field
 @Field static final Boolean DEFAULT_LOG_ENABLE       = false
 @Field static final Integer DEFAULT_TIMEOUT          = 10
 
-@Field static final Integer LIMIT_REFRESH_INTERVAL_MAX = 59
-@Field static final Integer LIMIT_REFRESH_INTERVAL_MAN = 1
+@Field static final Integer LIMIT_REFRESH_INTERVAL_MAX = 240
+@Field static final Integer LIMIT_REFRESH_INTERVAL_MIN = 0
 @Field static final Integer LIMIT_TIMEOUT_MIN          = 1
 
 @Field static final String SETTING_DEVICE_IP        = 'deviceIp'
@@ -167,14 +167,14 @@ preferences {
 
         input name: SETTING_APP_REFRESH,      type: 'bool',   title: "Using ${this[SETTING_APP_REFRESH] ? 'advanced' : 'simple'} refresh controls", defaultValue: DEFAULT_APP_REFRESH, required: true
         input name: SETTING_REFRESH_UNITS,    type: 'enum',   title: "${this[SETTING_APP_REFRESH] ? 'Device Info' : 'Full'} refresh interval measured in Minutes, or Seconds", options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_REFRESH_UNITS, required: true
-        input name: SETTING_REFRESH_INTERVAL, type: 'number', title: "${this[SETTING_APP_REFRESH] ? 'Device Info' : 'Full'} refresh at least every n ${this[SETTING_REFRESH_UNITS]}.  0 disables auto-refresh, which is not recommended.", range: 0..60, defaultValue: DEFAULT_REFRESH_INTERVAL, required: true
+        input name: SETTING_REFRESH_INTERVAL, type: 'number', title: "${this[SETTING_APP_REFRESH] ? 'Device Info' : 'Full'} refresh at least every n ${this[SETTING_REFRESH_UNITS]}.  0 disables auto-refresh, which is not recommended.", range: 0..240, defaultValue: DEFAULT_REFRESH_INTERVAL, required: true
         if (this[SETTING_APP_REFRESH]) {
             input name: SETTING_APP_UNITS,      type: 'enum',   title: 'Active App refresh interval measured in Minutes, or Seconds', options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_APP_UNITS, required: true
-            input name: SETTING_APP_INTERVAL,   type: 'number', title: "Active App refresh at least every n ${this[SETTING_APP_UNITS]}.", range: 1..59, defaultValue: DEFAULT_APP_INTERVAL, required: true        
+            input name: SETTING_APP_INTERVAL,   type: 'number', title: "Active App refresh at least every n ${this[SETTING_APP_UNITS]}. 0 disables refresh", range: 0..240, defaultValue: DEFAULT_APP_INTERVAL, required: true        
             input name: SETTING_MEDIA_UNITS,    type: 'enum',   title: 'Media Player refresh interval measured in Minutes, or Seconds', options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_MEDIA_UNITS, required: true
-            input name: SETTING_MEDIA_INTERVAL, type: 'number', title: "Media Player refresh at least every n ${this[SETTING_MEDIA_UNITS]}.", range: 1..59, defaultValue: DEFAULT_MEDIA_INTERVAL, required: true        
+            input name: SETTING_MEDIA_INTERVAL, type: 'number', title: "Media Player refresh at least every n ${this[SETTING_MEDIA_UNITS]}. 0 disables refresh", range: 0..240, defaultValue: DEFAULT_MEDIA_INTERVAL, required: true        
             input name: SETTING_INV_UNITS,      type: 'enum',   title: 'Find installed apps interval measured in Minutes, or Seconds', options:[REFRESH_UNIT_MINUTES,REFRESH_UNIT_SECONDS], defaultValue: DEFAULT_INV_UNITS, required: true
-            input name: SETTING_INV_INTERVAL,   type: 'number', title: "Find installed apps at least every n ${this[SETTING_INV_UNITS]}.", range: 1..59, defaultValue: DEFAULT_INV_INTERVAL, required: true        
+            input name: SETTING_INV_INTERVAL,   type: 'number', title: "Find installed apps at least every n ${this[SETTING_INV_UNITS]}. 0 disables refresh.", range: 0..240, defaultValue: DEFAULT_INV_INTERVAL, required: true        
         }
         input name: SETTING_AUTO_MANAGE,      type: 'bool',   title: 'Enable automatic management of child devices', defaultValue: DEFAULT_AUTO_MANAGE, required: true
         if (this[SETTING_AUTO_MANAGE]?:true == true) {
@@ -241,8 +241,8 @@ def updated() {
 
     // Override out-of-bounds values
     [SETTING_REFRESH_INTERVAL, SETTING_APP_INTERVAL, SETTING_MEDIA_INTERVAL, SETTING_INV_INTERVAL].each { key ->
-        if (this[key]  > 59  ) updateSetting(key, LIMIT_REFRESH_INTERVAL_MAX)
-        if (this[key]  < 1   ) updateSetting(key, LIMIT_REFRESH_INTERVAL_MAN)
+        if (this[key]  > LIMIT_REFRESH_INTERVAL_MAX) updateSetting(key, LIMIT_REFRESH_INTERVAL_MAX)
+        if (this[key]  < LIMIT_REFRESH_INTERVAL_MIN) updateSetting(key, LIMIT_REFRESH_INTERVAL_MIN)
     }
     if (this[SETTING_TIMEOUT] < 1) updateSetting(SETTING_TIMEOUT, LIMIT_TIMEOUT_MIN)
 

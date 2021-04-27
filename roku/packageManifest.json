@@ -24,9 +24,9 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/device/roku-tv.groovy",
       "required": true,
-      "version": "2.7.0"
+      "version": "2.7.1"
     }
   ],
-  "version": "1.3.6",
-  "releaseNotes": "Added support for MediaTransport capability, which emulates the play/pause/stop commands of media players.  Updated refresh logic so that when the TV turns off, the transportStatus changes to stopped, and application changes to Roku. Fixed reported bugs in Roku Connect preventing the addition of new channels on newly added Roku devices. Added support for MediaInputSource to support standard input source selection, and removed refresh attribute.  This update limits event logging considerably to improve overall performance."
+  "version": "1.3.7",
+  "releaseNotes": "Added support for MediaTransport capability, which emulates the play/pause/stop commands of media players.  Updated refresh logic so that when the TV turns off, the transportStatus changes to stopped, and application changes to Roku. Fixed reported bugs in Roku Connect preventing the addition of new channels on newly added Roku devices. Added support for MediaInputSource to support standard input source selection, and removed refresh attribute.  This update limits event logging considerably to improve overall performance.  Enabled support for disabling refresh with refresh interval of 0"
 }
