@@ -301,7 +301,7 @@ void scheduleRefresh() {
 }
 
 void scheduleQueryDeviceInfo() {
-    unschedule('queryDeviceInfo)')
+    unschedule('queryDeviceInfo')
     if (this[SETTING_DEVICE_IP] && this[SETTING_REFRESH_INTERVAL] > 0) {
         Long delay = this[SETTING_REFRESH_INTERVAL]
         if (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES) {
@@ -312,7 +312,7 @@ void scheduleQueryDeviceInfo() {
 }
 
 void scheduleQueryMediaPlayer() {
-    unschedule('queryMediaPlayer)')
+    unschedule('queryMediaPlayer')
 
     if (device.currentValue('application', true) == 'Roku') {
         return
@@ -327,7 +327,7 @@ void scheduleQueryMediaPlayer() {
 }
 
 void scheduleQueryActiveApp() {
-    unschedule('queryActiveApp)')
+    unschedule('queryActiveApp')
     if (this[SETTING_DEVICE_IP] && this[SETTING_APP_INTERVAL] > 0) {
         Long delay = this[SETTING_APP_INTERVAL]
         if (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES) {
@@ -338,7 +338,7 @@ void scheduleQueryActiveApp() {
 }
 
 void scheduleQueryInstalledApps() {
-    unschedule('queryInstalledApps)')
+    unschedule('queryInstalledApps')
     if (this[SETTING_DEVICE_IP] && this[SETTING_INV_INTERVAL] > 0) {
         Long delay = this[SETTING_INV_INTERVAL]
         if (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES) {
