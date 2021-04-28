@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.5.2
+ * Version 2.7.4
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -302,48 +302,44 @@ void scheduleRefresh() {
 
 void scheduleQueryDeviceInfo() {
     unschedule('queryDeviceInfo')
-    if (this[SETTING_DEVICE_IP] && this[SETTING_REFRESH_INTERVAL] > 0) {
-        Long delay = this[SETTING_REFRESH_INTERVAL]
-        if (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES) {
-            delay = delay * 60
-        } 
+
+    Long delay = (this[SETTING_REFRESH_INTERVAL] ?: 0) * (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
+
+    if (this[SETTING_DEVICE_IP] && delay > 0) {
         runIn(delay, 'queryDeviceInfo')
+    }
+}
+
+void scheduleQueryActiveApp() {
+    unschedule('queryActiveApp')
+
+    Long delay = (this[SETTING_APP_INTERVAL] ?: 0) * (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
+
+    if (this[SETTING_DEVICE_IP] && delay > 0) {
+        runIn(delay, 'queryActiveApp')
     }
 }
 
 void scheduleQueryMediaPlayer() {
     unschedule('queryMediaPlayer')
 
+    Long delay = (this[SETTING_MEDIA_INTERVAL] ?: 0) * (this[SETTING_MEDIA_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
+
     if (device.currentValue('application', true) == 'Roku') {
         return
     }
-    if (this[SETTING_DEVICE_IP] && this[SETTING_MEDIA_INTERVAL] > 0) {
-        Long delay = this[SETTING_MEDIA_INTERVAL]
-        if (this[SETTING_MEDIA_UNITS] == REFRESH_UNIT_MINUTES) {
-            delay = delay * 60
-        } 
-        runIn(delay, 'queryMediaPlayer')
-    }
-}
 
-void scheduleQueryActiveApp() {
-    unschedule('queryActiveApp')
-    if (this[SETTING_DEVICE_IP] && this[SETTING_APP_INTERVAL] > 0) {
-        Long delay = this[SETTING_APP_INTERVAL]
-        if (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES) {
-            delay = delay * 60
-        } 
-        runIn(delay, 'queryActiveApp')
+    if (this[SETTING_DEVICE_IP] && delay > 0) {
+        runIn(delay, 'queryMediaPlayer')
     }
 }
 
 void scheduleQueryInstalledApps() {
     unschedule('queryInstalledApps')
-    if (this[SETTING_DEVICE_IP] && this[SETTING_INV_INTERVAL] > 0) {
-        Long delay = this[SETTING_INV_INTERVAL]
-        if (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES) {
-            delay = delay * 60
-        } 
+
+    Long delay = (this[SETTING_INV_INTERVAL] ?: 0) * (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
+
+    if (this[SETTING_DEVICE_IP] && delay > 0) {
         runIn(delay, 'queryInstalledApps')
     }
 }
@@ -619,7 +615,7 @@ String translateAppToInput(appName) {
 }
 
 void setCurrentApplication(currentApp) {
-    def previousApp = device.currentValue('application')
+    def previousApp = device.latestValue('application')
     sendEvent(name: 'application', value: currentApp)
     
     if (currentApp == 'Roku') {
@@ -651,8 +647,8 @@ void queryActiveApp() {
             def appType = body.app.@type
             def appId = body.app.@id
             def app = body.app.text()
+            def mediaApp = app
             if (appType     == 'tvin') {
-                def mediaApp = app
                 if (appId == 'tvinput.dtv')        mediaApp = 'Tuner'
                 if (appId == 'tvinput.cvbs')       mediaApp = 'AV'
                 if (appId == 'tvinput.hdmi1')      mediaApp = 'hdmi1'
@@ -660,9 +656,9 @@ void queryActiveApp() {
                 if (appId == 'tvinput.hdmi3')      mediaApp = 'hdmi3'
                 if (appId == 'tvinput.hdmi4')      mediaApp = 'hdmi4'
 
-                sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
 
             }
+            sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
             setCurrentApplication(app)
         }
     } catch (ex) {
@@ -814,7 +810,7 @@ private def parsePowerState(body) {
                     sendEvent(name: 'transportStatus', value: 'stopped')
                     sendEvent(name: 'mediaInputSource', value: 'Home')
                     setCurrentApplication('Roku')
-                    unschedule('queryActiveApp')
+                    scheduleQueryActiveApp()
                     unschedule('queryMediaPlayer')
                 }
                 break;
