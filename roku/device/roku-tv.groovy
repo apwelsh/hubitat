@@ -207,6 +207,7 @@ def updateSetting(key, value) {
 }
 
 def updated() {
+    if (this[SETTING_LOG_ENABLE]) { log.info "Update: App Configuration Updated" }
     if (!this[SETTING_DEVICE_IP]) {
         return
     }
@@ -301,7 +302,8 @@ void scheduleRefresh() {
 }
 
 void scheduleQueryDeviceInfo() {
-    unschedule('queryDeviceInfo')
+    if (this[SETTING_LOG_ENABLE]) { log.info "scheduleQueryDeviceInfo: Executed " }
+//    unschedule('queryDeviceInfo')
 
     Long delay = (this[SETTING_REFRESH_INTERVAL] ?: 0) * (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
@@ -311,7 +313,8 @@ void scheduleQueryDeviceInfo() {
 }
 
 void scheduleQueryActiveApp() {
-    unschedule('queryActiveApp')
+    if (this[SETTING_LOG_ENABLE]) { log.info "scheduleQueryActiveApp: Executed " }
+//    unschedule('queryActiveApp')
 
     Long delay = (this[SETTING_APP_INTERVAL] ?: 0) * (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
@@ -321,21 +324,25 @@ void scheduleQueryActiveApp() {
 }
 
 void scheduleQueryMediaPlayer() {
-    unschedule('queryMediaPlayer')
+    if (this[SETTING_LOG_ENABLE]) { log.info "scheduleQueryMediaPlayer: Executed " }
+//    unschedule('queryMediaPlayer')
 
     Long delay = (this[SETTING_MEDIA_INTERVAL] ?: 0) * (this[SETTING_MEDIA_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
-    if (device.currentValue('application', true) == 'Roku') {
+    if (device.latestValue('application', true) == 'Roku') {
+        if (this[SETTING_LOG_ENABLE]) { log.info "scheduleQueryMediaPlayer: App Compare is Roku" }
         return
     }
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
+        if (this[SETTING_LOG_ENABLE]) { log.info "scheduleQueryMediaPlayer: App Compare is not Roku schedule next check" }
         runIn(delay, 'queryMediaPlayer')
     }
 }
 
 void scheduleQueryInstalledApps() {
-    unschedule('queryInstalledApps')
+    if (this[SETTING_LOG_ENABLE]) { log.info "scheduleQueryInstalledApps: Executed " }
+//    unschedule('queryInstalledApps')
 
     Long delay = (this[SETTING_INV_INTERVAL] ?: 0) * (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
@@ -574,7 +581,8 @@ void sendWakeUp() {
 }
 
 void queryDeviceInfo() {
-    scheduleQueryDeviceInfo()
+    if (this[SETTING_LOG_ENABLE]) { log.info "queryDeviceInfo: Executed " }
+    unschedule('queryDeviceInfo')
     try {
         httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
             if (!response.isSuccess()) { return }
@@ -591,6 +599,7 @@ void queryDeviceInfo() {
 }
 
 void queryMediaPlayer() {
+    if (this[SETTING_LOG_ENABLE]) { log.info "queryMediaPlayer: Executed " }
     unschedule('queryMediaPlayer')
     try {
         httpGet([uri:apiPath('query/media-player'), timeout: this[SETTING_TIMEOUT]]) { response -> 
@@ -603,6 +612,7 @@ void queryMediaPlayer() {
         logExceptionWithPowerWarning(ex)
 
     }
+    if (this[SETTING_LOG_ENABLE]) { log.info "queryMediaPlayer: Schedule next run " }
     scheduleQueryMediaPlayer()
 }
 
@@ -615,15 +625,23 @@ String translateAppToInput(appName) {
 }
 
 void setCurrentApplication(currentApp) {
+    if (this[SETTING_LOG_ENABLE]) { log.info "setCurrentApplication: Executed " }
     def previousApp = device.latestValue('application')
-    sendEvent(name: 'application', value: currentApp)
+    if (this[SETTING_LOG_ENABLE]) { log.info "setCurrentApplication: Previous App - ${previousApp} Current App ${currentApp} " }
     
-    if (currentApp == 'Roku') {
-        unschedule('queryMediaPlayer')
-    } else if (currentApp != previousApp) {
+    
+    if (currentApp != previousApp){
+        if (this[SETTING_LOG_ENABLE]) { log.info "setCurrentApplication: A difference confirmed " }
+        sendEvent(name: 'application', value: currentApp)
+        if (currentApp == 'Roku') {
+        if (this[SETTING_LOG_ENABLE]) { log.info "setCurrentApplication: App validated as Roku. Unschedule queryMediaPlayer " }
+            unschedule('queryMediaPlayer')
+        } else  {
         sendEvent(name: 'switch', value: 'on')
-        scheduleQueryMediaPlayer()
-    }
+        if (this[SETTING_LOG_ENABLE]) { log.info "setCurrentApplication: App has changed and is not Roku run scheduleQueryMediaPlayer " }
+        runIn(2, 'scheduleQueryMediaPlayer')
+        }
+    } else {if (this[SETTING_LOG_ENABLE]) { log.info "setCurrentApplication: App has not changed. Nothing to do " }  }    
                 
     childDevices?.each { child ->
         def appName = "${child.name}"
@@ -810,7 +828,7 @@ private def parsePowerState(body) {
                     sendEvent(name: 'transportStatus', value: 'stopped')
                     sendEvent(name: 'mediaInputSource', value: 'Home')
                     setCurrentApplication('Roku')
-                    scheduleQueryActiveApp()
+                    unschedule('queryActiveApp')
                     unschedule('queryMediaPlayer')
                 }
                 break;
