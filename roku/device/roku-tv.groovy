@@ -26,6 +26,7 @@
  **/
 
 import groovy.transform.Field
+import java.util.concurrent.ConcurrentHashMap
 
 @Field static final String  REFRESH_UNIT_SECONDS = 'Seconds'
 @Field static final String  REFRESH_UNIT_MINUTES = 'Minutes'
@@ -45,6 +46,7 @@ import groovy.transform.Field
 @Field static final Boolean DEFAULT_INPUT_AV         = false
 @Field static final Boolean DEFAULT_INPUT_TUNER      = false
 @Field static final Boolean DEFAULT_LOG_ENABLE       = false
+@Field static final Boolean DEFAULT_DBG_ENABLE       = false
 @Field static final Integer DEFAULT_TIMEOUT          = 10
 
 @Field static final Integer LIMIT_REFRESH_INTERVAL_MAX = 240
@@ -80,6 +82,7 @@ import groovy.transform.Field
 @Field static final String MEDIA_STATE_STOPPED      = 'stopped'
 
 
+@Field static Map volatileAtomicStateByDeviceId = new ConcurrentHashMap()
 
 metadata {
     definition (
@@ -95,6 +98,7 @@ metadata {
         capability 'Polling'
         capability 'Refresh'
         capability 'MediaInputSource'
+        capability 'Configuration'
 
         command 'home'
         command 'keyPress', [[name:'Key Press Action', type: 'ENUM', constraints: [
@@ -191,7 +195,16 @@ preferences {
 
         }
     }
-    input name: SETTING_LOG_ENABLE,       type: 'bool',   title: 'Enable debug logging', defaultValue: DEFAULT_LOG_ENABLE, required: true
+    input name: SETTING_LOG_ENABLE,       type: 'bool',   title: 'Enable informational logging', defaultValue: DEFAULT_LOG_ENABLE, required: true
+}
+
+synchronized Map getVolatileAtomicState() {
+    Map result = volatileAtomicStateByDeviceId.get(device.deviceId)
+    if (!result) {
+        result = new ConcurrentHashMap()
+        volatileAtomicStateByDeviceId[device.deviceId] = result
+    }
+    return result
 }
 
 /**
@@ -325,7 +338,7 @@ void scheduleQueryMediaPlayer() {
 
     Long delay = (this[SETTING_MEDIA_INTERVAL] ?: 0) * (this[SETTING_MEDIA_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
-    if (device.currentValue('application', true) == 'Roku') {
+    if (currentValue('application') == 'Roku') {
         return
     }
 
@@ -355,7 +368,26 @@ String appIdForNetworkId(String netId) {
 String iconPathForApp(String netId) {
     apiPath("query/icon/${appIdForNetworkId(netId)}")
 }
+
+void sendEvent(Map properties) {
     
+    // Overrides driver.sendEvent() to populate cached values
+    if (volatileAtomicState[properties.name] != properties.value) {
+        device.sendEvent(properties)
+        volatileAtomicState[properties.name] = properties.value
+    }
+}
+
+Object currentValue(String attributeName) {
+    def result = volatileAtomicState[attributeName]
+    if (result != null) {
+        return result
+    }
+    result = device.currentValue(attributeName)
+    volatileAtomicState[attributeName] = result
+    return result
+}
+
 /*
  * Component Child Methods
  */
@@ -397,17 +429,21 @@ void componentRefresh(child){
  * Device Capability Interface Functions
  */
 
+void configure() {
+    volatileAtomicState.configured = false
+    queryDeviceInfo()
+}
+
 void on() {
     
-    Boolean isOff = device.currentValue('switch') == 'off'
+    Boolean isOff = currentValue('switch') == 'off'
     
-    sendEvent(name: 'switch', value: 'on')
     if (isOff) { sendWakeUp() }
     if (this[SETTING_USE_POWER_ON]) {
         keyPress('PowerOn')
     } else {
         queryDeviceInfo()
-        if (device.currentValue('switch') == 'off') {
+        if (currentValue('switch') == 'off') {
             keyPress('Power')
         }
     }
@@ -415,14 +451,13 @@ void on() {
 
 void off() {
 
-    Boolean isOn = device.currentValue('switch') == 'on'
+    Boolean isOn = currentValue('switch') == 'on'
 
-    sendEvent(name: 'switch', value: 'off')
     if (this[SETTING_USE_POWER_OFF]) {
         keyPress('PowerOff')
     } else {
         queryDeviceInfo()
-        if (device.currentValue('switch') == 'on') {
+        if (currentValue('switch') == 'on') {
             keyPress('Power')
         }
     }
@@ -431,19 +466,19 @@ void off() {
 }
 
 void play() {
-    if (device.currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
+    if (currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
         keyPress('Play')
     }
 }
 
 void pause() {
-    if (device.currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
+    if (currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
         keyPress('Play')
     }
 }
 
 void stop() {
-    if (device.currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
+    if (currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
         keyPress('Back')
     }
 }
@@ -574,14 +609,20 @@ void sendWakeUp() {
 }
 
 void queryDeviceInfo() {
-    scheduleQueryDeviceInfo()
+    if (this[SETTING_LOG_ENABLE]) { log.info "queryDeviceInfo: Executed " }
+    
+    // must unschedule the query first, because the scheduler may have one triggering at the same time.
+    unschedule('queryDeviceInfo')
+    
     try {
         httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
             if (!response.isSuccess()) { return }
 
             def body = response.data
             parsePowerState(body)
-            parseState(body)
+            if (!volatileAtomicState.configured) {
+                parseState(body)
+            }
         }
     } catch (ex) {
         logExceptionWithPowerWarning(ex)
@@ -591,6 +632,8 @@ void queryDeviceInfo() {
 }
 
 void queryMediaPlayer() {
+
+    // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryMediaPlayer')
     try {
         httpGet([uri:apiPath('query/media-player'), timeout: this[SETTING_TIMEOUT]]) { response -> 
@@ -607,35 +650,57 @@ void queryMediaPlayer() {
 }
 
 String translateAppToInput(appName) {
-    if (appName == 'Roku')      return 'Home'
-    if (appName ==  'Tuner')    return 'InputTuner'
-    if (appName ==  'AV')       return 'InputAV1'
-    if (appName ==~ /^hdmi\d$/) return "Input${appName.toUpperCase()}"
+    
+    // Translate mediaInputSource to Generic App Names
+    
+    if (appName == 'Roku')          return 'Home'
+    if (appName == 'tvinput.dtv')   return 'InputTuner'
+    if (appName == 'tvinput.cvbs')  return 'InputAV1'
+    if (appName == 'tvinput.hdmi1') return 'InputHDMI1'
+    if (appName == 'tvinput.hdmi2') return 'InputHDMI2'
+    if (appName == 'tvinput.hdmi3') return 'InputHDMI3'
+    if (appName == 'tvinput.hdmi4') return 'InputHDMI4'
+
     return appName
 }
 
 void setCurrentApplication(currentApp) {
-    def previousApp = device.latestValue('application')
+    def previousApp = currentValue('application')
     sendEvent(name: 'application', value: currentApp)
     
-    if (currentApp == 'Roku') {
-        unschedule('queryMediaPlayer')
-    } else if (currentApp != previousApp) {
-        sendEvent(name: 'switch', value: 'on')
-        scheduleQueryMediaPlayer()
-    }
-                
-    childDevices?.each { child ->
-        def appName = "${child.name}"
-        def value = (currentApp == appName) ? 'on' : 'off'
-        if ("${child.currentValue('switch')}" != "${value}") {
-            child.parse([[name: 'switch', value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+    // only perform updated if the application is different from last check
+    if (currentApp != previousApp) {
+
+        if (currentApp == 'Roku') {
+            unschedule('queryMediaPlayer')
+            scheduleQueryDeviceInfo()
+        } else  {
+            log.info "turning on, because app is not roku"
+            sendEvent(name: 'switch', value: 'on')
+            
+            if (this[SETTING_APP_REFRESH]) { // if an app is active, TV is on.  Don't check for power state.
+                unschedule('queryDeviceInfo') 
+            }
+            // Check the Media Player ONLY when an Application is active (Assumes any app other than Roku)
+            // TODO: compare current app to installed apps to determine if app is active.
+            scheduleQueryMediaPlayer()    
+
+        }
+        
+        // update the child devices with the current state
+        childDevices?.each { child ->
+            def appName = "${child.name}"
+            def value = (currentApp == appName) ? 'on' : 'off'
+            if ("${child.currentValue('switch')}" != "${value}") {
+                child.parse([[name: 'switch', value: value, descriptionText: "${child.displayName} was turned ${value}"]])
+            }
         }
     }
-
 }
 
 void queryActiveApp() {
+
+    // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryActiveApp')
 
     try {
@@ -647,17 +712,7 @@ void queryActiveApp() {
             def appType = body.app.@type
             def appId = body.app.@id
             def app = body.app.text()
-            def mediaApp = app
-            if (appType     == 'tvin') {
-                if (appId == 'tvinput.dtv')        mediaApp = 'Tuner'
-                if (appId == 'tvinput.cvbs')       mediaApp = 'AV'
-                if (appId == 'tvinput.hdmi1')      mediaApp = 'hdmi1'
-                if (appId == 'tvinput.hdmi2')      mediaApp = 'hdmi2'
-                if (appId == 'tvinput.hdmi3')      mediaApp = 'hdmi3'
-                if (appId == 'tvinput.hdmi4')      mediaApp = 'hdmi4'
-
-
-            }
+            def mediaApp = appType == 'tvin' ? appID : app
             sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
             setCurrentApplication(app)
         }
@@ -672,6 +727,7 @@ def queryInstalledApps() {
     if (!this[SETTING_AUTO_MANAGE]) 
         return
 
+    // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryInstalledApps')
 
     def apps = getInstalledApps()
@@ -741,22 +797,23 @@ private void parseState(body) {
     } else {
         setState('isTV', false)
     }
+    volatileAtomicState.configured = true
 }
 
 private void parseMediaPlayer(body) {
     switch (body.@state) {
         case 'play':
-            if (device.currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
+            if (currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
                sendEvent(name: 'transportStatus', value: MEDIA_STATE_PLAYING)
             }
             break;
         case 'pause':
-            if (device.currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
+            if (currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
                 sendEvent(name: 'transportStatus', value: MEDIA_STATE_PAUSED)
             }
             break;
         default:
-            if (device.currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
+            if (currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
                 sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
             }
             break;
@@ -798,20 +855,23 @@ private def parsePowerState(body) {
         sendEvent(name: 'power', value: mode)
         switch (mode) {
             case 'PowerOn':
-                sendEvent(name: 'switch', value: 'on')
-                queryActiveApp()
+                if (currentValue('switch') != 'on') {
+                    sendEvent(name: 'switch', value: 'on')
+                    queryActiveApp()
+                }
                 break;
             case 'PowerOff':
             case 'DisplayOff':
             case 'Headless':
             case 'Ready':
-                if (device.currentValue('switch') != 'off') {
+                if (currentValue('switch') != 'off') {
                     sendEvent(name: 'switch', value: 'off')
                     sendEvent(name: 'transportStatus', value: 'stopped')
                     sendEvent(name: 'mediaInputSource', value: 'Home')
                     setCurrentApplication('Roku')
                     scheduleQueryActiveApp()
                     unschedule('queryMediaPlayer')
+                    unschedule('queryInstalledApps')
                 }
                 break;
         }
@@ -1001,4 +1061,5 @@ private String apiPath(String queryPath) {
     String suffix = queryPath ? "/${queryPath}" : ''
     "http://${this[SETTING_DEVICE_IP]}:8060${suffix}"
 }
+
 
