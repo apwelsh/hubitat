@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.4
+ * Version 2.7.5
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
