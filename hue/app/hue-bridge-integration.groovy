@@ -24,6 +24,7 @@
  **/
 
  import groovy.transform.Field
+ import java.util.concurrent.ConcurrentHashMap
 
 definition(
     name:'Advanced Hue Bridge Integration',
@@ -50,6 +51,8 @@ definition(
 @Field static final String PAGE_FIND_SCENES = 'findScenes'
 @Field static final String PAGE_ADD_SCENES = 'addScenes'
 
+@Field static Map volatileAtomicStateByDeviceId = new ConcurrentHashMap()
+
 preferences {
     page(name: PAGE_MAINPAGE)
     page(name: PAGE_BRIDGE_DISCOVERY, title: 'Device Discovery', refreshTimeout:PAGE_REFRESH_TIMEOUT)
@@ -62,6 +65,16 @@ preferences {
     page(name: PAGE_FIND_SCENES,      title: 'Scene Discovery Started!', refreshTimeout:PAGE_REFRESH_TIMEOUT)
     page(name: PAGE_ADD_SCENES,       title: 'Add Scene')
 
+}
+
+synchronized Map getVolatileAtomicState(def device) {
+    Integer deviceId = device.deviceId ?: device.device.deviceId
+    Map result = volatileAtomicStateByDeviceId.get(deviceId)
+    if (result == null) {
+        result = new ConcurrentHashMap()
+        volatileAtomicStateByDeviceId[deviceId] = result
+    }
+    return result
 }
 
 def mainPage(Map params=[:]) {
@@ -534,6 +547,7 @@ def updated() {
 }
 
 def initialize() {
+    volatileAtomicStateByDeviceId.clear()
     ssdpDiscover()
     runEvery5Minutes('ssdpDiscover')
 }
@@ -777,7 +791,7 @@ void setDeviceState(def child, Map deviceState) {
 
     // If device state does not contain the value on, then determine if we must queue the state for a future call
     if (!deviceState.on && ! deviceState.scene) {
-        if ((child.device.currentValue('switch') ?: 'on') == 'off') {
+        if ((currentValue(child, 'switch') ?: 'on') == 'off') {
             return
         }
     }
@@ -1088,54 +1102,87 @@ def findScene(String groupId, String sceneId) {
     }
 }
 
-void sendChildEvent(def child, Map event) {
+Object getDeviceForChild(def child) {
+    def nid = (child.device?:child).deviceNetworkId
+    def dev = getChildDevice(nid)
+    if (dev) {
+        return dev
+    }
+    return getChildDevice(networkIdForGroup(nid.split('/')[1])).getChildDevice(nid)
+}
+
+Object currentValue(def child, String attributeName) {
+    def nid = (child.device?:child).deviceNetworkId
+    def device = getDeviceForChild(child)
+
+    if (!device.hasAttribute(attributeName)) {
+        return null
+    }
+    def result = getVolatileAtomicState(child)[attributeName]
+    if (result != null) {
+        return result
+    }
+    result = (device.deviceId ? device : device.device).currentValue(attributeName)
+    if (result != null) {
+        getVolatileAtomicState(device)[attributeName] = result
+    }
+    return result
+}
+
+void sendChildEvent(def child, Map properties) {
+    def nid = (child.device?:child).deviceNetworkId
+    def device = getDeviceForChild(child)
+
+    if (!device.hasAttribute(properties.name)) { return }
 
     // Supress repetative updates, this reduces the load on the event bus.
-    if (child.device.currentValue(event.name) == event.value) { return }
+    if (currentValue(device, properties.name) == properties.value) { return }
 
     // Send the update to the event bus
-    child.sendEvent(event)
+    child.sendEvent(properties)
 
-    if (!child.logEnable) { return }
+    getVolatileAtomicState(device.device)[properties.name] = properties.value
 
     // Log a message that the value was updated
-    if (event.name == 'switch') {
-        String type = deviceIdType(child.device.deviceNetworkId) ?: 'device'
-        child.log.info "${type} ($child) turned ${event.value}"
-    } else {
-        child.log.info "Set ($child) ${event.name}: ${event.value}"
+    if (child.logEnable) {
+        if (event.name == 'switch') {
+            String type = deviceIdType(nid) ?: 'device'
+            child.log.info "${type} ($child) turned ${event.value}"
+        } else {
+            child.log.info "Set ($child) ${event.name}: ${event.value}"
+        }
     }
 }
 
 void setHueProperty(def child, Map args) {
     String type = deviceIdType(child.device.deviceNetworkId) ?: 'device'
 
-    Map state = args.state
+    Map devstate = args.state
 
     if (type ==~ /group|hub/) {
         // Groups report any_on and all_on in state
-        if (state) {
-            if (state['any_on']) { child.setHueProperty([name: 'any_on', value: state.any_on]) }
-            if (state['all_on']) { child.setHueProperty([name: 'all_on', value: state.all_on]) }
+        if (devstate) {
+            if (devstate['any_on']) { child.setHueProperty([name: 'any_on', value: devstate.any_on]) }
+            if (devstate['all_on']) { child.setHueProperty([name: 'all_on', value: devstate.all_on]) }
         }
         // Groups report all other values in action
-        state = args.action
+        devstate = args.action
     }    
 
-    if (state) {
-        if (type == 'group' && state.scene) {
-            child.setHueProperty([name: "scene", value: state.scene])
+    if (devstate) {
+        if (type == 'group' && devstate.scene) {
+            child.setHueProperty([name: "scene", value: devstate.scene])
             return
         }
     }
 
 
-    if (state.containsKey('on'))        { sendChildEvent(child, [name: 'switch',           value: state.on  ? 'on' : 'off']) }
-    if (state.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(state.colormode)]) }
-    if (state.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel(state.bri)]) }
-    if (state.containsKey('hue'))       { sendChildEvent(child, [name: 'hue',              value: convertHBHue(state.hue)]) }
-    if (state.containsKey('sat'))       { sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(state.sat)]) }
-    if (state.containsKey('ct'))        { sendChildEvent(child, [name: 'colorTemperature', value: convertHBColortemp(state.ct)]) }
+    if (devstate.containsKey('on'))        { sendChildEvent(child, [name: 'switch',           value: devstate.on  ? 'on' : 'off']) }
+    if (devstate.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(devstate.colormode)]) }
+    if (devstate.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel(devstate.bri)]) }
+    if (devstate.containsKey('hue'))       { sendChildEvent(child, [name: 'hue',              value: convertHBHue(devstate.hue)]) }
+    if (devstate.containsKey('sat'))       { sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(devstate.sat)]) }
+    if (devstate.containsKey('ct'))        { sendChildEvent(child, [name: 'colorTemperature', value: convertHBColortemp(devstate.ct)]) }
 }
 
 // Component Dimmer delegates
@@ -1174,9 +1221,9 @@ void componentStopLevelChange(def child) {
 }
 
 void componentSetColor(def child, Map colormap) {
-    if (colormap?.hue == null)        { colormap.hue        = child.currentValue('hue') ?: 0 }
-    if (colormap?.saturation == null) { colormap.saturation = child.currentValue('saturation') ?: 50 }
-    if (colormap?.level == null)      { colormap.level      = child.currentValue('level') ?: 100 }
+    if (colormap?.hue == null)        { colormap.hue        = currentValue(child, 'hue') ?: 0 }
+    if (colormap?.saturation == null) { colormap.saturation = currentValue(child, 'saturation') ?: 50 }
+    if (colormap?.level == null)      { colormap.level      = currentValue(child, 'level') ?: 100 }
 
     Map args = ['colormode': 'hs',
                 'hue': convertHEHue(colormap.hue as int),

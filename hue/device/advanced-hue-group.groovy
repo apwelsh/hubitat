@@ -249,7 +249,7 @@ void activateScene(String scene) {
 }
 
 void allOff() {
-    childDevices.findAll { scene -> scene.currentValue('switch') == 'on' }.each { scene ->
+    childDevices.findAll { scene -> parent.currentValue(scene, 'switch') == 'on' }.each { scene ->
         parent.sendChildEvent(scene, EVENT_SWITCH_OFF)
         log.info "Scene ($scene) turned off"
     }
@@ -260,13 +260,13 @@ void exclusiveOn(def child) {
         String dni = child.device.deviceNetworkId
         childDevices.each { scene ->
             Map event = (scene.deviceNetworkId == dni) ? EVENT_SWITCH_ON : EVENT_SWITCH_OFF
-            if (scene.currentValue('switch') != event.value) {
+            if (parent.currentValue(scene, 'switch') != event.value) {
                 parent.sendChildEvent(scene, event)
                 log.info "Scene (${scene}) turned ${event.value}"
             }
         }
     }
-    if (!(device.currentValue('switch') == 'on')) {
+    if (!(parent.currentValue(this, 'switch') == 'on')) {
         parent.sendChildEvent(this, EVENT_SWITCH_ON)
     }
 }
@@ -277,15 +277,15 @@ void exclusiveOn(def child) {
 
 void componentOn(def child) {
     if (logEnable) { log.info "Scene (${child}) turning on" }
-    String sceniId = parent.deviceIdNode(child.deviceNetworkId)
-    parent.setDeviceState(this, ['scene':sceniId])
+    String sceneId = parent.deviceIdNode(child.deviceNetworkId)
+    parent.setDeviceState(this, ['scene':sceneId])
 }
 
 void componentOff(def child) {
     if (logEnable) { log.info "Scene (${child}) turning off" }
     // Only change the state to off, there is not action to actually be performed.
     if (sceneMode == 'switch') {
-        if (child.currentValue('switch') == 'on') off()
+        if (parent.currentValue(child, 'switch') == 'on') off()
     } else {
         parent.sendChildEvent(child, EVENT_SWITCH_OFF)
     }
