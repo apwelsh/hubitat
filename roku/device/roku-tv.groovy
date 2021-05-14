@@ -372,7 +372,7 @@ String iconPathForApp(String netId) {
 void sendEvent(Map properties) {
     
     // Overrides driver.sendEvent() to populate cached values
-    if (volatileAtomicState[properties.name] != properties.value) {
+    if (currentValue(properties.name) != properties.value) {
         device.sendEvent(properties)
         volatileAtomicState[properties.name] = properties.value
     }
