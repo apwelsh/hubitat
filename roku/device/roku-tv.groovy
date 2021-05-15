@@ -55,7 +55,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 @Field static final String SETTING_DEVICE_IP        = 'deviceIp'
 @Field static final String SETTING_REFRESH_UNITS    = 'refreshUnits'
-@Field static final String SETTING_REFRESH_INTERVAL = 'refreshIntedrval'
+@Field static final String SETTING_REFRESH_INTERVAL = 'refreshInterval'
 @Field static final String SETTING_APP_REFRESH      = 'appRefresh'
 @Field static final String SETTING_APP_UNITS        = 'appUnits'
 @Field static final String SETTING_APP_INTERVAL     = 'appInterval'
@@ -247,15 +247,15 @@ def updated() {
     if (this[SETTING_USE_POWER_OFF]    == null) updateSetting(SETTING_USE_POWER_OFF,    state.isTV ?: false)
    
     if (!this[SETTING_APP_REFRESH]) {
-        [SETTING_APP_UNITS, SETTING_MEDIA_UNITS, SETTING_INV_UNITS].each { key -> updateSetting(key, SETTING_REFRESH_UNITS) }
-        [SETTING_APP_INTERVAL, SETTING_MEDIA_INTERVAL, SETTING_INV_INTERVAL].each { key -> updateSetting(key, SETTING_REFRESH_INTERVAL) }
+        [SETTING_APP_UNITS, SETTING_MEDIA_UNITS, SETTING_INV_UNITS].each { key -> updateSetting(key, DEFAULT_REFRESH_UNITS) }
+        [SETTING_APP_INTERVAL, SETTING_MEDIA_INTERVAL, SETTING_INV_INTERVAL].each { key -> updateSetting(key, DEFAULT_REFRESH_INTERVAL) }
     }
-
 
     // Override out-of-bounds values
     [SETTING_REFRESH_INTERVAL, SETTING_APP_INTERVAL, SETTING_MEDIA_INTERVAL, SETTING_INV_INTERVAL].each { key ->
-        if (this[key]  > LIMIT_REFRESH_INTERVAL_MAX) updateSetting(key, LIMIT_REFRESH_INTERVAL_MAX)
-        if (this[key]  < LIMIT_REFRESH_INTERVAL_MIN) updateSetting(key, LIMIT_REFRESH_INTERVAL_MIN)
+        Integer value = this[key]
+        if (value  > LIMIT_REFRESH_INTERVAL_MAX) updateSetting(key, LIMIT_REFRESH_INTERVAL_MAX)
+        if (value  < LIMIT_REFRESH_INTERVAL_MIN) updateSetting(key, LIMIT_REFRESH_INTERVAL_MIN)
     }
     if (this[SETTING_TIMEOUT] < 1) updateSetting(SETTING_TIMEOUT, LIMIT_TIMEOUT_MIN)
 
@@ -384,7 +384,9 @@ Object currentValue(String attributeName) {
         return result
     }
     result = device.currentValue(attributeName)
-    volatileAtomicState[attributeName] = result
+    if (result != null) {
+        volatileAtomicState[attributeName] = result
+    }
     return result
 }
 
