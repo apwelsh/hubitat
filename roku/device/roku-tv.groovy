@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.5
+ * Version 2.7.8
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -112,6 +112,7 @@ metadata {
         command 'queryDeviceInfo'
         command 'queryMediaPlayer'
         command 'queryActiveApp'
+        command 'queryInstalledApps'
 
         command 'search', [[name: 'Keywords*',        type: 'STRING', description: 'Search keywords (REQUIRED)'],
                            [name: 'Type*',            type: 'ENUM',   constraints: ['movie', 'tv-show', 'person', 'channel', 'game']],
@@ -316,6 +317,10 @@ void scheduleRefresh() {
 void scheduleQueryDeviceInfo() {
     unschedule('queryDeviceInfo')
 
+    if (volatileAtomicState.configured && !state.isTV) {
+        return
+    }
+
     Long delay = (this[SETTING_REFRESH_INTERVAL] ?: 0) * (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
@@ -443,6 +448,8 @@ void on() {
     if (isOff) { sendWakeUp() }
     if (this[SETTING_USE_POWER_ON]) {
         keyPress('PowerOn')
+    } else if (!state.isTV) {
+        keyPress('Power')
     } else {
         queryDeviceInfo()
         if (currentValue('switch') == 'off') {
@@ -457,6 +464,8 @@ void off() {
 
     if (this[SETTING_USE_POWER_OFF]) {
         keyPress('PowerOff')
+    } else if (!state.isTV) {
+        keyPress('Power')
     } else {
         queryDeviceInfo()
         if (currentValue('switch') == 'on') {
@@ -616,19 +625,21 @@ void queryDeviceInfo() {
     // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryDeviceInfo')
     
-    try {
-        httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-            if (!response.isSuccess()) { return }
+    if (!volatileAtomicState.configured || state.isTV) {
+        try {
+            httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
+                if (!response.isSuccess()) { return }
 
-            def body = response.data
-            parsePowerState(body)
-            if (!volatileAtomicState.configured) {
-                parseState(body)
+                def body = response.data
+                parsePowerState(body)
+                if (!volatileAtomicState.configured) {
+                    parseState(body)
+                }
             }
-        }
-    } catch (ex) {
-        logExceptionWithPowerWarning(ex)
+        } catch (ex) {
+            logExceptionWithPowerWarning(ex)
 
+        }
     }
     scheduleQueryDeviceInfo()
 }
