@@ -133,7 +133,7 @@ void refresh() {
     scheduleRefresh()
 }
 
-void scheduleRefresh() {
+void resetRefreshSchedule() {
     unschedule(refresh)
     if (this[SETTING_AUTO_REFRESH]) {
         runIn(this[SETTING_REFRESH_INTERVAL] ?: DEFAULT_REFRESH_INTERVAL, refresh, SCHEDULE_NON_PERSIST)
