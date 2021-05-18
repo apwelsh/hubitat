@@ -94,7 +94,6 @@ def installed() {
 void updateSetting(String name, Object value) {
     device.updateSetting(name, value)
     this[name] = value
-    log.info "Set $name = $value"
 }
 
 def updated() {

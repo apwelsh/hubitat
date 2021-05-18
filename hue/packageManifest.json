@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.5.16",
+  "version": "1.5.17",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -33,7 +33,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy",
       "required": true,
-      "version": "1.2.1"
+      "version": "1.2.2"
     }
   ],
   "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception"
