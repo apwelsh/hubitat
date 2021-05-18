@@ -26,10 +26,16 @@
 import groovy.transform.Field
 
 @Field static final Boolean DEFAULT_AUTO_REFRESH     = false
-@Field static final Number  DEFAULT_REFRESH_INTERVAL = 60
+@Field static final Integer DEFAULT_REFRESH_INTERVAL = 60
 @Field static final Boolean DEFAULT_ANY_ON           = true
 @Field static final Boolean DEFAULT_LOG_ENABLE       = true
-@Field static final Boolean DEFAULT_DEBUG            = false
+@Field static final Boolean DEFAULT_DBG_ENABLE       = false
+
+@Field static final String SETTING_AUTO_REFRESH      = 'autoRefresh'
+@Field static final String SETTING_REFRESH_INTERVAL  = 'refreshInterval'
+@Field static final String SETTING_ANY_ON            = 'anyOn'
+@Field static final String SETTING_LOG_ENABLE        = 'logEnable'
+@Field static final String SETTING_DBG_ENABLE        = 'debug'
 
 @Field static final Map SCHEDULE_NON_PERSIST = [overwrite: true, misfire:'ignore']
 
@@ -39,6 +45,7 @@ metadata {
         namespace: 'apwelsh',
         author:    'Armand Welsh',
         importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy') {
+
         capability 'Switch'
         capability 'Refresh'
     }
@@ -46,35 +53,35 @@ metadata {
 
 preferences {
 
-    input name: 'autoRefresh',
+    input name: SETTING_AUTO_REFRESH,
           type: 'bool',
           defaultValue: DEFAULT_AUTO_REFRESH,
           title: 'Auto Refresh',
           description: 'Should this device support automatic refresh'
-
-    if (autoRefresh) {
-        input name: 'refreshInterval',
+    if (this[SETTING_AUTO_REFRESH] == true) {
+        input name: SETTING_REFRESH_INTERVAL,
               type: 'number',
               defaultValue: DEFAULT_REFRESH_INTERVAL,
               title: 'Refresh Inteval',
               description: 'Number of seconds to refresh the group state'
     }
 
-    input name: 'anyOn',
+    input name: SETTING_ANY_ON,
           type: 'bool',
           defaultValue: DEFAULT_ANY_ON,
           title: 'ANY on or ALL on',
           description: 'When ebabled, the group is considered on when any light is on'
 
-    input name: 'logEnable',
+    input name: SETTING_LOG_ENABLE,
           type: 'bool',
           defaultValue: DEFAULT_LOG_ENABLE,
           title: 'Enable informational logging'
 
-    input name: 'debug',
+    input name: SETTING_DBG_ENABLE,
           type: 'bool',
-          defaultValue: DEFAULT_DEBUG,
+          defaultValue: DEFAULT_DBG_ENABLE,
           title: 'Enable debug logging'
+
 }
 
 /**
@@ -84,14 +91,22 @@ def installed() {
     updated()
 }
 
-def updated() {
-    if (settings.autoRefresh     == null) { device.updateSetting('autoRefresh',     DEFAULT_AUTO_REFRESH) }
-    if (settings.refreshInterval == null) { device.updateSetting('refreshInterval', DEFAULT_REFRESH_INTERVAL) }
-    if (settings.anyOn           == null) { device.updateSetting('anyOn',           DEFAULT_ANY_ON) }
-    if (settings.logEnable       == null) { device.updateSetting('logEnable',       DEFAULT_LOG_ENABLE) }
+void updateSetting(String name, Object value) {
+    device.updateSetting(name, value)
+    this[name] = value
+    log.info "Set $name = $value"
+}
 
-    if (logEnable) { log.debug 'Preferences updated' }
-    refresh()
+def updated() {
+    if (this[SETTING_AUTO_REFRESH]     == null) { updateSetting(SETTING_AUTO_REFRESH,     DEFAULT_AUTO_REFRESH) }
+    if (this[SETTING_REFRESH_INTERVAL] == null) { updateSetting(SETTING_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL) }
+    if (this[SETTING_ANY_ON]           == null) { updateSetting(SETTING_ANY_ON,           DEFAULT_ANY_ON) }
+    if (this[SETTING_LOG_ENABLE]       == null) { updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE) }
+
+    if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
+    if (this[SETTING_AUTO_REFRESH]) {
+        runIn(1, refresh)
+    }
 }
 
 /*
@@ -101,38 +116,32 @@ def updated() {
 /** Switch Commands **/
 
 void on() {
-    if (logEnable) { log.info "Bridge (${this}) turning on" }
+    if (this[SETTING_LOG_ENABLE]) { log.info "Bridge (${this}) turning on" }
     parent.setDeviceState(this, ['on':true])
 }
 
 void off() {
-    if (logEnable) { log.info "Bridge (${this}) turning off" }
+    if (this[SETTING_LOG_ENABLE]) { log.info "Bridge (${this}) turning off" }
     parent.setDeviceState(this, ['on': false])
 }
 
 void refresh() {
-    if (debug) { log.debug "Bridge (${this}) refreshing" }
+    unschedule(refresh)
+    if (this[SETTING_DBG_ENABLE]) { log.debug "Bridge (${this}) refreshing" }
     parent.getDeviceState(this)
     parent.refreshHubStatus()
-    resetRefreshSchedule()
+    scheduleRefresh()
 }
 
-void autoRefresh() {
-    if (autoRefresh) {
-        runIn(refreshInterval ?: DEFAULT_REFRESH_INTERVAL, refresh, SCHEDULE_NON_PERSIST)
-    }
-    refresh()
-}
-
-void resetRefreshSchedule() {
-    unschedule()
-    if (autoRefresh) {
-        runIn(refreshInterval ?: DEFAULT_REFRESH_INTERVAL, refresh, SCHEDULE_NON_PERSIST)
+void scheduleRefresh() {
+    unschedule(refresh)
+    if (this[SETTING_AUTO_REFRESH]) {
+        runIn(this[SETTING_REFRESH_INTERVAL] ?: DEFAULT_REFRESH_INTERVAL, refresh, SCHEDULE_NON_PERSIST)
     }
 }
 
 void setHueProperty(Map args) {
-    if (args.name == (anyOn ? 'any_on' : 'all_on')) {
+    if (args.name == (this[SETTING_ANY_ON] ? 'any_on' : 'all_on')) {
         parent.sendChildEvent(this, [name: 'switch', value: value ? 'on' : 'off'])
     }
 }
