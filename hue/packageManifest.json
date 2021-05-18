@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.5.17",
+  "version": "1.5.18",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
@@ -15,7 +15,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.2.12"
+      "version": "1.2.13"
     }
   ],
   "drivers": [
@@ -36,6 +36,6 @@
       "version": "1.2.2"
     }
   ],
-  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception"
+  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices."
 
 }
