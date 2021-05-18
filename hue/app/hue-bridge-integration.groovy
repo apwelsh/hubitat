@@ -1179,7 +1179,7 @@ void setHueProperty(def child, Map args) {
 
     if (devstate.containsKey('on'))        { sendChildEvent(child, [name: 'switch',           value: devstate.on  ? 'on' : 'off']) }
     if (devstate.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(devstate.colormode)]) }
-    if (devstate.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel.bri)]) }
+    if (devstate.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel(devstate.bri)]) }
     if (devstate.containsKey('hue'))       { sendChildEvent(child, [name: 'hue',              value: convertHBHue(devstate.hue)]) }
     if (devstate.containsKey('sat'))       { sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(devstate.sat)]) }
     if (devstate.containsKey('ct'))        { sendChildEvent(child, [name: 'colorTemperature', value: convertHBColortemp(devstate.ct)]) }
@@ -1200,7 +1200,7 @@ void componentRefresh(child){
 }
 
 void componentSetLevel(child, level, duration=null){
-    Integer heLevel = convertHELevel(level as int);
+    Integer heLevel = convertHELevel(level as int)
     Map args = ['on': (heLevel > 0), 'bri': heLevel]
     if (duration != null) { args['transitiontime'] = (duration as int) * 10 }
 
