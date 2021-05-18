@@ -130,7 +130,7 @@ void refresh() {
     if (this[SETTING_DBG_ENABLE]) { log.debug "Bridge (${this}) refreshing" }
     parent.getDeviceState(this)
     parent.refreshHubStatus()
-    scheduleRefresh()
+    resetRefreshSchedule()
 }
 
 void resetRefreshSchedule() {
