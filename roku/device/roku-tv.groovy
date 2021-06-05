@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.8
+ * Version 2.7.9
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -69,6 +69,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Field static final String SETTING_INPUT_AV         = 'inputAV'
 @Field static final String SETTING_INPUT_TUNER      = 'inputTuner'
 @Field static final String SETTING_LOG_ENABLE       = 'logEnable'
+@Field static final String SETTING_DBG_ENABLE       = 'dbgEnable'
 @Field static final String SETTING_TIMEOUT          = 'timeout'
 @Field static final String SETTING_USE_POWER_ON     = 'usePowerOn'
 @Field static final String SETTING_USE_POWER_OFF    = 'usePowerOff'
@@ -197,6 +198,7 @@ preferences {
         }
     }
     input name: SETTING_LOG_ENABLE,       type: 'bool',   title: 'Enable informational logging', defaultValue: DEFAULT_LOG_ENABLE, required: true
+    input name: SETTING_DBG_ENABLE,       type: 'bool',   title: 'Enable verbose debug logging', defaultValue: DEFAULT_DBG_ENABLE, required: true
 }
 
 synchronized Map getVolatileAtomicState() {
@@ -243,6 +245,7 @@ def updated() {
     if (this[SETTING_INPUT_AV]         == null) updateSetting(SETTING_INPUT_AV,         DEFAULT_INPUT_AV)
     if (this[SETTING_INPUT_TUNER]      == null) updateSetting(SETTING_INPUT_TUNER,      DEFAULT_INPUT_TUNER)
     if (this[SETTING_LOG_ENABLE]       == null) updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE)
+    if (this[SETTING_DBG_ENABLE]       == null) updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE)
     if (this[SETTING_TIMEOUT]          == null) updateSetting(SETTING_TIMEOUT,          DEFAULT_TIMEOUT)
     if (this[SETTING_USE_POWER_ON]     == null) updateSetting(SETTING_USE_POWER_ON,     state.isTV ?: false)
     if (this[SETTING_USE_POWER_OFF]    == null) updateSetting(SETTING_USE_POWER_OFF,    state.isTV ?: false)
@@ -527,14 +530,14 @@ void mute() {
 }
 
 void poll() {
-    if (this[SETTING_LOG_ENABLE])  { log.trace 'Executing \'poll\'' }
+    if (this[SETTING_DBG_ENABLE])  { log.trace 'Executing \'poll\'' }
     if (this[SETTING_APP_REFRESH]) { queryActiveApp }
     refresh()
 }
 
 void refresh() {
     if (this[SETTING_DEVICE_IP]) {
-        if (this[SETTING_LOG_ENABLE]) { log.trace 'Executing \'refresh\'' }
+        if (this[SETTING_DBG_ENABLE]) { log.trace 'Executing \'refresh\'' }
         queryActiveApp()
 
         queryDeviceInfo()
@@ -620,7 +623,7 @@ void sendWakeUp() {
 }
 
 void queryDeviceInfo() {
-    if (this[SETTING_LOG_ENABLE]) { log.info "queryDeviceInfo: Executed " }
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: enter " }
     
     // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryDeviceInfo')
@@ -637,14 +640,17 @@ void queryDeviceInfo() {
                 }
             }
         } catch (ex) {
-            logExceptionWithPowerWarning(ex)
+            log.trace "${ex}"
+            logExceptionWithPowerWarning("queryDeviceInfo", ex)
 
         }
     }
     scheduleQueryDeviceInfo()
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: exit " }
 }
 
 void queryMediaPlayer() {
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: enter " }
 
     // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryMediaPlayer')
@@ -656,11 +662,11 @@ void queryMediaPlayer() {
             parseMediaPlayer(body)
         }
     } catch (ex) {
-        logExceptionWithPowerWarning(ex)
+        logExceptionWithPowerWarning("queryMediaPlayer", ex)
 
     }
     scheduleQueryMediaPlayer()
-}
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: exit " }}
 
 String translateAppToInput(appName) {
     
@@ -712,7 +718,8 @@ void setCurrentApplication(currentApp) {
 }
 
 void queryActiveApp() {
-
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: enter " }
+    
     // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryActiveApp')
 
@@ -720,26 +727,27 @@ void queryActiveApp() {
         httpGet([uri:apiPath('query/active-app'), timeout: this[SETTING_TIMEOUT]]) { response -> 
             if (!response.isSuccess()) 
             return
-
             def body = response.data
             def appType = body.app.@type
             def appId = body.app.@id
             def app = body.app.text()
-            def mediaApp = appType == 'tvin' ? appID : app
+            def mediaApp = appType == 'tvin' ? appId : app
             sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
             setCurrentApplication(app)
         }
     } catch (ex) {
-        logExceptionWithPowerWarning(ex)
+        logExceptionWithPowerWarning("queryActiveApp", ex)
     }
     scheduleQueryActiveApp()
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: exit " }    
 }
 
 def queryInstalledApps() {
-    
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: enter " }
+
     if (!this[SETTING_AUTO_MANAGE]) 
         return
-
+    
     // must unschedule the query first, because the scheduler may have one triggering at the same time.
     unschedule('queryInstalledApps')
 
@@ -789,7 +797,7 @@ def queryInstalledApps() {
     
     }
     scheduleQueryInstalledApps()
-
+    if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: exit " }
 }
 
 private void parseState(body) {
@@ -919,7 +927,7 @@ def getInstalledApps() {
             }
         }
     } catch (ex) {
-        logExceptionWithPowerWarning(ex)
+        logExceptionWithPowerWarning("getInstalledApps", ex)
     }
 
     List inputs = ['Home']
@@ -961,7 +969,7 @@ def keyPress(key) {
             else log.error "Failed to send key press event for ${key}"
         }
     } catch (ex) {
-        logExceptionWithPowerWarning(ex)
+        logExceptionWithPowerWarning("keyPress", ex)
     }
 }
 
@@ -983,7 +991,7 @@ private def isValidKey(key) {
 }
 
 def launchApp(appId) {
-    if (this[SETTING_LOG_ENABLE]) log.debug "Executing 'launchApp ${appId}'"
+    if (this[SETTING_DBG_ENABLE]) log.debug "Executing 'launchApp ${appId}'"
     if (appId ==~ /^\d+$/ ) {
         try {
             httpPost([uri:apiPath("launch/${appId}"), timeout: this[SETTING_TIMEOUT]]) { response ->
@@ -998,7 +1006,7 @@ def launchApp(appId) {
                 }
             }
         } catch (ex) {
-            logExceptionWithPowerWarning(ex)
+            logExceptionWithPowerWarning("launchApp", ex)
         }
     } else if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
@@ -1063,9 +1071,9 @@ private def deviceLabel() {
     return device.label
 }
 
-private void logExceptionWithPowerWarning(ex) {
+private void logExceptionWithPowerWarning(String method, ex) {
     if (this[SETTING_LOG_ENABLE]) {
-        log.error ex
+        log.error "Exception thrown in call to ${method}: ${ex}"
         log.warn 'The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku.'
     }
 }
@@ -1074,5 +1082,3 @@ private String apiPath(String queryPath) {
     String suffix = queryPath ? "/${queryPath}" : ''
     "http://${this[SETTING_DEVICE_IP]}:8060${suffix}"
 }
-
-
