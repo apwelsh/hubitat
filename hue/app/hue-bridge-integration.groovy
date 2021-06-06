@@ -104,7 +104,12 @@ def mainPage(Map params=[:]) {
 
     Boolean uninstall = (state.bridgehost) ? false : true
 
-    return dynamicPage(name: PAGE_MAINPAGE, title: 'Manage your linked Hue Bridge', nextPage: null, uninstall: uninstall, install: true) {
+    return dynamicPage(name: PAGE_MAINPAGE, title: '', nextPage: null, uninstall: uninstall, install: true) {
+            section (getFormat("title", "Advanced Hue Bridge")) {
+                paragraph getFormat("subtitle", "Manager your linked Hue Bridge")
+                paragraph getFormat("line")
+            }
+
         if (selectedDevice == null) {
             section('Setup'){
                 paragraph 'To begin, select Find Bridges to start searching for your Hue Bride.'
@@ -129,8 +134,18 @@ def mainPage(Map params=[:]) {
                 input name: 'logEnable', type: 'bool', defaultValue: true,  title: 'Enable informational logging'
                 input name: 'debug',     type: 'bool', defaultValue: false, title: 'Enable debug logging'
             }
+            section() {
+                paragraph getFormat("line")
+                paragraph "<div style='color:#1A77C9;text-align:center'>Advanced Hue Bridge<br><a href='https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J' target='_blank'><img src='https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg' border='0' alt='PayPal Logo'></a><br><br>Please consider donating. This app took a lot of work to make.<br>If you find it valuable, I'd certainly appreciate it!</div>"
+            }      
         }
     }
+}
+
+def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code 
+	if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
+	if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
+	if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"
 }
 
 @Field static final Integer DEVICE_REFRESH_DICOVER_INTERVAL = 3

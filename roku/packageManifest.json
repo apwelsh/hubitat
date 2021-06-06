@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
       "required": false,
       "oauth": false,
-      "version": "1.2.3"
+      "version": "1.2.4"
     }
   ],
   "drivers": [
@@ -27,6 +27,6 @@
       "version": "2.7.9"
     }
   ],
-  "version": "1.3.16",
-  "releaseNotes": "1.3.2 - Added ability to turn off the ssdp auto-discovery. Added ability to choose power on/off command mode \n1.3.3 - Added support for MediaTransport capability, which emulates the play/pause/stop commands of media players. \n1.3.4 - Updated refresh logic so that when the TV turns off, the transportStatus changes to stopped, and application changes to Roku. \n1.3.5 - Fixed reported bugs in Roku Connect preventing the addition of new channels on newly added Roku devices. \n1.3.6 - Added support for MediaInputSource to support standard input source selection, and removed refresh attribute.  This update limits event logging considerably to improve overall performance. \n1.3.7 - Enabled support for disabling refresh with refresh interval of 0. \n1.3.8 - Added a critical bug fix and some more minor fixes for handling power state. \n1.3.110 - Fix logic fro updating mediaInputSource, and improved quality of transport status detection. \n1.3.11 - Implement logic changes to reduce CPU load and network traffic.  Suppress redundant events. \n1.3.12 - Minor update to improve performance on updating values. \n1.3.13 - Corrected annoying bug when adding new devices.  \n1.3.14 - Added logic to skip device info query on non-TV Roku device, since they do not report power state. \n1.3.15 - Fixed Null Point Exception parsing active application.  Added new Debug Verbose Logging setting. \n1.3.16 - Implement Initialize capability to refresh device state on hub startup."
+  "version": "1.3.17",
+  "releaseNotes": "1.3.2 - Added ability to turn off the ssdp auto-discovery. Added ability to choose power on/off command mode \n1.3.3 - Added support for MediaTransport capability, which emulates the play/pause/stop commands of media players. \n1.3.4 - Updated refresh logic so that when the TV turns off, the transportStatus changes to stopped, and application changes to Roku. \n1.3.5 - Fixed reported bugs in Roku Connect preventing the addition of new channels on newly added Roku devices. \n1.3.6 - Added support for MediaInputSource to support standard input source selection, and removed refresh attribute.  This update limits event logging considerably to improve overall performance. \n1.3.7 - Enabled support for disabling refresh with refresh interval of 0. \n1.3.8 - Added a critical bug fix and some more minor fixes for handling power state. \n1.3.110 - Fix logic fro updating mediaInputSource, and improved quality of transport status detection. \n1.3.11 - Implement logic changes to reduce CPU load and network traffic.  Suppress redundant events. \n1.3.12 - Minor update to improve performance on updating values. \n1.3.13 - Corrected annoying bug when adding new devices.  \n1.3.14 - Added logic to skip device info query on non-TV Roku device, since they do not report power state. \n1.3.15 - Fixed Null Point Exception parsing active application.  Added new Debug Verbose Logging setting. \n1.3.16 - Implement Initialize capability to refresh device state on hub startup. \n1.3.17 - Added donate link to app"
 }

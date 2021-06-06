@@ -94,7 +94,10 @@ def mainPage() {
         app.removeSetting('deviceNetworkId')
         app.removeSetting('selectedDevice')
         app.removeSetting('selectedApps')
-        return dynamicPage(name: 'mainPage', title: 'Manage your Roku connected devices', uninstall: true, install: true) {
+        return dynamicPage(name: 'mainPage', title: '', uninstall: true, install: true) {
+            section (getFormat("title", "Roku Connect")) {
+                paragraph getFormat("line")
+            }
             section(){
                 href 'deviceDiscovery', title:'Discover New Devices', description:''
             }
@@ -108,9 +111,17 @@ def mainPage() {
                 input name: 'autoDiscovery', type: 'bool', defaultValue: true, title: 'Auto detect IP changes of Roku devices'
                 input name: 'logEnable',     type: 'bool', defaultValue: true, title: 'Enable logging'
             }
-
+            section() {
+                paragraph getFormat("line")
+                paragraph "<div style='color:#1A77C9;text-align:center'>Roku Connect<br><a href='https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J' target='_blank'><img src='https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg' border='0' alt='PayPal Logo'></a><br><br>Please consider donating. This app took a lot of work to make.<br>If you find it valuable, I'd certainly appreciate it!</div>"
+            }      
         }
     }
+}
+
+def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code 
+	if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
+	if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
 }
 
 def deviceDiscovery() {
@@ -432,4 +443,3 @@ private Integer convertHexToInt(hex) {
 private String deviceLabel(device) {
     device?.label ?: device?.name
 }
-
