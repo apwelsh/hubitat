@@ -48,6 +48,7 @@ metadata {
 
         capability 'Switch'
         capability 'Refresh'
+        capability 'Initialize'
     }
 }
 
@@ -90,6 +91,12 @@ preferences {
 def installed() {
     updated()
 }
+
+def initialize() {
+    updated()
+    if (this[SETTING_AUTO_REFRESH] != true) {
+        runIn(1, refresh)
+    }}
 
 void updateSetting(String name, Object value) {
     device.updateSetting(name, value)

@@ -100,6 +100,7 @@ metadata {
         capability 'Refresh'
         capability 'MediaInputSource'
         capability 'Configuration'
+        capability 'Initialize'
 
         command 'home'
         command 'keyPress', [[name:'Key Press Action', type: 'ENUM', constraints: [
@@ -220,6 +221,10 @@ def installed() {
 def updateSetting(key, value) {
     device.updateSetting(key, value)
     this[key] = value
+}
+
+def initialize() {
+    refresh()
 }
 
 def updated() {
