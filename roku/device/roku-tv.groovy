@@ -645,7 +645,6 @@ void queryDeviceInfo() {
                 }
             }
         } catch (ex) {
-            log.trace "${ex}"
             logExceptionWithPowerWarning("queryDeviceInfo", ex)
 
         }
