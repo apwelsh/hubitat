@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.9
+ * Version 2.7.11
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -48,6 +48,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Field static final Boolean DEFAULT_LOG_ENABLE       = false
 @Field static final Boolean DEFAULT_DBG_ENABLE       = false
 @Field static final Integer DEFAULT_TIMEOUT          = 10
+@Field static final Boolean DEFAULT_EXPERIMENTAL     = false
 
 @Field static final Integer LIMIT_REFRESH_INTERVAL_MAX = 240
 @Field static final Integer LIMIT_REFRESH_INTERVAL_MIN = 0
@@ -77,11 +78,11 @@ import java.util.concurrent.ConcurrentHashMap
 @Field static final String SETTING_DELETE_KEY       = 'deleteChildKey'
 @Field static final String SETTING_CREATE_APP       = 'createChildApp'
 @Field static final String SETTING_DELETE_APP       = 'deleteChildApp'
+@Field static final String SETTING_EXPERIMENTAL     = 'experimental'
 
 @Field static final String MEDIA_STATE_PLAYING      = 'playing'
 @Field static final String MEDIA_STATE_PAUSED       = 'paused'
 @Field static final String MEDIA_STATE_STOPPED      = 'stopped'
-
 
 @Field static Map volatileAtomicStateByDeviceId = new ConcurrentHashMap()
 
@@ -200,21 +201,20 @@ preferences {
     }
     input name: SETTING_LOG_ENABLE,       type: 'bool',   title: 'Enable informational logging', defaultValue: DEFAULT_LOG_ENABLE, required: true
     input name: SETTING_DBG_ENABLE,       type: 'bool',   title: 'Enable verbose debug logging', defaultValue: DEFAULT_DBG_ENABLE, required: true
+    input name: SETTING_EXPERIMENTAL,     type: 'bool',   title: 'Enable experimental features', defaultValue: DEFAULT_EXPERIMENTAL, required: true
 }
 
-synchronized Map getVolatileAtomicState() {
-    Map result = volatileAtomicStateByDeviceId.get(device.deviceId)
-    if (!result) {
-        result = new ConcurrentHashMap()
-        volatileAtomicStateByDeviceId[device.deviceId] = result
-    }
-    return result
+Map getVolatileAtomicState() {
+    volatileAtomicStateByDeviceId.get(device.deviceId)
 }
 
 /**
  * Hubitat DTH Lifecycle Functions
  **/
 def installed() {
+    if (!volatileAtomicStateByDeviceId[device.deviceId]) {
+        volatileAtomicStateByDeviceId[device.deviceId] = new ConcurrentHashMap()
+    }
     updated()
 }
 
@@ -224,7 +224,31 @@ def updateSetting(key, value) {
 }
 
 def initialize() {
+    if (!volatileAtomicStateByDeviceId[device.deviceId]) {
+        volatileAtomicStateByDeviceId[device.deviceId] = new ConcurrentHashMap()
+    }
+
+    // If the cached power state is not set, assume it is off, then initialize the system.
+    if (!volatileAtomicState.power) {
+        volatileAtomicState.power = 'Off'
+    }
     refresh()
+}
+void updateIpAddress(String ipAddress) {
+    device.updateSetting(SETTING_DEVICE_IP, ipAddress)
+    this[SETTING_DEVICE_IP] = ipAddress
+
+    String uri = apiPath()
+    updateDataValue('query/device-info', "${uri}/query/device-info")
+    updateDataValue('query/media-player', "${uri}/query/media-player")
+    updateDataValue('query/active-app', "${uri}/query/active-app")
+    updateDataValue('query/apps', "${uri}/query/apps")
+    String mac = getMACFromIP(this[SETTING_DEVICE_IP])
+    if (state.deviceMac != mac) {
+        if (this[SETTING_LOG_ENABLE]) log.debug "Updating Mac from IP: ${mac}"
+        state.deviceMac = mac
+    }
+
 }
 
 def updated() {
@@ -251,6 +275,7 @@ def updated() {
     if (this[SETTING_INPUT_TUNER]      == null) updateSetting(SETTING_INPUT_TUNER,      DEFAULT_INPUT_TUNER)
     if (this[SETTING_LOG_ENABLE]       == null) updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE)
     if (this[SETTING_DBG_ENABLE]       == null) updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE)
+    if (this[SETTING_EXPERIMENTAL]     == null) updateSetting(SETTING_EXPERIMENTAL,     DEFAULT_EXPERIMENTAL)
     if (this[SETTING_TIMEOUT]          == null) updateSetting(SETTING_TIMEOUT,          DEFAULT_TIMEOUT)
     if (this[SETTING_USE_POWER_ON]     == null) updateSetting(SETTING_USE_POWER_ON,     state.isTV ?: false)
     if (this[SETTING_USE_POWER_OFF]    == null) updateSetting(SETTING_USE_POWER_OFF,    state.isTV ?: false)
@@ -268,17 +293,7 @@ def updated() {
     }
     if (this[SETTING_TIMEOUT] < 1) updateSetting(SETTING_TIMEOUT, LIMIT_TIMEOUT_MIN)
 
-    String uri = apiPath()
-    updateDataValue('query/device-info', "${uri}/query/device-info")
-    updateDataValue('query/media-player', "${uri}/query/media-player")
-    updateDataValue('query/active-app', "${uri}/query/active-app")
-    updateDataValue('query/apps', "${uri}/query/apps")
-    String mac = getMACFromIP(this[SETTING_DEVICE_IP])
-    if (state.deviceMac != mac) {
-        if (this[SETTING_LOG_ENABLE]) log.debug "Updating Mac from IP: ${mac}"
-        state.deviceMac = mac
-    }
-
+    updateIpAddress(this[SETTING_DEVICE_IP])
     getInstalledApps()
     scheduleRefresh()
 
@@ -314,59 +329,150 @@ def updated() {
 
 }
 
+// override the unschedule method
+void unscheduleQuery(handlerMethod = null) {
+    if (handlerMethod == null) {
+        volatileAtomicState.findAll { it.key ==~ /^(query[A-Z].*|pingDevice)/ }.each {
+            volatileAtomicState[it.value] = false
+            unschedule(it.key)
+        }
+    } else {
+        volatileAtomicState[handlerMethod] = false
+        unschedule(handlerMethod)
+    }
+}
+
+// override the runIn scheduler method
+void runQueryIn(Long delayInSeconds, String handlerMethod, Map options = null) {
+    volatileAtomicState[handlerMethod] = true
+    runIn(delayInSeconds, handlerMethod, options)
+}
+
 void scheduleRefresh() {
-    unschedule()
-    scheduleQueryActiveApp()
-    scheduleQueryMediaPlayer()
-    scheduleQueryDeviceInfo()
-    scheduleQueryInstalledApps()
+    unscheduleQuery()
+    if (isPowerOff()) {
+        // if the TV is powered off, then use Ping to detect power on
+        schedulePingDevice()
+    } else if (volatileAtomicState.power) {
+        // if the TV is has any power state, then the network should be up, 
+        // so startup the normal schedulers
+        scheduleQueryActiveApp()
+        scheduleQueryMediaPlayer()
+        scheduleQueryDeviceInfo()
+        scheduleQueryInstalledApps()
+    } else {
+        // if the TV does not have a power state, perform a ping test to determine how to proceed
+        pingDevice()
+    }
 }
 
 void scheduleQueryDeviceInfo() {
-    unschedule('queryDeviceInfo')
+
+    if (volatileAtomicState.queryDeviceInfo) {
+        return
+    }
 
     if (volatileAtomicState.configured && !state.isTV) {
+        return
+    }
+
+    if (isPowerOff()) {
+        schedulePingDevice()
         return
     }
 
     Long delay = (this[SETTING_REFRESH_INTERVAL] ?: 0) * (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runIn(delay, 'queryDeviceInfo')
+        runQueryIn(delay, 'queryDeviceInfo')
     }
 }
 
 void scheduleQueryActiveApp() {
-    unschedule('queryActiveApp')
+
+    if (volatileAtomicState.queryActiveApp) {
+        return
+    }
+
+    if (isPowerOff()) {
+        schedulePingDevice()
+        return
+    }
 
     Long delay = (this[SETTING_APP_INTERVAL] ?: 0) * (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runIn(delay, 'queryActiveApp')
+        runQueryIn(delay, 'queryActiveApp')
     }
 }
 
 void scheduleQueryMediaPlayer() {
-    unschedule('queryMediaPlayer')
+
+    if (volatileAtomicState.queryMediaPlayer) {
+        return
+    }
+
+    if (isPowerOff()) {
+        schedulePingDevice()
+        return
+    }
 
     Long delay = (this[SETTING_MEDIA_INTERVAL] ?: 0) * (this[SETTING_MEDIA_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
-    if (currentValue('application') == 'Roku') {
+    if (viewingHomeScreen()) {
         return
     }
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runIn(delay, 'queryMediaPlayer')
+        runQueryIn(delay, 'queryMediaPlayer')
     }
 }
 
 void scheduleQueryInstalledApps() {
-    unschedule('queryInstalledApps')
+
+    if (volatileAtomicState.queryInstalledApps) {
+        return
+    }
+
+    if (isPowerOff()) {
+        schedulePingDevice()
+        return
+    }
 
     Long delay = (this[SETTING_INV_INTERVAL] ?: 0) * (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runIn(delay, 'queryInstalledApps')
+        runQueryIn(delay, 'queryInstalledApps')
+    }
+}
+
+void schedulePingDevice() {
+
+    if (!isPowerOff()) {
+        if (volatileAtomicState.pingDevice) { unscheduleQuery('pingDevice') }
+        return
+    }
+
+    if (volatileAtomicState.pingDevice) {
+        return
+    }
+
+    Long delay1 = (this[SETTING_REFRESH_INTERVAL] ?: 0) * (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
+    Long delay2 = (this[SETTING_APP_INTERVAL]     ?: 0) * (this[SETTING_APP_UNITS]     == REFRESH_UNIT_MINUTES ? 60 : 1)
+    Long delay3 = (this[SETTING_MEDIA_INTERVAL]   ?: 0) * (this[SETTING_MEDIA_UNITS]   == REFRESH_UNIT_MINUTES ? 60 : 1)
+    Long delay4 = (this[SETTING_INV_INTERVAL]     ?: 0) * (this[SETTING_INV_UNITS]     == REFRESH_UNIT_MINUTES ? 60 : 1)
+
+    // determine the shortest of all the refreshes scheduled, but not more frequent than 10 seconds.
+    Long delay = Math.max([delay1, delay2, delay3, delay4].findAll { it > 0 }.min { it }, 20)
+
+    if (this[SETTING_DEVICE_IP] && delay > 0) {
+        runQueryIn(delay, 'pingDevice')
+
+        // Remove all other scheduled, because with the TV powered off, they will fail
+        if (volatileAtomicState.queryDeviceInfo)    { unscheduleQuery('queryDeviceInfo')    }
+        if (volatileAtomicState.queryActiveApp)     { unscheduleQuery('queryActiveApp')     }
+        if (volatileAtomicState.queryMediaPlayer)   { unscheduleQuery('queryMediaPlayer')   }
+        if (volatileAtomicState.queryInstalledApps) { unscheduleQuery('queryInstalledApps') }
     }
 }
 
@@ -451,9 +557,8 @@ void configure() {
 
 void on() {
     
-    Boolean isOff = currentValue('switch') == 'off'
-    
-    if (isOff) { sendWakeUp() }
+    // Do NOT use isPowerOff() here, it is experimental switch bound, and won't wakeup if experimental switch is off
+    if (currentValue('power') == 'Off') { sendWakeUp() }
     if (this[SETTING_USE_POWER_ON]) {
         keyPress('PowerOn')
     } else if (!state.isTV) {
@@ -536,18 +641,30 @@ void mute() {
 
 void poll() {
     if (this[SETTING_DBG_ENABLE])  { log.trace 'Executing \'poll\'' }
-    if (this[SETTING_APP_REFRESH]) { queryActiveApp }
+    if (this[SETTING_APP_REFRESH]) { queryActiveApp() }
     refresh()
 }
 
 void refresh() {
-    if (this[SETTING_DEVICE_IP]) {
-        if (this[SETTING_DBG_ENABLE]) { log.trace 'Executing \'refresh\'' }
-        queryActiveApp()
+    if (volatileAtomicState._refresh) { return }
+    try {
+        volatileAtomicState._refresh = true
+        if (this[SETTING_DBG_ENABLE]) { log.trace 'Enter refresh'}
+        if (isPowerOff()) {
+            pingDevice()
+            return
+        }        
 
-        queryDeviceInfo()
-        if (!this[SETTING_APP_REFRESH]) { queryActiveApp() }
-        if (this[SETTING_AUTO_MANAGE])  { queryInstalledApps() }
+        if (this[SETTING_DEVICE_IP]) {
+            if (this[SETTING_DBG_ENABLE]) { log.trace 'Executing \'refresh\'' }
+            queryActiveApp()
+
+            queryDeviceInfo()
+            if (!this[SETTING_APP_REFRESH]) { queryActiveApp() }
+            if (this[SETTING_AUTO_MANAGE])  { queryInstalledApps() }
+        }
+    } finally {
+        volatileAtomicState._refresh = false
     }
 }
 
@@ -627,50 +744,105 @@ void sendWakeUp() {
     }
 }
 
-void queryDeviceInfo() {
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: enter " }
-    
-    // must unschedule the query first, because the scheduler may have one triggering at the same time.
-    unschedule('queryDeviceInfo')
-    
-    if (!volatileAtomicState.configured || state.isTV) {
-        try {
-            httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-                if (!response.isSuccess()) { return }
-
-                def body = response.data
-                parsePowerState(body)
-                if (!volatileAtomicState.configured) {
-                    parseState(body)
-                }
-            }
-        } catch (ex) {
-            logExceptionWithPowerWarning("queryDeviceInfo", ex)
-
+void pingDevice() {
+    if (volatileAtomicState._pingDevice) { return }
+    try {
+        volatileAtomicState._pingDevice = true
+        if (!this[SETTING_DEVICE_IP]) {
+            return
         }
+
+
+        def start = now()
+        def result = hubitat.helper.NetworkUtils.ping(this[SETTING_DEVICE_IP], 1)
+        log.trace "Ping completed in: ${now() - start}ms"
+
+        if (result.packetLoss == 100 || result.packetsTransmitted == 0) {
+            if (currentValue('power') != 'Off') {
+                sendEvent(name: 'switch', value: 'off')
+                sendEvent(name: 'power', value: 'Off')
+                setCurrentApplication('Roku')
+                sendEvent(name: 'mediaInputSource', value: 'Home')
+                sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+            }
+            unscheduleQuery('pingDevice')
+            schedulePingDevice()
+        } else {
+            volatileAtomicState.power = 'Waking'
+            unscheduleQuery('pingDevice')
+            refresh()
+        }
+        if (SETTING_DBG_ENABLE) { log.trace "Ping/refresh completed in: ${now() - start}ms"}
+    } finally {
+        volatileAtomicState._pingDevice = false
     }
-    scheduleQueryDeviceInfo()
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: exit " }
+}
+
+void queryDeviceInfo() {
+    if (volatileAtomicState._queryDeviceInfo) { return }
+    try {
+        volatileAtomicState._queryDeviceInfo = true
+        if (isPowerOff()) { 
+            pingDevice()
+            return 
+        }
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: enter " }
+        
+        // must unschedule the query first, because the scheduler may have one triggering at the same time.
+        unscheduleQuery('queryDeviceInfo')
+        
+        if (!volatileAtomicState.configured || state.isTV) {
+            try {
+                httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
+                    if (!response.isSuccess()) { return }
+
+                    def body = response.data
+                    parsePowerState(body)
+                    if (!volatileAtomicState.configured) {
+                        parseState(body)
+                    }
+                }
+            } catch (ex) {
+                logExceptionWithPowerWarning("queryDeviceInfo", ex)
+
+            }
+        }
+        scheduleQueryDeviceInfo()
+    } finally {
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: exit " }
+        volatileAtomicState._queryDeviceInfo = false
+    }
 }
 
 void queryMediaPlayer() {
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: enter " }
-
-    // must unschedule the query first, because the scheduler may have one triggering at the same time.
-    unschedule('queryMediaPlayer')
+    if (volatileAtomicState._queryMediaPlayer) { return }
     try {
-        httpGet([uri:apiPath('query/media-player'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-            if (!response.isSuccess()) { return }
-
-            def body = response.data
-            parseMediaPlayer(body)
+        volatileAtomicState._queryMediaPlayer = true
+        if (isPowerOff()) { 
+            pingDevice()
+            return 
         }
-    } catch (ex) {
-        logExceptionWithPowerWarning("queryMediaPlayer", ex)
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: enter " }
 
+        // must unschedule the query first, because the scheduler may have one triggering at the same time.
+        unscheduleQuery('queryMediaPlayer')
+        try {
+            httpGet([uri:apiPath('query/media-player'), timeout: this[SETTING_TIMEOUT]]) { response -> 
+                if (!response.isSuccess()) { return }
+
+                def body = response.data
+                parseMediaPlayer(body)
+            }
+        } catch (ex) {
+            logExceptionWithPowerWarning("queryMediaPlayer", ex)
+
+        }
+        scheduleQueryMediaPlayer()
+    } finally {
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: exit " }
+        volatileAtomicState._queryMediaPlayer = false
     }
-    scheduleQueryMediaPlayer()
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: exit " }}
+}
 
 String translateAppToInput(appName) {
     
@@ -695,14 +867,14 @@ void setCurrentApplication(currentApp) {
     if (currentApp != previousApp) {
 
         if (currentApp == 'Roku') {
-            unschedule('queryMediaPlayer')
+            unscheduleQuery('queryMediaPlayer')
             scheduleQueryDeviceInfo()
         } else  {
             log.info "turning on, because app is not roku"
             sendEvent(name: 'switch', value: 'on')
             
             if (this[SETTING_APP_REFRESH]) { // if an app is active, TV is on.  Don't check for power state.
-                unschedule('queryDeviceInfo') 
+                unscheduleQuery('queryDeviceInfo') 
             }
             // Check the Media Player ONLY when an Application is active (Assumes any app other than Roku)
             // TODO: compare current app to installed apps to determine if app is active.
@@ -722,86 +894,106 @@ void setCurrentApplication(currentApp) {
 }
 
 void queryActiveApp() {
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: enter " }
-    
-    // must unschedule the query first, because the scheduler may have one triggering at the same time.
-    unschedule('queryActiveApp')
-
+    if (volatileAtomicState._queryActiveApp) { return }
     try {
-        httpGet([uri:apiPath('query/active-app'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-            if (!response.isSuccess()) 
-            return
-            def body = response.data
-            def appType = body.app.@type
-            def appId = body.app.@id
-            def app = body.app.text()
-            def mediaApp = appType == 'tvin' ? appId : app
-            sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
-            setCurrentApplication(app)
+        volatileAtomicState._queryActiveApp = true
+        if (isPowerOff()) { 
+            pingDevice()
+            return 
         }
-    } catch (ex) {
-        logExceptionWithPowerWarning("queryActiveApp", ex)
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: enter " }
+        
+        // must unschedule the query first, because the scheduler may have one triggering at the same time.
+        unscheduleQuery('queryActiveApp')
+
+        try {
+            httpGet([uri:apiPath('query/active-app'), timeout: this[SETTING_TIMEOUT]]) { response -> 
+                if (!response.isSuccess()) 
+                return
+                def body = response.data
+                def appType = body.app.@type
+                def appId = body.app.@id
+                def app = body.app.text()
+                def mediaApp = appType == 'tvin' ? appId : app
+                sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
+                setCurrentApplication(app)
+            }
+        } catch (ex) {
+            logExceptionWithPowerWarning("queryActiveApp", ex)
+        }
+        scheduleQueryActiveApp()
+    } finally {
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: exit " }
+        volatileAtomicState._queryActiveApp = false
     }
-    scheduleQueryActiveApp()
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: exit " }    
 }
 
 def queryInstalledApps() {
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: enter " }
+    if (volatileAtomicState._queryInstalledApps) { return }
+    try {
+        volatileAtomicState._queryInstalledApps = true
+        if (isPowerOff()) { 
+            pingDevice()
+            return 
+        }
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: enter " }
 
-    if (!this[SETTING_AUTO_MANAGE]) 
-        return
-    
-    // must unschedule the query first, because the scheduler may have one triggering at the same time.
-    unschedule('queryInstalledApps')
-
-    def apps = getInstalledApps()
-
-    if (apps) { 
-
-        def hdmiCount = this[SETTING_HDMI_PORTS] as int
+        if (!this[SETTING_AUTO_MANAGE]) 
+            return
         
-        childDevices.each{ child ->
-            
-            def nodeExists = false
-            
-            if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
-                nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
-            }
-            
-            if (this[SETTING_INPUT_AV])
-                nodeExists = nodeExists || networkIdForApp('AV1') == child.deviceNetworkId
-    
-            if (this[SETTING_INPUT_TUNER])
-                nodeExists = nodeExists || networkIdForApp('Tuner') == child.deviceNetworkId
+        // must unschedule the query first, because the scheduler may have one triggering at the same time.
+        unscheduleQuery('queryInstalledApps')
 
-            if (!appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/) {
-                nodeExists = nodeExist || isValidKey(appIdForNetworkId(child.deviceNetworkId))            
-            }
+        def apps = getInstalledApps()
 
-            nodeExists = nodeExists || apps.containsKey(child.deviceNetworkId)
+        if (apps) { 
+
+            def hdmiCount = this[SETTING_HDMI_PORTS] as int
             
-            if (!nodeExists) {
-                if (appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/ || this[SETTING_MANAGE_APPS]) {
-                    if (this[SETTING_LOG_ENABLE]) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
-                    deleteChildDevice(child.deviceNetworkId)
+            childDevices.each{ child ->
+                
+                def nodeExists = false
+                
+                if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
+                    nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
+                }
+                
+                if (this[SETTING_INPUT_AV])
+                    nodeExists = nodeExists || networkIdForApp('AV1') == child.deviceNetworkId
+        
+                if (this[SETTING_INPUT_TUNER])
+                    nodeExists = nodeExists || networkIdForApp('Tuner') == child.deviceNetworkId
+
+                if (!appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/) {
+                    nodeExists = nodeExist || isValidKey(appIdForNetworkId(child.deviceNetworkId))            
+                }
+
+                nodeExists = nodeExists || apps.containsKey(child.deviceNetworkId)
+                
+                if (!nodeExists) {
+                    if (appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/ || this[SETTING_MANAGE_APPS]) {
+                        if (this[SETTING_LOG_ENABLE]) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+                        deleteChildDevice(child.deviceNetworkId)
+                    }
                 }
             }
-        }
-        
-        if (this[SETTING_INPUT_AV])    updateChildApp(networkIdForApp('AV1'), 'AV')
-        if (this[SETTING_INPUT_TUNER]) updateChildApp(networkIdForApp('Tuner'), 'Antenna TV')
-        if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
-            updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
-        }
+            
+            if (this[SETTING_INPUT_AV])    updateChildApp(networkIdForApp('AV1'), 'AV')
+            if (this[SETTING_INPUT_TUNER]) updateChildApp(networkIdForApp('Tuner'), 'Antenna TV')
+            if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+                updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
+            }
 
-        if (this[SETTING_MANAGE_APPS]) apps.each { netId, appName ->
-            updateChildApp(netId, appName)
+            if (this[SETTING_MANAGE_APPS]) apps.each { netId, appName ->
+                updateChildApp(netId, appName)
+            }
+        
         }
-    
+        scheduleQueryInstalledApps()
+    } finally {
+        if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: exit " }
+        volatileAtomicState._queryInstalledApps = false
     }
-    scheduleQueryInstalledApps()
-    if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: exit " }
 }
 
 private void parseState(body) {
@@ -891,12 +1083,12 @@ private def parsePowerState(body) {
             case 'Ready':
                 if (currentValue('switch') != 'off') {
                     sendEvent(name: 'switch', value: 'off')
-                    sendEvent(name: 'transportStatus', value: 'stopped')
+                    sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
                     sendEvent(name: 'mediaInputSource', value: 'Home')
                     setCurrentApplication('Roku')
                     scheduleQueryActiveApp()
-                    unschedule('queryMediaPlayer')
-                    unschedule('queryInstalledApps')
+                    unscheduleQuery('queryMediaPlayer')
+                    unscheduleQuery('queryInstalledApps')
                 }
                 break;
         }
@@ -911,6 +1103,8 @@ private def purgeInstalledApps() {
 }
 
 def getInstalledApps() {
+    if (isPowerOff()) { return }
+
     def apps=[:]
     try {
         httpGet([uri:apiPath('query/apps'),timeout: this[SETTING_TIMEOUT]]) { response ->
@@ -932,6 +1126,7 @@ def getInstalledApps() {
         }
     } catch (ex) {
         logExceptionWithPowerWarning("getInstalledApps", ex)
+        return
     }
 
     List inputs = ['Home']
@@ -1076,13 +1271,38 @@ private def deviceLabel() {
 }
 
 private void logExceptionWithPowerWarning(String method, ex) {
-    if (this[SETTING_LOG_ENABLE]) {
-        log.error "Exception thrown in call to ${method}: ${ex}"
-        log.warn 'The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku.'
+    def result = hubitat.helper.NetworkUtils.ping(this[SETTING_DEVICE_IP], 1)
+    if (result.packetLoss == 100 || result.packetsTransmitted == 0) {
+        if (this[SETTING_LOG_ENABLE]) {
+            if ( currentValue('switch') == 'on') {
+                log.info "Lost connection to Roku device; Powering off."
+            } else if ( currentValue('power') != 'Off') {
+                log.info "Lost connection to Roku device; Switching to ping mode."
+            }
+        }
+        sendEvent(name: 'switch', value: 'off')
+        sendEvent(name: 'power', value: 'Off')
+        setCurrentApplication('Roku')
+        sendEvent(name: 'mediaInputSource', value: 'Home')
+        sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+        schedulePingDevice()
+    } else {
+        if (this[SETTING_LOG_ENABLE]) {
+            log.error "Exception thrown in call to ${method}: ${ex}"
+            log.warn 'The device appears to be powered off.  Please make sure Fast-Start is enabled on your Roku.'
+        }
     }
 }
 
 private String apiPath(String queryPath) {
     String suffix = queryPath ? "/${queryPath}" : ''
     "http://${this[SETTING_DEVICE_IP]}:8060${suffix}"
+}
+
+private Boolean isPowerOff() {
+    currentValue('power') == 'Off' && this[SETTING_EXPERIMENTAL]
+}
+
+private Boolean viewingHomeScreen() {
+    currentValue('application') == 'Roku'
 }
