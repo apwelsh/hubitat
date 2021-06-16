@@ -385,16 +385,17 @@ private updateDevice(event) {
     def roku = discovered["${ssdpUSN}"]
 
     if (roku.networkAddress != event.networkAddress || roku.deviceAddress != event.deviceAddress) {
-        def oldAddress = roku.deviceAddress
+        def oldPort = roku.deviceAddress
+        def oldAddress = roku.networkAddress
         roku << ['networkAddress': event.networkAddress,
-                   'deviceAddress': event.deviceAddress]
+                 'deviceAddress':  event.deviceAddress]
 
-        if (logEnable)  { log.debug "Detected roku address update: ${roku.name} from ${oldAddress} to ${event.deviceAddress}" }
+        if (logEnable)  { log.debug "Detected roku address update: ${roku.name} from ${oldAddress}:${oldPort} to ${event.networkAddress}:${event.deviceAddress}" }
     }
 
     def child = getChildDevice(roku.mac)
     if (child) {
-        child.updateSetting('deviceIp', roku.networkAddress)
+        child.updateIpAddress(roku.networkAddress)
     } else {
         cleanupOrphans(roku.mac)
     }
