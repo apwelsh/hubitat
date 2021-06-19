@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.11
+ * Version 2.7.12
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -26,6 +26,7 @@
  **/
 
 import groovy.transform.Field
+import groovy.json.JsonBuilder
 import java.util.concurrent.ConcurrentHashMap
 
 @Field static final String  REFRESH_UNIT_SECONDS = 'Seconds'
@@ -155,7 +156,7 @@ preferences {
     Map installed=[:]
     try {
         if (this[SETTING_DEVICE_IP] && (!this[SETTING_AUTO_MANAGE] || !this[SETTING_MANAGE_APPS])) {
-            getInstalledApps().each { netId, appName ->
+            volatileAtomicState.installedApps.each { netId, appName ->
                 if (getChildDevice(netId)) {
                     installed[netId] = appName
                 } else {
@@ -204,29 +205,75 @@ preferences {
     input name: SETTING_EXPERIMENTAL,     type: 'bool',   title: 'Enable experimental features', defaultValue: DEFAULT_EXPERIMENTAL, required: true
 }
 
+synchronized Map initializeVolatileAtomicState() {
+    Map state = volatileAtomicStateByDeviceId[device.deviceId]
+     if (!state) {
+        state = new ConcurrentHashMap()
+        volatileAtomicStateByDeviceId[device.deviceId] = state
+    }
+    return state
+}
+
 Map getVolatileAtomicState() {
-    volatileAtomicStateByDeviceId.get(device.deviceId)
+    volatileAtomicStateByDeviceId.get(device.deviceId)?: initializeVolatileAtomicState()
+}
+
+/**
+ * Overridden functions
+ **/
+def updateSetting(key, value) {
+    device.updateSetting(key, value)
+    this[key] = value
+}
+
+void sendEvent(Map properties) {
+    
+    // Overrides driver.sendEvent() to populate cached values
+    if (currentValue(properties.name) != properties.value) {
+        device.sendEvent(properties)
+        volatileAtomicState[properties.name] = properties.value
+    }
+}
+
+Object currentValue(String attributeName) {
+    def result = volatileAtomicState[attributeName]
+    if (result != null) {
+        return result
+    }
+    result = device.currentValue(attributeName)
+    if (result != null) {
+        volatileAtomicState[attributeName] = result
+    }
+    return result
+}
+
+// override the unschedule method
+void unschedule(handlerMethod = null) {
+    if (handlerMethod == null) {
+        volatileAtomicState.findAll { it.key ==~ /^(query[A-Z].*|pingDevice)/ }.each {
+            volatileAtomicState[it.value] = false
+            this.delegate.unschedule(it.key)
+        }
+    } else {
+        volatileAtomicState[handlerMethod] = false
+        this.delegate.unschedule(handlerMethod)
+    }
+}
+
+// override the runIn scheduler method
+void runIn(Long delayInSeconds, String handlerMethod, Map options = null) {
+    volatileAtomicState[handlerMethod] = true
+    this.delegate.runIn(delayInSeconds, handlerMethod, options)
 }
 
 /**
  * Hubitat DTH Lifecycle Functions
  **/
 def installed() {
-    if (!volatileAtomicStateByDeviceId[device.deviceId]) {
-        volatileAtomicStateByDeviceId[device.deviceId] = new ConcurrentHashMap()
-    }
     updated()
 }
 
-def updateSetting(key, value) {
-    device.updateSetting(key, value)
-    this[key] = value
-}
-
 def initialize() {
-    if (!volatileAtomicStateByDeviceId[device.deviceId]) {
-        volatileAtomicStateByDeviceId[device.deviceId] = new ConcurrentHashMap()
-    }
 
     // If the cached power state is not set, assume it is off, then initialize the system.
     if (!volatileAtomicState.power) {
@@ -234,24 +281,12 @@ def initialize() {
     }
     refresh()
 }
-void updateIpAddress(String ipAddress) {
-    device.updateSetting(SETTING_DEVICE_IP, ipAddress)
-    this[SETTING_DEVICE_IP] = ipAddress
-
-    String uri = apiPath()
-    updateDataValue('query/device-info', "${uri}/query/device-info")
-    updateDataValue('query/media-player', "${uri}/query/media-player")
-    updateDataValue('query/active-app', "${uri}/query/active-app")
-    updateDataValue('query/apps', "${uri}/query/apps")
-    String mac = getMACFromIP(this[SETTING_DEVICE_IP])
-    if (state.deviceMac != mac) {
-        if (this[SETTING_LOG_ENABLE]) log.debug "Updating Mac from IP: ${mac}"
-        state.deviceMac = mac
-    }
-
-}
 
 def updated() {
+    if (!volatileAtomicStateByDeviceId[device.deviceId]) {
+        volatileAtomicStateByDeviceId[device.deviceId] = new ConcurrentHashMap()
+    }
+
     if (!this[SETTING_DEVICE_IP]) {
         return
     }
@@ -294,7 +329,7 @@ def updated() {
     if (this[SETTING_TIMEOUT] < 1) updateSetting(SETTING_TIMEOUT, LIMIT_TIMEOUT_MIN)
 
     updateIpAddress(this[SETTING_DEVICE_IP])
-    getInstalledApps()
+    Map apps = volatileAtomicState.installedApps?:getInstalledApps()
     scheduleRefresh()
 
     if (this[SETTING_CREATE_KEY]) {
@@ -313,7 +348,6 @@ def updated() {
         String netId=this[SETTING_CREATE_APP]
         updateSetting(SETTING_CREATE_APP, [value: '', type:'enum'])
         if (this[SETTING_AUTO_MANAGE]==false || this[SETTING_MANAGE_APPS]==false) {
-            Map apps=getInstalledApps()
             String appName=apps[netId]
             if (appName && netId)
                 updateChildApp(netId, appName)
@@ -329,27 +363,25 @@ def updated() {
 
 }
 
-// override the unschedule method
-void unscheduleQuery(handlerMethod = null) {
-    if (handlerMethod == null) {
-        volatileAtomicState.findAll { it.key ==~ /^(query[A-Z].*|pingDevice)/ }.each {
-            volatileAtomicState[it.value] = false
-            unschedule(it.key)
-        }
-    } else {
-        volatileAtomicState[handlerMethod] = false
-        unschedule(handlerMethod)
-    }
-}
+void updateIpAddress(String ipAddress) {
+    device.updateSetting(SETTING_DEVICE_IP, ipAddress)
+    this[SETTING_DEVICE_IP] = ipAddress
 
-// override the runIn scheduler method
-void runQueryIn(Long delayInSeconds, String handlerMethod, Map options = null) {
-    volatileAtomicState[handlerMethod] = true
-    runIn(delayInSeconds, handlerMethod, options)
+    String uri = apiPath()
+    updateDataValue('query/device-info', "${uri}/query/device-info")
+    updateDataValue('query/media-player', "${uri}/query/media-player")
+    updateDataValue('query/active-app', "${uri}/query/active-app")
+    updateDataValue('query/apps', "${uri}/query/apps")
+    String mac = getMACFromIP(this[SETTING_DEVICE_IP])
+    if (state.deviceMac != mac) {
+        if (this[SETTING_LOG_ENABLE]) log.debug "Updating Mac from IP: ${mac}"
+        state.deviceMac = mac
+    }
+
 }
 
 void scheduleRefresh() {
-    unscheduleQuery()
+    unschedule()
     if (isPowerOff()) {
         // if the TV is powered off, then use Ping to detect power on
         schedulePingDevice()
@@ -384,7 +416,7 @@ void scheduleQueryDeviceInfo() {
     Long delay = (this[SETTING_REFRESH_INTERVAL] ?: 0) * (this[SETTING_REFRESH_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runQueryIn(delay, 'queryDeviceInfo')
+        runIn(delay, 'queryDeviceInfo')
     }
 }
 
@@ -402,7 +434,7 @@ void scheduleQueryActiveApp() {
     Long delay = (this[SETTING_APP_INTERVAL] ?: 0) * (this[SETTING_APP_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runQueryIn(delay, 'queryActiveApp')
+        runIn(delay, 'queryActiveApp')
     }
 }
 
@@ -424,7 +456,7 @@ void scheduleQueryMediaPlayer() {
     }
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runQueryIn(delay, 'queryMediaPlayer')
+        runIn(delay, 'queryMediaPlayer')
     }
 }
 
@@ -442,14 +474,14 @@ void scheduleQueryInstalledApps() {
     Long delay = (this[SETTING_INV_INTERVAL] ?: 0) * (this[SETTING_INV_UNITS] == REFRESH_UNIT_MINUTES ? 60 : 1)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runQueryIn(delay, 'queryInstalledApps')
+        runIn(delay, 'queryInstalledApps')
     }
 }
 
 void schedulePingDevice() {
 
     if (!isPowerOff()) {
-        if (volatileAtomicState.pingDevice) { unscheduleQuery('pingDevice') }
+        if (volatileAtomicState.pingDevice) { unschedule('pingDevice') }
         return
     }
 
@@ -466,13 +498,13 @@ void schedulePingDevice() {
     Long delay = Math.max([delay1, delay2, delay3, delay4].findAll { it > 0 }.min { it }, 20)
 
     if (this[SETTING_DEVICE_IP] && delay > 0) {
-        runQueryIn(delay, 'pingDevice')
+        runIn(delay, 'pingDevice')
 
         // Remove all other scheduled, because with the TV powered off, they will fail
-        if (volatileAtomicState.queryDeviceInfo)    { unscheduleQuery('queryDeviceInfo')    }
-        if (volatileAtomicState.queryActiveApp)     { unscheduleQuery('queryActiveApp')     }
-        if (volatileAtomicState.queryMediaPlayer)   { unscheduleQuery('queryMediaPlayer')   }
-        if (volatileAtomicState.queryInstalledApps) { unscheduleQuery('queryInstalledApps') }
+        if (volatileAtomicState.queryDeviceInfo)    { unschedule('queryDeviceInfo')    }
+        if (volatileAtomicState.queryActiveApp)     { unschedule('queryActiveApp')     }
+        if (volatileAtomicState.queryMediaPlayer)   { unschedule('queryMediaPlayer')   }
+        if (volatileAtomicState.queryInstalledApps) { unschedule('queryInstalledApps') }
     }
 }
 
@@ -486,27 +518,6 @@ String appIdForNetworkId(String netId) {
 
 String iconPathForApp(String netId) {
     apiPath("query/icon/${appIdForNetworkId(netId)}")
-}
-
-void sendEvent(Map properties) {
-    
-    // Overrides driver.sendEvent() to populate cached values
-    if (currentValue(properties.name) != properties.value) {
-        device.sendEvent(properties)
-        volatileAtomicState[properties.name] = properties.value
-    }
-}
-
-Object currentValue(String attributeName) {
-    def result = volatileAtomicState[attributeName]
-    if (result != null) {
-        return result
-    }
-    result = device.currentValue(attributeName)
-    if (result != null) {
-        volatileAtomicState[attributeName] = result
-    }
-    return result
 }
 
 /*
@@ -628,7 +639,7 @@ void volumeDown() {
 }
 
 void setVolume(Integer level) {
-    log.trace 'set volume not supported by Roku'
+    log.info 'Set volume not supported by Roku. Please report the Roku ECP protocol limitation to Roku support.'
 }
 
 void unmute() {
@@ -640,31 +651,28 @@ void mute() {
 }
 
 void poll() {
-    if (this[SETTING_DBG_ENABLE])  { log.trace 'Executing \'poll\'' }
-    if (this[SETTING_APP_REFRESH]) { queryActiveApp() }
     refresh()
 }
 
 void refresh() {
     if (volatileAtomicState._refresh) { return }
-    try {
-        volatileAtomicState._refresh = true
-        if (this[SETTING_DBG_ENABLE]) { log.trace 'Enter refresh'}
-        if (isPowerOff()) {
-            pingDevice()
-            return
-        }        
+    if (this[SETTING_DEVICE_IP]) {
+        try {
+            volatileAtomicState._refresh = true
+            if (this[SETTING_DBG_ENABLE]) { log.trace 'refresh: enter'}
+            if (isPowerOff()) {
+                pingDevice()
+                return
+            }        
 
-        if (this[SETTING_DEVICE_IP]) {
-            if (this[SETTING_DBG_ENABLE]) { log.trace 'Executing \'refresh\'' }
             queryActiveApp()
-
             queryDeviceInfo()
             if (!this[SETTING_APP_REFRESH]) { queryActiveApp() }
             if (this[SETTING_AUTO_MANAGE])  { queryInstalledApps() }
+        } finally {
+            if (this[SETTING_DBG_ENABLE]) { log.trace 'refresh: exit' }
+            volatileAtomicState._refresh = false
         }
-    } finally {
-        volatileAtomicState._refresh = false
     }
 }
 
@@ -755,7 +763,6 @@ void pingDevice() {
 
         def start = now()
         def result = hubitat.helper.NetworkUtils.ping(this[SETTING_DEVICE_IP], 1)
-        log.trace "Ping completed in: ${now() - start}ms"
 
         if (result.packetLoss == 100 || result.packetsTransmitted == 0) {
             if (currentValue('power') != 'Off') {
@@ -765,14 +772,14 @@ void pingDevice() {
                 sendEvent(name: 'mediaInputSource', value: 'Home')
                 sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
             }
-            unscheduleQuery('pingDevice')
+            unschedule('pingDevice')
             schedulePingDevice()
         } else {
             volatileAtomicState.power = 'Waking'
-            unscheduleQuery('pingDevice')
+            unschedule('pingDevice')
             refresh()
         }
-        if (SETTING_DBG_ENABLE) { log.trace "Ping/refresh completed in: ${now() - start}ms"}
+        if (SETTING_DBG_ENABLE) { log.trace "Ping completed in: ${now() - start}ms"}
     } finally {
         volatileAtomicState._pingDevice = false
     }
@@ -781,36 +788,25 @@ void pingDevice() {
 void queryDeviceInfo() {
     if (volatileAtomicState._queryDeviceInfo) { return }
     try {
-        volatileAtomicState._queryDeviceInfo = true
         if (isPowerOff()) { 
             pingDevice()
             return 
         }
+        volatileAtomicState._queryDeviceInfo = true
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: enter " }
         
         // must unschedule the query first, because the scheduler may have one triggering at the same time.
-        unscheduleQuery('queryDeviceInfo')
+        unschedule('queryDeviceInfo')
         
         if (!volatileAtomicState.configured || state.isTV) {
             try {
-                httpGet([uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-                    if (!response.isSuccess()) { return }
-
-                    def body = response.data
-                    parsePowerState(body)
-                    if (!volatileAtomicState.configured) {
-                        parseState(body)
-                    }
-                }
+                asynchttpGet(parseDeviceInfo, [uri:apiPath('query/device-info'), timeout: this[SETTING_TIMEOUT]])
             } catch (ex) {
                 logExceptionWithPowerWarning("queryDeviceInfo", ex)
-
             }
         }
-        scheduleQueryDeviceInfo()
     } finally {
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryDeviceInfo: exit " }
-        volatileAtomicState._queryDeviceInfo = false
     }
 }
 
@@ -825,19 +821,13 @@ void queryMediaPlayer() {
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: enter " }
 
         // must unschedule the query first, because the scheduler may have one triggering at the same time.
-        unscheduleQuery('queryMediaPlayer')
+        unschedule('queryMediaPlayer')
         try {
-            httpGet([uri:apiPath('query/media-player'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-                if (!response.isSuccess()) { return }
-
-                def body = response.data
-                parseMediaPlayer(body)
-            }
+            asynchttpGet(parseMediaPlayer, [uri:apiPath('query/media-player'), timeout: this[SETTING_TIMEOUT]])
         } catch (ex) {
             logExceptionWithPowerWarning("queryMediaPlayer", ex)
 
         }
-        scheduleQueryMediaPlayer()
     } finally {
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryMediaPlayer: exit " }
         volatileAtomicState._queryMediaPlayer = false
@@ -867,14 +857,15 @@ void setCurrentApplication(currentApp) {
     if (currentApp != previousApp) {
 
         if (currentApp == 'Roku') {
-            unscheduleQuery('queryMediaPlayer')
+            unschedule('queryMediaPlayer')
             scheduleQueryDeviceInfo()
         } else  {
-            log.info "turning on, because app is not roku"
-            sendEvent(name: 'switch', value: 'on')
-            
+            if (currentValue('switch') != 'on') {
+                if (this[SETTING_LOG_ENABLE]) { log.info "turning on, because app is not roku" }
+                sendEvent(name: 'switch', value: 'on')
+            }
             if (this[SETTING_APP_REFRESH]) { // if an app is active, TV is on.  Don't check for power state.
-                unscheduleQuery('queryDeviceInfo') 
+                unschedule('queryDeviceInfo') 
             }
             // Check the Media Player ONLY when an Application is active (Assumes any app other than Roku)
             // TODO: compare current app to installed apps to determine if app is active.
@@ -904,24 +895,13 @@ void queryActiveApp() {
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: enter " }
         
         // must unschedule the query first, because the scheduler may have one triggering at the same time.
-        unscheduleQuery('queryActiveApp')
+        unschedule('queryActiveApp')
 
         try {
-            httpGet([uri:apiPath('query/active-app'), timeout: this[SETTING_TIMEOUT]]) { response -> 
-                if (!response.isSuccess()) 
-                return
-                def body = response.data
-                def appType = body.app.@type
-                def appId = body.app.@id
-                def app = body.app.text()
-                def mediaApp = appType == 'tvin' ? appId : app
-                sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
-                setCurrentApplication(app)
-            }
+            asynchttpGet(parseActiveApp, [uri:apiPath('query/active-app'), timeout: this[SETTING_TIMEOUT]])
         } catch (ex) {
             logExceptionWithPowerWarning("queryActiveApp", ex)
         }
-        scheduleQueryActiveApp()
     } finally {
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryActiveApp: exit " }
         volatileAtomicState._queryActiveApp = false
@@ -942,57 +922,78 @@ def queryInstalledApps() {
             return
         
         // must unschedule the query first, because the scheduler may have one triggering at the same time.
-        unscheduleQuery('queryInstalledApps')
+        unschedule('queryInstalledApps')
 
-        def apps = getInstalledApps()
+        Map apps = getInstalledApps()
+        updateInstalledApps(apps)
 
-        if (apps) { 
-
-            def hdmiCount = this[SETTING_HDMI_PORTS] as int
-            
-            childDevices.each{ child ->
-                
-                def nodeExists = false
-                
-                if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
-                    nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
-                }
-                
-                if (this[SETTING_INPUT_AV])
-                    nodeExists = nodeExists || networkIdForApp('AV1') == child.deviceNetworkId
-        
-                if (this[SETTING_INPUT_TUNER])
-                    nodeExists = nodeExists || networkIdForApp('Tuner') == child.deviceNetworkId
-
-                if (!appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/) {
-                    nodeExists = nodeExist || isValidKey(appIdForNetworkId(child.deviceNetworkId))            
-                }
-
-                nodeExists = nodeExists || apps.containsKey(child.deviceNetworkId)
-                
-                if (!nodeExists) {
-                    if (appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/ || this[SETTING_MANAGE_APPS]) {
-                        if (this[SETTING_LOG_ENABLE]) log.trace "Deleting child device: ${child.name} (${child.deviceNetworkId})"
-                        deleteChildDevice(child.deviceNetworkId)
-                    }
-                }
-            }
-            
-            if (this[SETTING_INPUT_AV])    updateChildApp(networkIdForApp('AV1'), 'AV')
-            if (this[SETTING_INPUT_TUNER]) updateChildApp(networkIdForApp('Tuner'), 'Antenna TV')
-            if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
-                updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
-            }
-
-            if (this[SETTING_MANAGE_APPS]) apps.each { netId, appName ->
-                updateChildApp(netId, appName)
-            }
-        
-        }
         scheduleQueryInstalledApps()
     } finally {
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: exit " }
         volatileAtomicState._queryInstalledApps = false
+    }
+}
+
+void updateInstalledApps(Map apps) {
+    if (apps) { 
+
+        def hdmiCount = this[SETTING_HDMI_PORTS] as int
+        
+        childDevices.each{ child ->
+            
+            def nodeExists = false
+            
+            if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
+                nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
+            }
+            
+            if (this[SETTING_INPUT_AV])
+                nodeExists = nodeExists || networkIdForApp('AV1') == child.deviceNetworkId
+    
+            if (this[SETTING_INPUT_TUNER])
+                nodeExists = nodeExists || networkIdForApp('Tuner') == child.deviceNetworkId
+
+            if (!appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/) {
+                nodeExists = nodeExist || isValidKey(appIdForNetworkId(child.deviceNetworkId))            
+            }
+
+            nodeExists = nodeExists || apps.containsKey(child.deviceNetworkId)
+            
+            if (!nodeExists) {
+                if (appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/ || this[SETTING_MANAGE_APPS]) {
+                    if (this[SETTING_LOG_ENABLE]) log.info "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+                    deleteChildDevice(child.deviceNetworkId)
+                }
+            }
+        }
+        
+        if (this[SETTING_INPUT_AV])    updateChildApp(networkIdForApp('AV1'), 'AV')
+        if (this[SETTING_INPUT_TUNER]) updateChildApp(networkIdForApp('Tuner'), 'Antenna TV')
+        if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+            updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
+        }
+
+        if (this[SETTING_MANAGE_APPS]) apps.each { netId, appName ->
+            updateChildApp(netId, appName)
+        }
+    
+    }
+}
+
+void parseDeviceInfo(response, data) {
+    try {
+        Integer status = response.getStatus()
+        if (status < 200 || status > 300) { return }
+
+        def body = response.getXml()
+        if (!body) { return }
+        parsePowerState(body)
+        if (!volatileAtomicState.configured) {
+            parseState(body)
+        }
+    } finally {
+        volatileAtomicState._queryDeviceInfo = false
+        scheduleQueryDeviceInfo()
     }
 }
 
@@ -1017,23 +1018,55 @@ private void parseState(body) {
     volatileAtomicState.configured = true
 }
 
-private void parseMediaPlayer(body) {
-    switch (body.@state) {
-        case 'play':
-            if (currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
-               sendEvent(name: 'transportStatus', value: MEDIA_STATE_PLAYING)
-            }
-            break;
-        case 'pause':
-            if (currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
-                sendEvent(name: 'transportStatus', value: MEDIA_STATE_PAUSED)
-            }
-            break;
-        default:
-            if (currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
-                sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
-            }
-            break;
+// private void parseMediaPlayer(body) {
+private void parseMediaPlayer(response, data) {
+    try {
+        Integer status = response.getStatus()
+        if (status < 200 || status > 300) { return }
+
+        def body = response.getXml()
+        if (!body) { return }
+
+        switch (body.@state) {
+            case 'play':
+                if (currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
+                sendEvent(name: 'transportStatus', value: MEDIA_STATE_PLAYING)
+                }
+                break;
+            case 'pause':
+                if (currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
+                    sendEvent(name: 'transportStatus', value: MEDIA_STATE_PAUSED)
+                }
+                break;
+            default:
+                if (currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
+                    sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+                }
+                break;
+        }
+    } finally {
+        volatileAtomicState._queryMediaPlayer = false
+        scheduleQueryMediaPlayer()
+    }
+}
+
+void parseActiveApp(response, data) {
+    try {
+        Integer status = response.getStatus()
+        if (status < 200 || status > 300) { return }
+
+        def body = response.getXml()
+        if (!body) { return }
+
+        def appType = body.app.@type
+        def appId = body.app.@id
+        def app = body.app.text()
+        def mediaApp = appType == 'tvin' ? appId : app
+        sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
+        setCurrentApplication(app)
+    } finally {
+        volatileAtomicState._queryActiveApp = false
+        scheduleQueryActiveApp()
     }
 }
 
@@ -1087,8 +1120,8 @@ private def parsePowerState(body) {
                     sendEvent(name: 'mediaInputSource', value: 'Home')
                     setCurrentApplication('Roku')
                     scheduleQueryActiveApp()
-                    unscheduleQuery('queryMediaPlayer')
-                    unscheduleQuery('queryInstalledApps')
+                    unschedule('queryMediaPlayer')
+                    unschedule('queryInstalledApps')
                 }
                 break;
         }
@@ -1096,13 +1129,13 @@ private def parsePowerState(body) {
 }
 
 
-private def purgeInstalledApps() {    
+private void purgeInstalledApps() {    
     if (this[SETTING_MANAGE_APPS]) childDevices.each{ child ->
         deleteChildDevice(child.deviceNetworkId)
     }
 }
 
-def getInstalledApps() {
+Map getInstalledApps() {
     if (isPowerOff()) { return }
 
     def apps=[:]
@@ -1123,6 +1156,7 @@ def getInstalledApps() {
                 def appName = node.text()
                 apps[netId] = appName
             }
+            volatileAtomicState.installedApps = apps
         }
     } catch (ex) {
         logExceptionWithPowerWarning("getInstalledApps", ex)
@@ -1136,17 +1170,17 @@ def getInstalledApps() {
         inputs += ((1..hdmiCount).collect { "InputHDMI${it}" })
     }
     inputs += apps.values()
-    sendEvent(name: 'supportedInputs', value: inputs)
+    sendEvent(name: 'supportedInputs', value: groovy.json.JsonOutput.toJson(inputs))
 
     return apps
 }
 
-def setInputSource(source) {
+void setInputSource(source) {
 
     if (source ==~ /^(Home)|Input(AV1|Tuner|HDMI\d)$/ ) {
         keyPress(source)
     } else {
-        def nid = (getInstalledApps().find { it.value == source })?.key
+        def nid = ((volatileAtomicState.installedApps?:getInstalledApps()).find { it.value == source })?.key
         if (nid) {
             launchApp(appIdForNetworkId(nid))
         } else {
@@ -1156,23 +1190,35 @@ def setInputSource(source) {
     queryActiveApp()
 }
 
-def keyPress(key) {
+void keyPress(key) {
     if (!isValidKey(key)) {
         log.warn "Invalid key press: ${key}"
         return
     }
-    if (this[SETTING_LOG_ENABLE]) log.debug "Executing '${key}'"
+    unschedule('queryDeviceInfo')
+    unschedule('queryActiveApp')
+    if (this[SETTING_DBG_ENABLE]) log.debug "keyPress(${key}): enter"
     try {
-        httpPost([uri:apiPath("keypress/${key}"), timeout: this[SETTING_TIMEOUT]]) { response -> 
-            if (response.isSuccess()) poll()
-            else log.error "Failed to send key press event for ${key}"
-        }
+        asynchttpPost(parseKeyPress, [uri:apiPath("keypress/${key}"), timeout: this[SETTING_TIMEOUT]]) 
     } catch (ex) {
         logExceptionWithPowerWarning("keyPress", ex)
+        scheduleRefresh()
     }
 }
 
-private def isValidKey(key) {
+void parseKeyPress(response, data) {
+    try {
+        Integer status = response.getStatus()
+        if (status < 200 || status > 300) { return }
+
+        refresh()
+    } finally {
+        if (this[SETTING_DBG_ENABLE]) log.debug "keyPress: exit"
+        scheduleRefresh()
+    }
+}
+
+private Boolean isValidKey(key) {
     def keys = [
         'Home',      'Back',       'Select',
         'Up',        'Down',       'Left',        'Right',
@@ -1189,29 +1235,36 @@ private def isValidKey(key) {
     return keys.contains(key)
 }
 
-def launchApp(appId) {
-    if (this[SETTING_DBG_ENABLE]) log.debug "Executing 'launchApp ${appId}'"
+void launchApp(appId) {
     if (appId ==~ /^\d+$/ ) {
+        unschedule('queryActiveApp')
+        if (this[SETTING_DBG_ENABLE]) log.debug "launchApp(${appId}): enter"
         try {
-            httpPost([uri:apiPath("launch/${appId}"), timeout: this[SETTING_TIMEOUT]]) { response ->
-                if (response.isSuccess()) {
-                    def netId = networkIdForApp(appId)
-                    def child = getChildDevice(netId)
-                    log.info "Launch app: ${appId} with Network Id: ${netId}"
-                    child.sendEvent(name: 'switch', value: 'on')
-                    queryActiveApp()
-                } else {
-                    log.error "Failed to launch appId: ${data.appId}"
-                }
-            }
+            asynchttpPost(parseLaunchApp, [uri:apiPath("launch/${appId}"), timeout: this[SETTING_TIMEOUT]], [appId: appId]) 
         } catch (ex) {
             logExceptionWithPowerWarning("launchApp", ex)
+            scheduleQueryActiveApp()
         }
     } else if (appId ==~ /^(AV1|Tuner|hdmi\d)$/ ) {
         this."input_$appId"()
     } else {
         this.keyPress(appId)
     }
+}
+
+void parseLaunchApp(response, data) {
+    try {
+        Integer status = response.getStatus()
+        if (status < 200 || status > 300) { return }
+
+        def netId = networkIdForApp(data.appId)
+        def child = getChildDevice(netId)
+        if (this[SETTING_LOG_ENABLE]) { log.info "Launch app: ${data.appId} with Network Id: ${netId}" }
+        if (child) { child.sendEvent(name: 'switch', value: 'on') }
+    } finally {
+        if (this[SETTING_DBG_ENABLE]) log.debug "launchApp: exit"
+    }
+    queryActiveApp()
 }
 
 /**
