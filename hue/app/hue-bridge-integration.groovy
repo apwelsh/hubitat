@@ -1259,7 +1259,7 @@ void componentSetSaturation(def child, saturation) {
 
 void componentSetColorTemperature(def child, colortemperature, level = null, transitionTime = null) {
     Map values = ['colormode': 'ct', 'ct': convertHEColortemp(colortemperature as int)]
-    if (level)          { values.['bri']           = convertHELevel(level) }
+    if (level)          { values['bri']            = convertHELevel(level) }
     if (transitionTime) { values['transitiontime'] = (transitionTime as int) * 10}
 
     setDeviceState(child, values)
