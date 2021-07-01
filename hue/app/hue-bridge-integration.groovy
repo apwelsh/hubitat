@@ -1144,19 +1144,19 @@ Object currentValue(def child, String attributeName) {
     return result
 }
 
-void sendChildEvent(def child, Map properties) {
+void sendChildEvent(def child, Map event) {
     def nid = (child.device?:child).deviceNetworkId
     def device = getDeviceForChild(child)
 
-    if (!device.hasAttribute(properties.name)) { return }
+    if (!device.hasAttribute(event.name)) { return }
 
     // Supress repetative updates, this reduces the load on the event bus.
-    if (currentValue(device, properties.name) == properties.value) { return }
+    if (currentValue(device, event.name) == event.value) { return }
 
     // Send the update to the event bus
-    child.sendEvent(properties)
+    child.sendEvent(event)
 
-    getVolatileAtomicState(device.device)[properties.name] = properties.value
+    getVolatileAtomicState(device.device)[event.name] = event.value
 
     // Log a message that the value was updated
     if (child.logEnable) {
@@ -1257,8 +1257,12 @@ void componentSetSaturation(def child, saturation) {
     setDeviceState(child, ['colormode': 'hs', 'sat': convertHESaturation(saturation as int)])
 }
 
-void componentSetColorTemperature(def child, colortemperature) {
-    setDeviceState(child, ['colormode': 'ct', 'ct': convertHEColortemp(colortemperature as int)])
+void componentSetColorTemperature(def child, colortemperature, level = null, transitionTime = null) {
+    Map values = ['colormode': 'ct', 'ct': convertHEColortemp(colortemperature as int)]
+    if (level)          { values.['bri']           = convertHELevel(level) }
+    if (transitionTime) { values['transitiontime'] = (transitionTime as int) * 10}
+
+    setDeviceState(child, values)
 }
 
 Integer transitionTime() {

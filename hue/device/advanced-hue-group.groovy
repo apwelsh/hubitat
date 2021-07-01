@@ -175,9 +175,9 @@ void setSaturation(saturation) {
 
 /** ColorTemperature Commands **/
 
-void setColorTemperature(colortemperature) {
+void setColorTemperature(colortemperature, level = null, transitionTime = null) {
     if (logEnable) { log.info "Setting (${this}) color temp: ${colortemperature}" }
-    parent.componentSetColorTemperature(this, colortemperature)
+    parent.componentSetColorTemperature(this, colortemperature, level, transitionTime)
     attributeChanged()
 }
 
