@@ -1240,7 +1240,8 @@ void componentSetColor(def child, Map colormap) {
     if (colormap?.saturation == null) { colormap.saturation = currentValue(child, 'saturation') ?: 50 }
     if (colormap?.level == null)      { colormap.level      = currentValue(child, 'level') ?: 100 }
 
-    Map args = ['colormode': 'hs',
+    Map args = ['on': true,
+                'colormode': 'hs',
                 'hue': convertHEHue(colormap.hue as int),
                 'sat': convertHESaturation(colormap.saturation as int),
                 'bri': convertHELevel(colormap.level as int)]
@@ -1250,16 +1251,19 @@ void componentSetColor(def child, Map colormap) {
 }
 
 void componentSetHue(def child, hue) {
-    setDeviceState(child, ['colormode': 'hs', 'hue': convertHEHue(hue as int)])
+    setDeviceState(child, ['on': true, 'colormode': 'hs', 'hue': convertHEHue(hue as int)])
 }
 
 void componentSetSaturation(def child, saturation) {
-    setDeviceState(child, ['colormode': 'hs', 'sat': convertHESaturation(saturation as int)])
+    setDeviceState(child, ['on': true, 'colormode': 'hs', 'sat': convertHESaturation(saturation as int)])
 }
 
 void componentSetColorTemperature(def child, colortemperature, level = null, transitionTime = null) {
-    Map values = ['colormode': 'ct', 'ct': convertHEColortemp(colortemperature as int)]
-    if (level)          { values['bri']            = convertHELevel(level) }
+    Map values = [
+        'on': true,
+        'colormode': 'ct', 
+        'ct': convertHEColortemp(colortemperature as int)]
+    if (level)          { values['bri']            = convertHELevel(level as int) }
     if (transitionTime) { values['transitiontime'] = (transitionTime as int) * 10}
 
     setDeviceState(child, values)

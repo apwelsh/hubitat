@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.2.16"
+      "version": "1.2.17"
     }
   ],
   "drivers": [
@@ -35,7 +35,7 @@
       "version": "1.2.3"
     }
   ],
-  "version": "1.5.22",
-  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices. Added Initialize capability to sync devices to hub state on startup. \n1.5.20 - Added donate link \n1.5.21 - Fix setColorTemperature method to accept level and transitionTime.  Corrected parsing logic for send child event."
+  "version": "1.5.23",
+  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices. Added Initialize capability to sync devices to hub state on startup. \n1.5.20 - Added donate link \n1.5.21 - Fix setColorTemperature method to accept level and transitionTime.  Corrected parsing logic for send child event. \n1.5.23 - any change to color or brightness will turn on the associated device"
 
 }
