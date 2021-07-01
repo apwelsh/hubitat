@@ -1240,7 +1240,7 @@ void componentSetColor(def child, Map colormap) {
     if (colormap?.saturation == null) { colormap.saturation = currentValue(child, 'saturation') ?: 50 }
     if (colormap?.level == null)      { colormap.level      = currentValue(child, 'level') ?: 100 }
 
-    Map args = ['on': true,
+    Map args = ['on': colormap.level > 0,
                 'colormode': 'hs',
                 'hue': convertHEHue(colormap.hue as int),
                 'sat': convertHESaturation(colormap.saturation as int),
@@ -1260,7 +1260,7 @@ void componentSetSaturation(def child, saturation) {
 
 void componentSetColorTemperature(def child, colortemperature, level = null, transitionTime = null) {
     Map values = [
-        'on': true,
+        'on': (level?:100) > 0,
         'colormode': 'ct', 
         'ct': convertHEColortemp(colortemperature as int)]
     if (level)          { values['bri']            = convertHELevel(level as int) }
