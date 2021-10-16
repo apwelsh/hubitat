@@ -1,5 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
+ * Version 1.3.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -44,6 +45,7 @@ definition(
 @Field static final String PAGE_BRIDGE_DISCOVERY = 'bridgeDiscovery'
 @Field static final String PAGE_ADD_DEVICE = 'addDevice'
 @Field static final String PAGE_BRIDGE_LINKING = 'bridgeLinking'
+@Field static final String PAGE_UNLINK = 'unlink'
 @Field static final String PAGE_FIND_LIGHTS = 'findLights'
 @Field static final String PAGE_ADD_LIGHTS = 'addLights'
 @Field static final String PAGE_FIND_GROUPS = 'findGroups'
@@ -57,6 +59,7 @@ preferences {
     page(name: PAGE_MAINPAGE)
     page(name: PAGE_BRIDGE_DISCOVERY, title: 'Device Discovery', refreshTimeout:PAGE_REFRESH_TIMEOUT)
     page(name: PAGE_ADD_DEVICE,       title: 'Add Hue Bridge')
+    page(name: PAGE_UNLINK,           title: 'Unlink your Hue')
     page(name: PAGE_BRIDGE_LINKING,   title: 'Linking with your Hue', refreshTimeout:5)
     page(name: PAGE_FIND_LIGHTS,      title: 'Light Discovery Started!', refreshTimeout:PAGE_REFRESH_TIMEOUT)
     page(name: PAGE_ADD_LIGHTS,       title: 'Add Light')
@@ -67,7 +70,7 @@ preferences {
 
 }
 
-synchronized Map getVolatileAtomicState(def device) {
+synchronized Map getVolatileAtomicState(def device) { 
     Integer deviceId = device.deviceId ?: device.device.deviceId
     Map result = volatileAtomicStateByDeviceId.get(deviceId)
     if (result == null) {
@@ -77,8 +80,23 @@ synchronized Map getVolatileAtomicState(def device) {
     return result
 }
 
-def mainPage(Map params=[:]) {
+public String getBridgeHost() {
+    String host = state.bridgeHost
+    if (host?.endsWith(':80')) {
+        host = "${host.substring(0,host.length-3)}:443"
+        state.bridgeHost = host
+    }
+    return host
+}
 
+public void setBridgeHost(String host) {
+    if (host?.endsWith(':80')) {
+        host = "${host.substring(0,host.length-3)}:443"
+    }    
+    state.bridgeHost = host
+}
+
+def mainPage(Map params=[:]) {
     if (app.installationState == 'INCOMPLETE') {
         return dynamicPage(name: PAGE_MAINPAGE, title: 'Advanced Hue Bridge Integration', nextPage: null, uninstall: true, install: true) {
             section {
@@ -86,11 +104,11 @@ def mainPage(Map params=[:]) {
             }
         }
     }
-    if (!state.bridgeHost) {
+    if (!bridgeHost) {
         return bridgeDiscovery()
     }
 
-    if (params[nextPage]==PAGE_BRIDGE_LINKING) {
+    if (params.nextPage==PAGE_BRIDGE_LINKING) {
         return bridgeLinking()
     }
 
@@ -102,7 +120,7 @@ def mainPage(Map params=[:]) {
         title='Find Bridges'
     }
 
-    Boolean uninstall = (state.bridgehost) ? false : true
+    Boolean uninstall = bridgeHost ? false : true
 
     return dynamicPage(name: PAGE_MAINPAGE, title: '', nextPage: null, uninstall: uninstall, install: true) {
             section (getFormat("title", "Advanced Hue Bridge")) {
@@ -121,18 +139,12 @@ def mainPage(Map params=[:]) {
                 href PAGE_FIND_LIGHTS, title:'Find Lights', description:''
                 href PAGE_FIND_GROUPS, title:'Find Groups', description:''
                 href PAGE_FIND_SCENES, title:'Find Scenes', description:''
-                href PAGE_BRIDGE_DISCOVERY, title:title, description:'', state:selectedDevice? 'complete' : null //, params: [nextPage: PAGE_BRIDGE_LINKING]
-
-            // childDevices.sort({ a, b -> a['deviceNetworkId'] <=> b['deviceNetworkId'] }).each {
-                    //if(it.typeName == 'Advanced Hue Bridge'){
-                    //    href 'configurePDevice', title:"$it.label", description:'', params: [did: it.deviceNetworkId]
-                    //}
-
-                //}
+                href selectedDevice ? PAGE_BRIDGE_LINKING : PAGE_BRIDGE_DISCOVERY, title:title, description:'', state:selectedDevice? 'complete' : null //, params: [nextPage: PAGE_BRIDGE_LINKING]
             }
             section('Options') {
                 input name: 'logEnable', type: 'bool', defaultValue: true,  title: 'Enable informational logging'
                 input name: 'debug',     type: 'bool', defaultValue: false, title: 'Enable debug logging'
+                href PAGE_UNLINK, title: 'Unlink hub', description:'Use this to unlink your hub and force a new hub link'
             }
             section() {
                 paragraph getFormat("line")
@@ -152,6 +164,9 @@ def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code
 @Field static final Integer DEVICE_REFRESH_MAX_COUNT = 30
 
 def bridgeDiscovery(Map params=[:]) {
+    if (selectedDevice) {
+        
+    }
     if (logEnable) { log.debug 'Searching for Hub additions and updates' }
     Map hubs = discoveredHubs()
 
@@ -174,7 +189,7 @@ def bridgeDiscovery(Map params=[:]) {
         ssdpDiscover()
     }
 
-    Boolean uninstall = state.bridgehost ? false : true
+    Boolean uninstall = bridgeHost ? false : true
     String nextPage = selectedDevice ? PAGE_BRIDGE_LINKING : null
 
     return dynamicPage(name:PAGE_BRIDGE_DISCOVERY, title:'Discovery Started!', nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
@@ -184,6 +199,22 @@ def bridgeDiscovery(Map params=[:]) {
     }
 }
 
+def unlink() {
+    def hub = getHubForMac(selectedDevice)
+    hub.remove("clientkey")
+    hub.remove("username")
+    state.hub = hub
+    state.remove('username')
+    state.remove('clientkey')
+    selectedDevice = ''
+
+    return dynamicPage(name:PAGE_UNLINK, title:'Unlink bridge', nextPage:null, uninstsall: false) {
+        section('') {
+            paragraph "You hub has been unlinked.  Use hub linking to re-link your hub."
+        }
+    }
+
+}
 def bridgeLinking() {
     ssdpUnsubscribe()
 
@@ -200,16 +231,16 @@ def bridgeLinking() {
         paragraphText = 'Press the button on your Hue Bridge to setup a link. '
 
         def hub = getHubForMac(selectedDevice)
-        if (hub?.username) { //if discovery worked
+        if (hub?.username && hub?.clientkey) { //if discovery worked
             if (logEnable) { log.debug "Hub linking completed for ${hub.name}" }
             return addDevice(hub)
         }
         if (hub?.networkAddress) {
-            state.bridgeHost = hub.networkAddress
+            bridgeHost = hub.networkAddress
         }
 
         if (hub) {
-            if((linkRefreshcount % 2) == 0 && !state.username) {
+            if((linkRefreshcount % 2) == 0 && (!state.username || !state.clientkey)) {
                 requestHubAccess(selectedDevice)
             }
         }
@@ -218,7 +249,7 @@ def bridgeLinking() {
         paragraphText = 'You haven\'t selected a Hue Bridge, please Press \'Done\' and select one before clicking next.'
     }
 
-    def uninstall = state.bridgehost ? false : true
+    def uninstall = bridgeHost ? false : true
 
     return dynamicPage(name:PAGE_BRIDGE_LINKING, title:title, nextPage:nextPage, refreshInterval:refreshInterval, uninstsall: uninstall) {
         section('') {
@@ -237,8 +268,9 @@ def addDevice(device) {
     def d
     if (device) {
         d = childDevices?.find { dev -> dev.deviceNetworkId == dni }
-        state.bridgeHost = "${device.networkAddress}:${device.deviceAddress}"
+        bridgeHost = "${device.networkAddress}:${device.deviceAddress}"
         state.username = "${device.username}"
+        state.clientkey = "${device.clientkey}"
         refreshHubStatus()
     }
 
@@ -316,7 +348,6 @@ def addLights(Map params=[:]){
         String type = bulbTypeForLight(lightId)
         try {
 
-            // addChildDevice('apwelsh', 'AdvancedHueGroup', dni, null, ['label': "${name}"])
             def child = addChildDevice('hubitat', "Generic Component ${type}", "${dni}",
             [label: "${name}", isComponent: false, name: 'AdvancedHueBulb'])
             child.updateSetting('txtEnable', false)
@@ -504,7 +535,6 @@ def addScenes(params){
         String dni = networkIdForScene(selectedGroup, sceneId)
         try {
 
-            // group.addChildDevice('apwelsh', 'AdvancedHueScene', "${dni}', ['label': '${name}"])
             def child = group.addChildDevice('hubitat', 'Generic Component Switch', "${dni}",
             [label: "${name}", isComponent: false, name: 'AdvancedHueScene'])
             child.updateSetting('txtEnable', false)
@@ -670,7 +700,7 @@ void verifyDevice(parsedEvent) {
 
 private requestHubAccess(mac) {
     def device = getHubForMac(mac)
-    def deviceType = '{"devicetype": "AdvanceHueBridgeLink#Hubitat"}'
+    def deviceType = '{"devicetype": "AdvanceHueBridgeLink#Hubitat", "generateclientkey": true}'
 
     asynchttpPost(requestHubAccessHandler,
                   [uri: "http://${device.networkAddress}/api",
@@ -689,9 +719,10 @@ def requestHubAccessHandler(response, args) {
         if (data.error?.description) {
             if (logEnable) { log.error "${data.error.description[0]}" }
         } else if (data.success) {
-            if (data.success.username) {
+            if (data.success.username && data.success.clientkey) {
                 def device = getHubForMac(args.device.mac)
-                device << [username: "${data.success.username[0]}"]
+                device.remove("clientkey")
+                device << [username: "${data.success.username[0]}"] << [clientkey: "${data.success.clientkey[0]}"]
                 if (logEnable) { log.debug "Obtained credentials: ${device}" }
             } else {
                 log.error "Problem with hub linking.  Received response: ${data}"
@@ -702,13 +733,20 @@ def requestHubAccessHandler(response, args) {
 
     }
 }
+
+String getApiUrl() {
+    "https://${bridgeHost}/api/${state.username}/"
+}
+
 void refreshHubStatus() {
 
-    def url = "http://${state.bridgeHost}/api/${state.username}/"
+    def url = apiUrl
 
     httpGet([uri: url,
              contentType: 'application/json',
+             ignoreSSLIssues: true, 
              requestContentType: 'application/json']) { response ->
+
         if (!response.isSuccess()) { return }
 
         def data = response.data
@@ -725,11 +763,11 @@ void refreshHubStatus() {
 
 private enumerateGroups() {
 
-    def url = "http://${state.bridgeHost}/api/${state.username}/groups"
-    //if (debug) { log.debug "${url}" }
+    def url = "${apiUrl}/groups"
 
     httpGet([uri: url,
             contentType: 'application/json',
+             ignoreSSLIssues: true, 
             requestContentType: 'application/json']) { response ->
         if (!response.isSuccess()) { return }
 
@@ -750,11 +788,11 @@ private enumerateGroups() {
 
 private enumerateScenes() {
 
-    def url = "http://${state.bridgeHost}/api/${state.username}/scenes"
-    //if (debug) { log.debug "${url}" }
+    def url = "${apiUrl}/scenes"
 
     httpGet([uri: url,
              contentType: 'application/json',
+             ignoreSSLIssues: true, 
              requestContentType: 'application/json']) { response ->
         if (!response.isSuccess()) { return }
 
@@ -774,11 +812,11 @@ private enumerateScenes() {
 
 private enumerateLights() {
 
-    def url = "http://${state.bridgeHost}/api/${state.username}/lights"
-    //if (debug) { log.debug "${url}" }
+    def url = "${apiUrl}/lights"
 
     httpGet([uri: url,
              contentType: 'application/json',
+             ignoreSSLIssues: true, 
              requestContentType: 'application/json']) { response ->
         if (!response.isSuccess()) { return }
 
@@ -838,11 +876,12 @@ void setDeviceState(def child, Map deviceState) {
     def hub = getChildDeviceForMac(selectedDevice)
     hub.resetRefreshSchedule()
 
-    String url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}/${action}"
+    String url = "${apiUrl}/${type}/${node}/${action}"
     if (debug) { log.debug "URL: ${url}" }
     if (debug) { log.debug "args: ${deviceState}" }
     httpPut([uri: url,
              contentType: 'application/json',
+             ignoreSSLIssues: true, 
              requestContentType: 'application/json',
              body: newState]) { response ->
 
@@ -867,7 +906,9 @@ void setDeviceState(def child, Map deviceState) {
                 }
                 def device = type == 'group' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
                 setHueProperty(device, [(result[3]): [(result[4]): value]])
-                hub.runInMillis(500, 'refresh', [overwrite: true, misfire:'ignore'])
+                if (getVolatileAtomicState(hub).WebSocketSubscribed != true) {
+                    hub.runInMillis(500, 'refresh', [overwrite: true, misfire:'ignore'])
+                }
 
             }
         }
@@ -891,10 +932,11 @@ void getDeviceState(def child) {
         type = "${deviceIdType(deviceNetworkId)}s"
         node = deviceIdNode(deviceNetworkId)
     }
-    String url = "http://${state.bridgeHost}/api/${state.username}/${type}/${node}"
+    String url = "${apiUrl}/${type}/${node}"
     if (debug) { log.debug "URL: ${url}" }
     httpGet([uri: url,
              contentType: 'application/json',
+             ignoreSSLIssues: true, 
              requestContentType: 'application/json']) { response ->
 
         if (!response.success) { return }
@@ -930,15 +972,15 @@ void getDeviceState(def child) {
  *
  */
 
-private String networkIdForGroup(id) {
+public String networkIdForGroup(id) {
     "hueGroup:${app.getId()}/${id}"
 }
 
-private String networkIdForLight(id) {
+public String networkIdForLight(id) {
     def type=bulbTypeForLight(id)
     "hueBulb${type}:${app.getId()}/${id}"
 }
-String networkIdForScene(groupId,sceneId) {
+public networkIdForScene(groupId,sceneId) {
     "hueScene:${app.getId()}/${groupId}/${sceneId}"
 }
 
@@ -999,11 +1041,6 @@ private Integer convertHexToInt(hex) {
     hubitat.helper.HexUtils.hexStringToInt(hex)
 }
 
-// private String convertIPtoHex(ipAddress) {
-//     String hex = ipAddress.tokenize( '.' ).collect {  String.format( '%02x', it.toInteger() ) }.join()
-//     return hex
-// }
-
 /*
  *
  * Hub Device Utility Functions
@@ -1014,18 +1051,9 @@ def deviceNetworkId(mac) {
     mac ? "hue-${mac}" : null
 }
 
-// private getHubForNetworkId(deviceNetworkId) {
-//     getHubs().find { it.value.deviceNetworkId == deviceNetworkId }
-// }
-
 private getChildDeviceForMac(mac) {
-    //childDevices?.find {it.deviceNetworkId == deviceNetworkId(mac)  }
     getChildDevice(deviceNetworkId(mac))
 }
-
-// private clearDiscoveredHubs() {
-//     state.hubs = getHubs().findAll { getChildDeviceForMac(it.value.mac) != null }
-// }
 
 Map discoveredHubs() {
     Map vhubs = getHubs()
@@ -1191,13 +1219,67 @@ void setHueProperty(def child, Map args) {
         }
     }
 
+    if (devstate.containsKey('colormode')) {
+        if (devstate.colormode == 'ct') { 
+            devstate.remove('hue')
+            devstate.remove('sat')
+            //devstate.remove('xy')
+        } else if (devstate.colormode == 'hs') { 
+            devstate.remove('ct')
+            devstate.remove('mirek')
+            //devstate.remove('xy')
+        } else if (devstate.color?.xy && devstate.mirek_valid == false) {
+            devstate.colormode = 'xy'
+        }
+    }
 
-    if (devstate.containsKey('on'))        { sendChildEvent(child, [name: 'switch',           value: devstate.on  ? 'on' : 'off']) }
-    if (devstate.containsKey('colormode')) { sendChildEvent(child, [name: 'colorMode',        value: convertHBColorMode(devstate.colormode)]) }
-    if (devstate.containsKey('bri'))       { sendChildEvent(child, [name: 'level',            value: convertHBLevel(devstate.bri)]) }
-    if (devstate.containsKey('hue'))       { sendChildEvent(child, [name: 'hue',              value: convertHBHue(devstate.hue)]) }
-    if (devstate.containsKey('sat'))       { sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(devstate.sat)]) }
-    if (devstate.containsKey('ct'))        { sendChildEvent(child, [name: 'colorTemperature', value: convertHBColortemp(devstate.ct)]) }
+    // transform hue attributes and values to device attributes and values
+    def events = devstate.collectEntries {  key, value ->
+        switch (key) {
+            case 'on':         ['switch':           value ? 'on' : 'off']; break
+            case 'colormode':  ['colorMode':        convertHBColorMode(value)]; break
+            case 'bri':        ['level':            convertHBLevel(value)]; break
+            case 'brightness': ['level':            convertHBLevel((value * 2.55) as int)]; break
+            case 'hue':        ['hue':              convertHBHue(value)]; break
+            case 'sat':        ['saturation':       convertHBSaturation(value)]; break
+            case 'ct':         ['colorTemperature': convertHBColortemp(value)]; break
+            case 'mirek':      ['colorTemperature': convertHBColortemp(value)]; break
+            default:           [key, value]
+        }
+    }.findAll { key, value -> child.hasAttribute("$key")}
+
+
+    log.debug "Received State ($child): $devstate"
+    log.debug "Translated Events ($child): $events"
+    
+    events.each { key, value -> sendChildEvent(child, [name: key, value: value]) }
+
+    child.getCapabilities().each { log.info "${it.name} = ${it.reference} :: ${it.toString()}" }
+    
+    // Fast-fail here to abort additional processing if this is not a color capable device
+    if (!child.hasCapability('ColorControl')) { return }
+    // Fast-fail here to abort additional processing if this is not an XY color change
+    String colorMode = events.colorMode?:currentValue(child, 'ColorMode')
+    if (colorMode != 'RGB' || !devstate.xy) { return }
+
+    List hsv = [currentValue(child, 'hue') as Integer, currentValue(child, 'saturation') as Integer, currentValue(child, 'level') as Integer]
+
+    List rgb1 = hubitat.helper.ColorUtils.hsvToRGB(hsv)
+    log.debug "hsv -> rgb = $rgb1"
+    List xy = rgbToXY(rgb1)
+    log.debug "rgb -> xy = ${[x: xy[0], y: xy[1], bri: currentValue(child, 'level')]}"
+    if (devstate.containsKey('xy')) {
+        Float level = devstate.containsKey(brightness) ? (devstate.brightness / 2.55) : events.level ?: currentValue(child, 'level')
+        Float x = devstate.xy[0]
+        Float y = devstate.xy[1]
+        // List rgb = xyToRGB([x, y, level/100])
+        List rgb = xyToRGB([x, y], level)
+        // List hsv = hubitat.helper.ColorUtils.rgbToHSV(rgb)
+        log.debug "xyy -> rgb = $rgb"
+        //sendChildEvent(child, [name: 'hue',              value: convertHBHue(hsv[0])])
+        //sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(hsv[1])])
+        //sendChildEvent(child, [name: 'level',            value: convertHBLevel(hsv[2])])
+    }
 }
 
 // Component Dimmer delegates
@@ -1215,7 +1297,7 @@ void componentRefresh(child){
 }
 
 void componentSetLevel(child, level, duration=null){
-    Integer heLevel = convertHELevel(level as int)
+    Float heLevel = convertHELevel(level as int)
     Map args = ['on': (heLevel > 0), 'bri': heLevel]
     if (duration != null) { args['transitiontime'] = (duration as int) * 10 }
 
@@ -1281,7 +1363,7 @@ private Number valueBetween(Number value, Number min, Number max) {
     return Math.min(Math.max(value, min), max)
 }
 
-Integer convertHBLevel(Integer value) {
+Integer convertHBLevel(Number value) {
     Math.round(value / 2.54)
 }
 
@@ -1294,7 +1376,7 @@ Number convertHBHue(Number value) {
 }
 
 Number convertHEHue(Number value) {
-    valueBetween(Math.round(value * 655.35), 0, 65535)
+    value == 33 ? 21845 : value == 66 ? 43690 : valueBetween(Math.round(value * 655.35), 0, 65535)
 }
 
 Number convertHBSaturation(Number value) {
@@ -1313,9 +1395,117 @@ Number convertHEColortemp(Number value) {
     valueBetween(Math.round(500 - ((value - 2000) / (4500 / 347))), 153, 500)
 }
 
+List xyToRGB(List xy, Number level) {
+    Float x = xy[0]
+    Float y = xy[1]
+    Float z = 1.0 - x - y
+    Float Y = level / 100
+    Float X = (Y / y) * x
+    Float Z = (Y / y) * z
+
+    // sRGB (D65)
+    // Double r =  (X * 3.2404542) - (Y * 1.5371385) - (Z * 0.4985314)
+    // Double g = -(X * 0.9692660) + (Y * 1.8760108) + (Z * 0.0415560)
+    // Double b =  (X * 0.0556434) - (Y * 0.2040259) + (Z * 1.0572252)
+    // CIE-RGB (E)
+    Float r =  (X * 2.3638081) - (Y * 0.8676030) - (Z * 0.4988161)
+    Float g = -(X * 0.5005940) + (Y * 1.3962369) + (Z * 0.1047562)
+    Float b =  (X * 0.0141712) - (Y * 0.0306400) + (Z * 1.2323842)
+    // PhotoShopRGB
+    // Double r = (X * 0.7977) + (Y * 0.2880) + (Z * 0.0000)
+    // Double g = (X * 0.1352) + (Y * 0.7120) + (Z * 0.0000)
+    // Double b = (X * 0.0313) + (Y * 0.0000) + (Z * 0.8249)
+    // AllColors-RGB
+    // Double r = ( X * 0.9642) + (Y * 0.3482) + (Z * 0.0000)
+    // Double g = (-X * 0.0000) + (Y * 0.7100) + (Z * 0.0000)
+    // Double b = ( X * 0.0000) - (Y * 0.0582) + (Z * 0.8249)
+    // Identity-RGB
+    // Double r = ( X * 0.9642) + (Y * 0.0000) + (Z * 0.0000)
+    // Double g = ( X * 0.0000) + (Y * 1.0000) + (Z * 0.0000)
+    // Double b = ( X * 0.0000) + (Y * 0.0000) + (Z * 0.8249)
+    
+    // Apply gamma correction
+    // r = r <= 0.0031308 ? 12.92 * r : (1.0 + 0.055) * Math.pow(r, (1.0 / 2.4)) - 0.055
+    // g = g <= 0.0031308 ? 12.92 * g : (1.0 + 0.055) * Math.pow(g, (1.0 / 2.4)) - 0.055
+    // b = b <= 0.0031308 ? 12.92 * b : (1.0 + 0.055) * Math.pow(b, (1.0 / 2.4)) - 0.055
+
+    // Scale values back in range
+    Double maxValue = Math.max(r, Math.max(g, b))
+    r = r / maxValue
+    g = g / maxValue
+    b = b / maxValue
+
+    // Convert to Hubitat RGB Array
+    List rgb = [((r < 0 ? 1 : r) * 255) as int, 
+                ((g < 0 ? 1 : g) * 255) as int, 
+                ((b < 0 ? 1 : b) * 255) as int]
+
+    return rgb
+}
+
+
+List xyzToRGB(List xyz) {
+    Float x = xyz[0]
+    Float y = xyz[1]
+    Float z = xyz[2]
+
+    // Apply gamma correction
+    Float gamma = 1/2.2
+    Float r = Math.max((2.3706743 * x) + (-0.9000405 * y) +(-0.4706338*z), 0)
+    Float g = Math.max((2.3706743 * x) + (-0.9000405 * y) +(-0.4706338*z), 0)
+    Float b = Math.max((2.3706743 * x) + (-0.9000405 * y) +(-0.4706338*z), 0)
+
+    // Convert to Hubitat RGB Array
+    List rgb = [(Math.pow(r, gamma) * 255) as int, 
+                (Math.pow(g, gamma) * 255) as int, 
+                (Math.pow(b, gamma) * 255) as int]
+
+    return rgb
+}
+
+List xyyToXYZ(List xyy) {
+    if (xyy[1] == 0) { return [0, 0, 0] }
+    return [ valueBetween((xyy[0] * xyy[2]) / [xyy[1]], 0, 1), 
+             valueBetween(xyy[2], 0, 1), 
+             valueBetween(((1 - xyy[0] - xyy[1]) * xyy[2]) / xyy[1], 0, 1)]
+}
+
+List xyyToRGB(List xyy) {
+    log.debug "${[x: xyy[0], y: xyy[1], Y: xyy[2]]}"
+    List xyz = xyyToXYZ(xyy)
+    List rgb = xyzToRGB(xyz)
+    return rgb
+}
+
+List rgbToXY(List rgb) {
+    Float r = rgb[0] / 1
+    Float g = rgb[1] / 1
+    Float b = rgb[2] / 1
+
+    // Apply gamma correction
+    // r = (r > 0.040454) ? Math.pow((r + 0.055) / (1.0 + 0.055), 2.4) : (r / 12.92)
+    // g = (g > 0.040454) ? Math.pow((g + 0.055) / (1.0 + 0.055), 2.4) : (g / 12.92)
+    // b = (b > 0.040454) ? Math.pow((b + 0.055) / (1.0 + 0.055), 2.4) : (b / 12.92)
+
+    // Wide gamut conversion D65
+    Float X =  (r * 0.4868870) + (g * 0.3062984) + (b * 0.1710347)
+    Float Y =  (r * 0.1746583) + (g * 0.8247541) + (b * 0.0005877)
+    Float Z = -(r * 0.0012563) + (g * 0.0169832) + (b * 0.8094831)
+
+    Float cx = X / (X + Y + Z)
+    Float cy = Y / (X + Y + Z)
+    Float cz = Z / (X + Y + Z)
+
+    if (cx.isNaN()) { cx = 0.0 }
+    if (cy.isNaN()) { cy = 0.0 }
+
+    return [cx, cy]
+}
+
 String convertHBColorMode(String value) {
     if (value == 'hs') { return 'RGB'  }
     if (value == 'ct') { return 'CT' }
     if (value == 'xy') { return 'RGB' }
     return ''
 }
+
