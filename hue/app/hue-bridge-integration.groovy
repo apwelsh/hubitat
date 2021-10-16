@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.3.0
+ * Version 1.3.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1249,12 +1249,12 @@ void setHueProperty(def child, Map args) {
     }.findAll { key, value -> child.hasAttribute("$key")}
 
 
-    log.debug "Received State ($child): $devstate"
-    log.debug "Translated Events ($child): $events"
+    // log.debug "Received State ($child): $devstate"
+    // log.debug "Translated Events ($child): $events"
     
     events.each { key, value -> sendChildEvent(child, [name: key, value: value]) }
 
-    child.getCapabilities().each { log.info "${it.name} = ${it.reference} :: ${it.toString()}" }
+    // child.getCapabilities().each { log.info "${it.name} = ${it.reference} :: ${it.toString()}" }
     
     // Fast-fail here to abort additional processing if this is not a color capable device
     if (!child.hasCapability('ColorControl')) { return }
@@ -1262,24 +1262,26 @@ void setHueProperty(def child, Map args) {
     String colorMode = events.colorMode?:currentValue(child, 'ColorMode')
     if (colorMode != 'RGB' || !devstate.xy) { return }
 
-    List hsv = [currentValue(child, 'hue') as Integer, currentValue(child, 'saturation') as Integer, currentValue(child, 'level') as Integer]
+    // TODO: The following is test code to try and figure out a good XY to HSV technique.  Commented out for release.
 
-    List rgb1 = hubitat.helper.ColorUtils.hsvToRGB(hsv)
-    log.debug "hsv -> rgb = $rgb1"
-    List xy = rgbToXY(rgb1)
-    log.debug "rgb -> xy = ${[x: xy[0], y: xy[1], bri: currentValue(child, 'level')]}"
-    if (devstate.containsKey('xy')) {
-        Float level = devstate.containsKey(brightness) ? (devstate.brightness / 2.55) : events.level ?: currentValue(child, 'level')
-        Float x = devstate.xy[0]
-        Float y = devstate.xy[1]
-        // List rgb = xyToRGB([x, y, level/100])
-        List rgb = xyToRGB([x, y], level)
-        // List hsv = hubitat.helper.ColorUtils.rgbToHSV(rgb)
-        log.debug "xyy -> rgb = $rgb"
-        //sendChildEvent(child, [name: 'hue',              value: convertHBHue(hsv[0])])
-        //sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(hsv[1])])
-        //sendChildEvent(child, [name: 'level',            value: convertHBLevel(hsv[2])])
-    }
+    // List hsv = [currentValue(child, 'hue') as Integer, currentValue(child, 'saturation') as Integer, currentValue(child, 'level') as Integer]
+
+    // List rgb1 = hubitat.helper.ColorUtils.hsvToRGB(hsv)
+    // log.debug "hsv -> rgb = $rgb1"
+    // List xy = rgbToXY(rgb1)
+    // log.debug "rgb -> xy = ${[x: xy[0], y: xy[1], bri: currentValue(child, 'level')]}"
+    // if (devstate.containsKey('xy')) {
+    //     Float level = devstate.containsKey(brightness) ? (devstate.brightness / 2.55) : events.level ?: currentValue(child, 'level')
+    //     Float x = devstate.xy[0]
+    //     Float y = devstate.xy[1]
+    //     // List rgb = xyToRGB([x, y, level/100])
+    //     List rgb = xyToRGB([x, y], level)
+    //     // List hsv = hubitat.helper.ColorUtils.rgbToHSV(rgb)
+    //     log.debug "xyy -> rgb = $rgb"
+    //     //sendChildEvent(child, [name: 'hue',              value: convertHBHue(hsv[0])])
+    //     //sendChildEvent(child, [name: 'saturation',       value: convertHBSaturation(hsv[1])])
+    //     //sendChildEvent(child, [name: 'level',            value: convertHBLevel(hsv[2])])
+    // }
 }
 
 // Component Dimmer delegates

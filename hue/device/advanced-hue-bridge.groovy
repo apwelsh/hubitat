@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge 
- * Version 1.3.5
+ * Version 1.3.6
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -129,9 +129,7 @@ void connect() {
     String apiKey = parent.state.username.trim()
     Map headers = ['hue-application-key': apiKey, Accept: 'text/event-stream']
 
-    if (this[SETTING_DBG_ENABLE]) { 
-        log.debug "Attempting to establish streaming connection to ${url}"
-    }
+    if (this[SETTING_DBG_ENABLE]) { log.debug "Attempting to establish streaming connection to ${url}" }
 
     interfaces.eventStream.connect(url, [
         ignoreSSLIssues: true,
@@ -166,7 +164,7 @@ void parse(String text) {
                 Map events = [state:[:], action:[:]]
                 switch (event.type) {
                     case 'light':
-                        log.info "Parsing event: ${event}"
+                        // log.info "Parsing event: ${event}"
 
                         def light = parent.getChildDevice(parent.networkIdForLight(eventId))
                         if (!light) { break }
@@ -186,7 +184,7 @@ void parse(String text) {
                         break
 
                     case 'grouped_light':
-                        log.info "Parsing event: ${event}"
+                        // log.info "Parsing event: ${event}"
 
                         def group = parent.getChildDevice(parent.networkIdForGroup(eventId))
                         if (!group) { break }
@@ -209,14 +207,16 @@ void parse(String text) {
                         break
 
                     default:
-                        log.warn "Unhandeled event type: ${event.type}"
-                        log.debug "$event"
+                        if (this[SETTING_DBG_ENABLE]) {
+                            log.warn "Unhandeled event type: ${event.type}"
+                            log.debug "$event"
+                        }
                     }
                 }
             return
         }
 
-        log.debug "Received unhandled message: ${text}"
+        if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled message: ${text}" }
 
     } catch (ex) {
         log.error(ex)
@@ -225,7 +225,7 @@ void parse(String text) {
 }
 
 void eventStreamStatus(String message) {
-    log.trace message
+    // log.trace message
     if (message ==~ /STOP:.*/) {
         parent.getVolatileAtomicState(this).WebSocketSubscribed = false
         resetRefreshSchedule()
