@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.3.1"
+      "version": "1.3.2"
     }
   ],
   "drivers": [
@@ -35,7 +35,7 @@
       "version": "1.3.6"
     }
   ],
-  "version": "1.6.1",
-  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices. Added Initialize capability to sync devices to hub state on startup. \n1.5.20 - Added donate link \n1.5.21 - Fix setColorTemperature method to accept level and transitionTime.  Corrected parsing logic for send child event. \n1.5.23 - any change to color or brightness will turn on the associated device \n1.6.0 - Basic (initial) support for push based hue updates.  When enabled on a Huitat 2.2.9+ Hue will use push updates to trigger refreshes. \n1.6.1 - Removed testing code to cleanup logging, and wasted computations not required for this version."
+  "version": "1.6.2",
+  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices. Added Initialize capability to sync devices to hub state on startup. \n1.5.20 - Added donate link \n1.5.21 - Fix setColorTemperature method to accept level and transitionTime.  Corrected parsing logic for send child event. \n1.5.23 - any change to color or brightness will turn on the associated device \n1.6.0 - Basic (initial) support for push based hue updates.  When enabled on a Huitat 2.2.9+ Hue will use push updates to trigger refreshes. \n1.6.1 - Removed testing code to cleanup logging, and wasted computations not required for this version. \n 1.6.2 - Reverted hub status logic to use http instead of https."
 
 }
