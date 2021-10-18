@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.3.2
+ * Version 1.3.3
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -83,7 +83,7 @@ synchronized Map getVolatileAtomicState(def device) {
 public String getBridgeHost() {
     String host = state.bridgeHost
     if (host?.endsWith(':80')) {
-        host = "${host.substring(0,host.length-3)}:443"
+        host = "${host.substring(0,host.size()-3)}:443"
         state.bridgeHost = host
     }
     return host
@@ -91,7 +91,7 @@ public String getBridgeHost() {
 
 public void setBridgeHost(String host) {
     if (host?.endsWith(':80')) {
-        host = "${host.substring(0,host.length-3)}:443"
+        host = "${host.substring(0,host.size()-3)}:443"
     }    
     state.bridgeHost = host
 }
@@ -236,7 +236,7 @@ def bridgeLinking() {
             return addDevice(hub)
         }
         if (hub?.networkAddress) {
-            bridgeHost = hub.networkAddress
+            setBridgeHost(hub.networkAddress)
         }
 
         if (hub) {
@@ -268,7 +268,7 @@ def addDevice(device) {
     def d
     if (device) {
         d = childDevices?.find { dev -> dev.deviceNetworkId == dni }
-        bridgeHost = "${device.networkAddress}:${device.deviceAddress}"
+        setBridgeHost("${device.networkAddress}:${device.deviceAddress}")
         state.username = "${device.username}"
         state.clientkey = "${device.clientkey}"
         refreshHubStatus()
@@ -741,8 +741,8 @@ String getApiUrl() {
 void refreshHubStatus() {
 
     def url = apiUrl
-
-    httpGet([uri: url.replaceFirst("https:", "http:"),
+//log.debug "refreshHubStatus(${url})"
+    httpGet([uri: url,
              contentType: 'application/json',
              ignoreSSLIssues: true, 
              requestContentType: 'application/json']) { response ->
