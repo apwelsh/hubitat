@@ -33,8 +33,6 @@ import groovy.transform.Field
 @Field static final String SETTING_LOG_ENABLE        = 'logEnable'
 @Field static final String SETTING_DBG_ENABLE        = 'debug'
 
-@Field static final Map SCHEDULE_NON_PERSIST = [overwrite: true, misfire:'ignore']
-
 metadata {
     definition (
         name:      'AdvancedHueLightSensor',
