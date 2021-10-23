@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge 
- * Version 1.3.6
+ * Version 1.3.8
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -152,7 +152,7 @@ void parse(String text) {
     try {
         
         if (type == 'id') {
-                if (this[SETTING_DBG_ENABLE]) { log.debug "Received message with ID ${message}"}
+                if (this[SETTING_DBG_ENABLE]) { log.debug "Received message with ID ${message}" }
                 return
         }
         if (type == 'data') {
@@ -180,7 +180,7 @@ void parse(String text) {
                             events.state << event.color_temperature.find { k, v -> k == 'mirek' }
                         }
                         parent.setHueProperty(light, events)
-                        runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on only groups
+                        runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on affected groups
                         break
 
                     case 'grouped_light':
@@ -200,7 +200,24 @@ void parse(String text) {
                             events.action << event.color_temperature.find { k, v -> k == 'mirek' }
                         }
                         parent.setHueProperty(group, events)
-                        runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])
+                        runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])  // temporary.  Need to add logic to force refresh on affected groups
+                        break
+
+                    case 'motion':
+                    case 'temperature':
+                    case 'light_level':
+                    case 'device_power':
+                        //log.info "Parsing event: ${event}"
+
+                        def sensor = parent.getChildDevice(parent.networkIdForSensor(eventId))
+                        if (!sensor) { break }
+
+                         if (event.motion?.motion_valid)           { events.state << [presence: event.motion.motion] }
+                         if (event.temperature?.temperature_valid) { events.state << [temperature: event.temperature.temperature * 100.0] }
+                         if (event.light?.light_level_valid)       { events.state << [lightlevel: event.light.light_level] }
+                         if (event.power_state)                    { events.state << [battery: event.power_state.battery_level]}
+
+                        parent.setHueProperty(sensor, events)
                         break
 
                     case 'zigbee_connectivity':
@@ -278,5 +295,3 @@ void setHueProperty(Map args) {
         parent.sendChildEvent(this, [name: 'switch', value: value ? 'on' : 'off'])
     }
 }
-
-

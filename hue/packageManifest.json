@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "minimumHEVersion": "2.2",
+  "minimumHEVersion": "2.2.9",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
   "communityLink": "https://community.hubitat.com/t/release-advanced-hue-bridge-integration/51420",
@@ -14,7 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.3.3"
+      "version": "1.4.0"
     }
   ],
   "drivers": [
@@ -32,10 +32,33 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-bridge.groovy",
       "required": true,
-      "version": "1.3.6"
+      "version": "1.3.8"
+    },
+    {
+      "id": "4e877c99-7537-47d9-9849-9022e75fc355",
+      "name": "AdvancedHueLightSensor",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-light-sensor.groovy",
+      "required": false,
+      "version": "1.0.0"
+    },
+    {
+      "id": "428ff30b-152a-4e21-8daf-fa58935a018a",
+      "name": "AdvancedHueMotionSensor",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-motion-sensor.groovy",
+      "required": false,
+      "version": "1.0.0"
+    },
+    {
+      "id": "bbf68d11-1581-40a1-9218-561899546174",
+      "name": "AdvancedHueTemperatureSensor",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-temperature-sensor.groovy",
+      "required": false,
+      "version": "1.0.0"
     }
   ],
-  "version": "1.6.3",
-  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices. Added Initialize capability to sync devices to hub state on startup. \n1.5.20 - Added donate link \n1.5.21 - Fix setColorTemperature method to accept level and transitionTime.  Corrected parsing logic for send child event. \n1.5.23 - any change to color or brightness will turn on the associated device \n1.6.0 - Basic (initial) support for push based hue updates.  When enabled on a Huitat 2.2.9+ Hue will use push updates to trigger refreshes. \n1.6.1 - Removed testing code to cleanup logging, and wasted computations not required for this version. \n 1.6.2 - Reverted hub status logic to use http instead of https. \n1.6.3 - Put back https call and fixed code that sets the bridgehost which appears to be the real source of the issue"
-
+  "version": "1.7.0",
+  "releaseNotes": "Serious bug fix that was overloading the hub due to excessive calls to refresh, even when turned off.  Fix for missing method exception.  Correct logic flaw with setLevel() for light devices. Added Initialize capability to sync devices to hub state on startup. \n1.5.20 - Added donate link \n1.5.21 - Fix setColorTemperature method to accept level and transitionTime.  Corrected parsing logic for send child event. \n1.5.23 - any change to color or brightness will turn on the associated device \n1.6.0 - Basic (initial) support for push based hue updates.  When enabled on a Huitat 2.2.9+ Hue will use push updates to trigger refreshes. \n1.6.1 - Removed testing code to cleanup logging, and wasted computations not required for this version. \n 1.6.2 - Reverted hub status logic to use http instead of https. \n1.6.3 - Put back https call and fixed code that sets the bridgehost which appears to be the real source of the issue \n1.7.0 - Added support for Hue sensors (temperature, motion, and light level)."
 }
