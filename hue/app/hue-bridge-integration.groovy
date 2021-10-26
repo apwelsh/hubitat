@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.1
+ * Version 1.4.2
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -127,12 +127,6 @@ def mainPage(Map params=[:]) {
         title='Find Bridge'
     }
 
-    app.removeSetting('selectedLights')
-    app.removeSetting('selectedGroups')
-    app.removeSetting('selectedGroup')
-    app.removeSetting('selectedScenes')
-    app.removeSetting('selectedSensors')
-    
     Boolean uninstall = bridgeHost ? false : true
 
     return dynamicPage(name: PAGE_MAINPAGE, title: '', nextPage: null, uninstall: uninstall, install: true) {
@@ -395,7 +389,7 @@ def addLights(Map params=[:]){
         title = "Failed to add ${subject}"
     }
 
-    return dynamicPage(name:PAGE_ADD_LIGHTS, title:title, nextPage:PAGE_MAINPAGE) {
+    return dynamicPage(name:PAGE_ADD_LIGHTS, title:title, nextPage:null) {
         section() {
             paragraph sectionText
         }
@@ -475,7 +469,7 @@ def addGroups(params){
         title = 'Failed to add Group'
     }
 
-    return dynamicPage(name:PAGE_ADD_GROUPS, title:title, nextPage:PAGE_MAINPAGE) {
+    return dynamicPage(name:PAGE_ADD_GROUPS, title:title, nextPage:null) {
         section() {
             paragraph sectionText
         }
@@ -483,7 +477,7 @@ def addGroups(params){
 
 }
 
-def scenesForGroupId(groupNetworkId) {
+Map scenesForGroupId(groupNetworkId) {
     def groupId = deviceIdNode(groupNetworkId)
     state.scenes?.findAll { it.value.type == 'GroupScene' && it.value.group == groupId }
 }
@@ -495,15 +489,15 @@ def findScenes(params){
     getInstalledGroups().each { groupOptions[deviceIdNode(it.deviceNetworkId)] = it.label }
 
     Map options = [:]
-    def scenes
+    Map scenes
     def group
-    def installed
-    def dnilist
+    List installed
+    List dnilist
     if (selectedGroup) {
         group = getChildDevice(networkIdForGroup(selectedGroup))
         if (group) {
-            installed = group.childDevices.collect { it.label }
-            dnilist = group.childDevices?.collect { it.deviceNetworkId }
+            installed = group.getChildDevices()?.collect { it.label }
+            dnilist = group.getChildDevices()?.collect { it.deviceNetworkId }
         }
         scenes = scenesForGroupId(selectedGroup)
     }
@@ -580,7 +574,7 @@ def addScenes(params){
         title = 'Failed to add Scene'
     }
 
-    return dynamicPage(name:PAGE_ADD_SCENES, title:title, nextPage:PAGE_MAINPAGE) {
+    return dynamicPage(name:PAGE_ADD_SCENES, title:title, nextPage:null) {
         section() {
             paragraph sectionText
         }
@@ -673,7 +667,7 @@ def addSensors(Map params=[:]){
         title = "Failed to add ${subject}"
     }
 
-    return dynamicPage(name:PAGE_ADD_SENSORS, title:title, nextPage:PAGE_MAINPAGE) {
+    return dynamicPage(name:PAGE_ADD_SENSORS, title:title, nextPage:null) {
         section() {
             paragraph sectionText
         }
