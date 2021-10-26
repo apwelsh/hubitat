@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.0
+ * Version 1.4.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -102,9 +102,12 @@ public void setBridgeHost(String host) {
 
 def mainPage(Map params=[:]) {
     if (app.installationState == 'INCOMPLETE') {
-        return dynamicPage(name: PAGE_MAINPAGE, title: 'Advanced Hue Bridge Integration', nextPage: null, uninstall: true, install: true) {
-            section {
-                paragraph 'Hit Done to to install the Hue Bridge Integration.\nRe-open to setup.'
+        return dynamicPage(name: PAGE_MAINPAGE, title: '', nextPage: null, uninstall: true, install: true) {
+            section (getFormat("title", "Advanced Hue Bridge")) {
+                paragraph getFormat("subtitle", "Installing new Hue Bridge Integration")
+                paragraph getFormat("line")
+                paragraph 'Click the Done button to install the Hue Bridge Integration.'
+                paragraph 'Re-open the app to setup your device'
             }
         }
     }
@@ -121,9 +124,15 @@ def mainPage(Map params=[:]) {
         discoveredHubs()[selectedDevice]
         title=discoveredHubs()[selectedDevice]
     } else {
-        title='Find Bridges'
+        title='Find Bridge'
     }
 
+    app.removeSetting('selectedLights')
+    app.removeSetting('selectedGroups')
+    app.removeSetting('selectedGroup')
+    app.removeSetting('selectedScenes')
+    app.removeSetting('selectedSensors')
+    
     Boolean uninstall = bridgeHost ? false : true
 
     return dynamicPage(name: PAGE_MAINPAGE, title: '', nextPage: null, uninstall: uninstall, install: true) {
@@ -134,8 +143,8 @@ def mainPage(Map params=[:]) {
 
         if (selectedDevice == null) {
             section('Setup'){
-                paragraph 'To begin, select Find Bridges to start searching for your Hue Bride.'
-                href PAGE_BRIDGE_DISCOVERY, title:'Find Bridges', description:''//, params: [pbutton: i]
+                paragraph 'To begin, select Find Bridge to start searching for your Hue Bride.'
+                href PAGE_BRIDGE_DISCOVERY, title:'Find Bridge', description:''//, params: [pbutton: i]
             }
         } else {
             section('Configure'){
@@ -149,17 +158,24 @@ def mainPage(Map params=[:]) {
             section('Options') {
                 input name: 'logEnable', type: 'bool', defaultValue: true,  title: 'Enable informational logging'
                 input name: 'debug',     type: 'bool', defaultValue: false, title: 'Enable debug logging'
+                input name: 'logNew',    type: 'bool', defaultValue: false, title: 'Enable detection, and logging of new device types'
                 href PAGE_UNLINK, title: 'Unlink hub', description:'Use this to unlink your hub and force a new hub link'
             }
             section() {
                 paragraph getFormat("line")
-                paragraph "<div style='color:#1A77C9;text-align:center'>Advanced Hue Bridge<br><a href='https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J' target='_blank'><img src='https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg' border='0' alt='PayPal Logo'></a><br><br>Please consider donating. This app took a lot of work to make.<br>If you find it valuable, I'd certainly appreciate it!</div>"
+                paragraph '''<div style='color:#1A77C9;text-align:center'>Advanced Hue Bridge
+                    |
+                    |<a href='https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J' target='_blank'><img src='https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg' border='0' alt='PayPal Logo'></a>
+                    |
+                    |Please consider donating. This app took a lot of work to make.
+                    |Any donations received will be used to purchase additional Hue products to further the development of new device support
+                    |</div>'''.stripMargin()
             }      
         }
     }
 }
 
-def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code 
+def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code
 	if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
 	if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
 	if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"

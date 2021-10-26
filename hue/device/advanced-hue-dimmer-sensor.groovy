@@ -46,6 +46,7 @@ metadata {
         capability 'PushableButton'
         capability 'HoldableButton'
         capability 'ReleasableButton'
+        capability 'Refresh'
     }
 }
 
