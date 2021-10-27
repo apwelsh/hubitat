@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.2
+ * Version 1.4.3
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -151,8 +151,8 @@ def mainPage(Map params=[:]) {
             }
             section('Options') {
                 input name: 'logEnable', type: 'bool', defaultValue: true,  title: 'Enable informational logging'
-                input name: 'debug',     type: 'bool', defaultValue: false, title: 'Enable debug logging'
-                input name: 'logNew',    type: 'bool', defaultValue: false, title: 'Enable detection, and logging of new device types'
+                input name: 'dbgEnable', type: 'bool', defaultValue: false, title: 'Enable debug logging'
+                input name: 'newEnable', type: 'bool', defaultValue: false, title: 'Enable detection, and logging of new device types'
                 href PAGE_UNLINK, title: 'Unlink hub', description:'Use this to unlink your hub and force a new hub link'
             }
             section() {
@@ -679,7 +679,7 @@ def addSensors(Map params=[:]){
 
 def installed() {
     app.updateSetting('logEnable', true)
-    app.updateSetting('debug', false)
+    app.updateSetting('dbgEnable', false)
     ssdpSubscribe()
     ssdpDiscover()
 }
@@ -692,6 +692,10 @@ def uninstalled() {
 }
 
 def updated() {
+    if (debug)  { app.updateSetting('dbgEnable', debug) }
+    if (logNew) { app.updateSetting('newEnable', logNew) }
+    app.removeSetting('debug')
+    app.removeSetting('logNew')
     unsubscribe()
     unschedule()
     initialize()
@@ -877,7 +881,7 @@ private enumerateGroups() {
         if (!response.isSuccess()) { return }
 
         def data = response.data
-        if (debug) { log.debug "enumerateGroups: ${data}" }
+        if (dbgEnable) { log.debug "enumerateGroups: ${data}" }
         if (data) {
             if (data.error?.description) {
                 if (logEnable) { log.error "${data.error.description[0]}" }
@@ -1003,8 +1007,8 @@ void setDeviceState(def child, Map deviceState) {
     hub.resetRefreshSchedule()
 
     String url = "${apiUrl}/${type}/${node}/${action}"
-    if (debug) { log.debug "URL: ${url}" }
-    if (debug) { log.debug "args: ${deviceState}" }
+    if (dbgEnable) { log.debug "URL: ${url}" }
+    if (dbgEnable) { log.debug "args: ${deviceState}" }
     httpPut([uri: url,
              contentType: 'application/json',
              ignoreSSLIssues: true, 
@@ -1015,7 +1019,7 @@ void setDeviceState(def child, Map deviceState) {
 
         response.data?.each { item ->
             if (item.error?.description) {
-                if (debug) { log.error "set state: ${item.error.description[0]}" }
+                if (dbgEnable) { log.error "set state: ${item.error.description[0]}" }
 
             }
             item.success?.each { key, value ->
@@ -1059,7 +1063,7 @@ void getDeviceState(def child) {
         node = deviceIdNode(deviceNetworkId)
     }
     String url = "${apiUrl}/${type}/${node}"
-    if (debug) { log.debug "URL: ${url}" }
+    if (dbgEnable) { log.debug "URL: ${url}" }
     httpGet([uri: url,
              contentType: 'application/json',
              ignoreSSLIssues: true, 
@@ -1069,7 +1073,7 @@ void getDeviceState(def child) {
 
         def data = response.data
         if (data) {
-            if (debug) { log.debug "getDeviceState received data: ${data}" }  // temporary until lights are added, and all groups/all lights
+            if (dbgEnable) { log.debug "getDeviceState received data: ${data}" }  // temporary until lights are added, and all groups/all lights
             if ( data.error ) {
                 if (logEnable) { log.error "${it.error.description[0]}" }
                 return
@@ -1086,7 +1090,7 @@ void getDeviceState(def child) {
                 }
                 setHueProperty(child, [state: data.state, action: data.action])
             } else {
-                if (debug) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
+                if (dbgEnable) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
             }
         }
 
@@ -1270,7 +1274,7 @@ void parseGroups(json) {
         // Add code to update all installed groups state
         def group = getChildDevice(networkIdForGroup(id))
         if (group) {
-            if (debug) { log.debug "Parsing response: $data for $id" }
+            if (dbgEnable) { log.debug "Parsing response: $data for $id" }
             group.resetRefreshSchedule()
             if (data.state?.all_on || data.state?.any_on) data.state.remove('on')
             if (data.state?.all_on || data.state?.any_on) data.action.remove('on')
@@ -1284,7 +1288,7 @@ void parseLights(json) {
         // Add code to update all installed lights state
         def light = getChildDevice(networkIdForLight(id))
         if (light) {
-            if (debug) { log.debug "Parsing response: $data for $id" }
+            if (dbgEnable) { log.debug "Parsing response: $data for $id" }
             light.unschedule()
             setHueProperty(light, [state: data.state, action: data.action])
         }
@@ -1293,7 +1297,7 @@ void parseLights(json) {
 
 void parseScenes(json) {
     //json.each { id, value ->
-    //    if (debug) { log.debug "${id}" }
+    //    if (dbgEnable) { log.debug "${id}" }
     //}
 }
 
@@ -1302,7 +1306,7 @@ void parseSensors(json) {
         // Add code to update all installed groups state
         def sensor = getChildDevice(networkIdForSensor(id))
         if (sensor) {
-            if (debug) { log.debug "Parsing response: $data for $id" } 
+            if (dbgEnable) { log.debug "Parsing response: $data for $id" } 
             setHueProperty(sensor, [state: data.state, action: data.action])
         }
     }

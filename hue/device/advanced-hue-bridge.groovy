@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge 
- * Version 1.3.8
+ * Version 1.3.9
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -118,6 +118,7 @@ def updated() {
 
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
     runIn(1, connect)
+    log.info "Parent logging enable? ${parent.newEnable}"
 }
 
 void connect() {
@@ -149,78 +150,108 @@ void parse(String text) {
     }
 
     def (String type, String message) = text.split(':', 2)
-    try {
+    //try {
         
         if (type == 'id') {
                 if (this[SETTING_DBG_ENABLE]) { log.debug "Received message with ID ${message}" }
                 return
         }
         if (type == 'data') {
-            parseJson(message).data.each {
-                def event = it[0]
-                //if (this[SETTING_DBG_ENABLE]) { log.debug "Parsing event: ${event}"}
+            parseJson(message).each { event ->
+                if (this[SETTING_DBG_ENABLE]) { 
+                    log.debug "Parsing event: ${event}"
+                }
 
-                String eventId = (event.id_v1.split('/') as List).last()
+                def data = event.data[0]
+                String idV1 = (data.id_v1.split('/') as List).last()
+                String dataType = data.type
                 Map events = [state:[:], action:[:]]
                 switch (event.type) {
-                    case 'light':
-                        // log.info "Parsing event: ${event}"
-
-                        def light = parent.getChildDevice(parent.networkIdForLight(eventId))
-                        if (!light) { break }
-
-                        if (event.on)      { events.state << event.on }
-                        if (event.dimming) { events.state << event.dimming }
-                        if (event.color)   {
-                            events.state << [colormode: 'xy']
-                            events.state << [xy: [event.color.xy.x, event.color.xy.y]]
+                    case 'add':
+                        if (parent.newEnable) {
+                            log.warn "Discovered new device added to Hue hub of type: ${dataType}"
+                            log.debug "$event"
                         }
-                        if (event.color_temperature && event.color_temperature.mirek_valid == true) {
-                            events.state << [colormode: 'ct']
-                            events.state << event.color_temperature.find { k, v -> k == 'mirek' }
-                        }
-                        parent.setHueProperty(light, events)
-                        runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on affected groups
                         break
-
-                    case 'grouped_light':
-                        // log.info "Parsing event: ${event}"
-
-                        def group = parent.getChildDevice(parent.networkIdForGroup(eventId))
-                        if (!group) { break }
-
-                        if (event.on)      { events.action << event.on }
-                        if (event.dimming) { events.action << event.dimming }
-                        if (event.color)   {
-                            events.action << [colormode: 'xy']
-                            events.action << [xy: [event.color.xy.x, event.color.xy.y]]
-                        }
-                        if (event.color_temperature && event.color_temperature.mirek_valid == true) {
-                            events.action << [colormode: 'ct']
-                            events.action << event.color_temperature.find { k, v -> k == 'mirek' }
-                        }
-                        parent.setHueProperty(group, events)
-                        runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])  // temporary.  Need to add logic to force refresh on affected groups
+                    case 'delete':
+                        // if (parent.newEnable) {
+                        //     log.warn "Discovered a device was deleted from Hue hub of type: ${dataType}"
+                        //     log.debug "$event"
+                        // }
                         break
+                    case 'update':
 
-                    case 'motion':
-                    case 'temperature':
-                    case 'light_level':
-                    case 'device_power':
-                        //log.info "Parsing event: ${event}"
+                        switch (dataType) {
+                            case 'light':
+                                // log.info "Parsing event: ${event}"
 
-                        def sensor = parent.getChildDevice(parent.networkIdForSensor(eventId))
-                        if (!sensor) { break }
+                                def light = parent.getChildDevice(parent.networkIdForLight(idV1))
+                                if (!light) { break }
 
-                         if (event.motion?.motion_valid)           { events.state << [presence: event.motion.motion] }
-                         if (event.temperature?.temperature_valid) { events.state << [temperature: event.temperature.temperature * 100.0] }
-                         if (event.light?.light_level_valid)       { events.state << [lightlevel: event.light.light_level] }
-                         if (event.power_state)                    { events.state << [battery: event.power_state.battery_level]}
+                                if (data.on)      { events.state << data.on }
+                                if (data.dimming) { events.state << data.dimming }
+                                if (data.color)   {
+                                    events.state << [colormode: 'xy']
+                                    events.state << [xy: [data.color.xy.x, data.color.xy.y]]
+                                }
+                                if (data.color_temperature && data.color_temperature.mirek_valid == true) {
+                                    events.state << [colormode: 'ct']
+                                    events.state << data.color_temperature.find { k, v -> k == 'mirek' }
+                                }
+                                parent.setHueProperty(light, events)
+                                runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on affected groups
+                                break
 
-                        parent.setHueProperty(sensor, events)
-                        break
+                            case 'grouped_light':
+                                // log.info "Parsing event: ${event}"
 
-                    case 'zigbee_connectivity':
+                                def group = parent.getChildDevice(parent.networkIdForGroup(idV1))
+                                if (!group) { break }
+
+                                if (data.on)      { events.action << data.on }
+                                if (data.dimming) { events.action << data.dimming }
+                                if (data.color)   {
+                                    events.action << [colormode: 'xy']
+                                    events.action << [xy: [data.color.xy.x, data.color.xy.y]]
+                                }
+                                if (data.color_temperature && data.color_temperature.mirek_valid == true) {
+                                    events.action << [colormode: 'ct']
+                                    events.action << event.color_temperature.find { k, v -> k == 'mirek' }
+                                }
+                                parent.setHueProperty(group, events)
+                                runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])  // temporary.  Need to add logic to force refresh on affected groups
+                                break
+
+                            case 'motion':
+                            case 'temperature':
+                            case 'light_level':
+                            case 'device_power':
+                                //log.info "Parsing event: ${event}"
+
+                                def sensor = parent.getChildDevice(parent.networkIdForSensor(idV1))
+                                if (!sensor) { break }
+
+                                if (data.motion?.motion_valid)           { events.state << [presence:    data.motion.motion] }
+                                if (data.temperature?.temperature_valid) { events.state << [temperature: data.temperature.temperature * 100.0] }
+                                if (data.light?.light_level_valid)       { events.state << [lightlevel:  data.light.light_level] }
+                                if (data.power_state)                    { events.state << [battery:     data.power_state.battery_level]}
+
+                                parent.setHueProperty(sensor, events)
+                                break
+
+                            case 'button':
+                                // log.info 'Unhandled button event'
+                                break
+
+                            case 'zigbee_connectivity':
+                                break
+
+                            default:
+                                if (this[SETTING_DBG_ENABLE]) {
+                                    log.warn "Unhandeled event data type: ${dataType}"
+                                    log.debug "$event"
+                                }
+                        }
                         break
 
                     default:
@@ -228,17 +259,18 @@ void parse(String text) {
                             log.warn "Unhandeled event type: ${event.type}"
                             log.debug "$event"
                         }
-                    }
+                }
+
                 }
             return
         }
 
         if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled message: ${text}" }
 
-    } catch (ex) {
-        log.error(ex)
-        log.info text
-    }
+    // } catch (ex) {
+    //     log.error(ex)
+    //     log.info text
+    // }
 }
 
 void eventStreamStatus(String message) {
@@ -247,12 +279,12 @@ void eventStreamStatus(String message) {
         parent.getVolatileAtomicState(this).WebSocketSubscribed = false
         resetRefreshSchedule()
         sendEvent(name: 'networkStatus', value: 'offline')
-        if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream disconnected' }
+        if (this[SETTING_DBG_ENABLE]) { log.info 'Event Stream disconnected' }
     } else if (message ==~ /START:.*/) {
         parent.getVolatileAtomicState(this).WebSocketSubscribed = true
         sendEvent(name: 'networkStatus', value: 'online')
         unschedule(refresh)
-        if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream connected' }
+        if (this[SETTING_DBG_ENABLE]) { log.info 'Event Stream connected' }
     } else {
         if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled Event Stream status message: ${message}" }
     }
