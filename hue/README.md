@@ -6,7 +6,9 @@ This application and associated drivers are now ready for general use.  A beta b
 
 Hue Play systems, like the Hue Sync are not yet supported, as I do not own one to test with.
 
-The functionality is very limited at this time, but I believe this system already provides more features and better performance than the built-in Hue integration.
+The functionality is mostly complete at this time.  I believe this system already provides more features and better performance than the built-in Hue integration, but that is an opion, not a measured fact.
+
+This integration fully supports hue push notifaction events, so that sensors can be leveraged in near-realtime, and lights are updated in near-realtime with no need to require a scheduled refresh of the Hue system.
 
 
 ## Features
@@ -19,7 +21,7 @@ The functionality is very limited at this time, but I believe this system alread
    - Used to schedule the hub refresh event.
    - Supports `Switch` capability to turn on/off all Hue lights.
    - Can be configured to automatically turn on if Any light is on, or if All ligts are on.
- - [Advance Hue Group Device](device/advanced-hue-group.groovy)
+ - [Advanced Hue Group Device](device/advanced-hue-group.groovy)
    - All imported Hue Groups will use this device to manage the group.  This device depends on the parent app to operate. The initial version of this device supports all color light control capabilities, and the ability to activate any hue scene by scene ID or scene name (as identified in the hue bridge).
    - Can define a default scene to activate when the group is turned on.
  - Hue Lights Device `Generic Hubitat Device`
@@ -34,7 +36,20 @@ The functionality is very limited at this time, but I believe this system alread
    - Can be configured as a momentary (trigger) switch, or as a toggle switch.
      - Trigger (momentary) mode.  When turned on, scene will be activated and will automatically turn off the switch after 400 milliseconds.
      - Switch mode.  Turning on a scene will result in the scene switch staying on, until *any* attribute of the group or bublbs within the group are changed, or until another scene is activated.  Turning off the active scene will turn off the parent Hue group.
-
+ - [Advanced Hue Motion Sensor Device](device/advanced-hue-motion-sensor.groovy)
+   - Support for Motion Sensor
+   - Support for Battery level
+   - Support for Refresh
+ - [Advanced Hue Light Sensor Device](device/advanced-hue-light-sensor.groovy)
+   - Support for IlluminanceMeasurement
+   - Support for Battery level
+   - Support for Refresh
+ - [Advanced Hue Temperature Sensor Device](device/advanced-hue-temperature-sensor.groovy)
+   - Support for TemperatureMeasurement
+   - Support for Battery level
+   - Support for Refresh
+ 
+   
 
 ## Vision / Future Enhancements
 The goal of this project is to more tightly integrate the hue system with Hubitat.  
