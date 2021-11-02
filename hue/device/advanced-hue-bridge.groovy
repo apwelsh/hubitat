@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge 
- * Version 1.3.9
+ * Version 1.3.10
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -150,7 +150,7 @@ void parse(String text) {
     }
 
     def (String type, String message) = text.split(':', 2)
-    //try {
+    try {
         
         if (type == 'id') {
                 if (this[SETTING_DBG_ENABLE]) { log.debug "Received message with ID ${message}" }
@@ -188,16 +188,8 @@ void parse(String text) {
                                 def light = parent.getChildDevice(parent.networkIdForLight(idV1))
                                 if (!light) { break }
 
-                                if (data.on)      { events.state << data.on }
-                                if (data.dimming) { events.state << data.dimming }
-                                if (data.color)   {
-                                    events.state << [colormode: 'xy']
-                                    events.state << [xy: [data.color.xy.x, data.color.xy.y]]
-                                }
-                                if (data.color_temperature && data.color_temperature.mirek_valid == true) {
-                                    events.state << [colormode: 'ct']
-                                    events.state << data.color_temperature.find { k, v -> k == 'mirek' }
-                                }
+                                events.state << mapEventState(data)
+
                                 parent.setHueProperty(light, events)
                                 runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on affected groups
                                 break
@@ -207,17 +199,9 @@ void parse(String text) {
 
                                 def group = parent.getChildDevice(parent.networkIdForGroup(idV1))
                                 if (!group) { break }
+                                
+                                events.action << mapEventState(data)
 
-                                if (data.on)      { events.action << data.on }
-                                if (data.dimming) { events.action << data.dimming }
-                                if (data.color)   {
-                                    events.action << [colormode: 'xy']
-                                    events.action << [xy: [data.color.xy.x, data.color.xy.y]]
-                                }
-                                if (data.color_temperature && data.color_temperature.mirek_valid == true) {
-                                    events.action << [colormode: 'ct']
-                                    events.action << event.color_temperature.find { k, v -> k == 'mirek' }
-                                }
                                 parent.setHueProperty(group, events)
                                 runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])  // temporary.  Need to add logic to force refresh on affected groups
                                 break
@@ -231,10 +215,7 @@ void parse(String text) {
                                 def sensor = parent.getChildDevice(parent.networkIdForSensor(idV1))
                                 if (!sensor) { break }
 
-                                if (data.motion?.motion_valid)           { events.state << [presence:    data.motion.motion] }
-                                if (data.temperature?.temperature_valid) { events.state << [temperature: data.temperature.temperature * 100.0] }
-                                if (data.light?.light_level_valid)       { events.state << [lightlevel:  data.light.light_level] }
-                                if (data.power_state)                    { events.state << [battery:     data.power_state.battery_level]}
+                                events.state << mapEventState(data)
 
                                 parent.setHueProperty(sensor, events)
                                 break
@@ -267,10 +248,32 @@ void parse(String text) {
 
         if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled message: ${text}" }
 
-    // } catch (ex) {
-    //     log.error(ex)
-    //     log.info text
-    // }
+    } catch (ex) {
+        log.error(ex)
+        log.info text
+    }
+}
+
+private Map mapEventState(data) {
+
+    Map result = [:]
+    if (data.on)      { result << data.on }
+    if (data.dimming) { result << data.dimming }
+    if (data.color)   {
+        result << [colormode: 'xy']
+        result << [xy: [data.color.xy.x, data.color.xy.y]]
+    }
+    if (data.color_temperature && data.color_temperature.mirek_valid == true) {
+        result << [colormode: 'ct']
+        result << data.color_temperature.find { k, v -> k == 'mirek' }
+    }
+
+    if (data.motion?.motion_valid)           { result << [presence:    data.motion.motion] }
+    if (data.temperature?.temperature_valid) { result << [temperature: data.temperature.temperature * 100.0] }
+    if (data.light?.light_level_valid)       { result << [lightlevel:  data.light.light_level] }
+    if (data.power_state)                    { result << [battery:     data.power_state.battery_level]}
+
+    return result
 }
 
 void eventStreamStatus(String message) {

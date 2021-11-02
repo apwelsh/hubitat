@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.3
+ * Version 1.4.5
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -56,6 +56,7 @@ definition(
 @Field static final String PAGE_ADD_SENSORS = 'addSensors'
 
 @Field static Map volatileAtomicStateByDeviceId = new ConcurrentHashMap()
+@Field static Map eventQueue = null
 
 preferences {
     page(name: PAGE_MAINPAGE)
@@ -150,9 +151,10 @@ def mainPage(Map params=[:]) {
                 href selectedDevice ? PAGE_BRIDGE_LINKING : PAGE_BRIDGE_DISCOVERY, title:title, description:'', state:selectedDevice? 'complete' : null //, params: [nextPage: PAGE_BRIDGE_LINKING]
             }
             section('Options') {
-                input name: 'logEnable', type: 'bool', defaultValue: true,  title: 'Enable informational logging'
-                input name: 'dbgEnable', type: 'bool', defaultValue: false, title: 'Enable debug logging'
-                input name: 'newEnable', type: 'bool', defaultValue: false, title: 'Enable detection, and logging of new device types'
+                input name: 'logEnable',  type: 'bool', defaultValue: true,  title: 'Enable informational logging'
+                input name: 'dbgEnable',  type: 'bool', defaultValue: false, title: 'Enable debug logging'
+                input name: 'newEnable',  type: 'bool', defaultValue: false, title: 'Enable detection, and logging of new device types'
+                input name: 'autorename', type: 'bool', defaultValue: false, title: 'Automatically track, and rename installed devices to match Hue defined names'
                 href PAGE_UNLINK, title: 'Unlink hub', description:'Use this to unlink your hub and force a new hub link'
             }
             section() {
@@ -170,9 +172,9 @@ def mainPage(Map params=[:]) {
 }
 
 def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code
-	if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
-	if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
-	if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"
+    if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
+    if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
+    if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"
 }
 
 @Field static final Integer DEVICE_REFRESH_DICOVER_INTERVAL = 3
@@ -692,10 +694,10 @@ def uninstalled() {
 }
 
 def updated() {
-    if (debug)  { app.updateSetting('dbgEnable', debug) }
-    if (logNew) { app.updateSetting('newEnable', logNew) }
-    app.removeSetting('debug')
-    app.removeSetting('logNew')
+    if (debug)  { app.updateSetting('dbgEnable', debug) }  // temporary cleanup code
+    if (logNew) { app.updateSetting('newEnable', logNew) } // temporary cleanup code
+    app.removeSetting('debug')  // temporary cleanup code
+    app.removeSetting('logNew') // temporary cleanup code
     unsubscribe()
     unschedule()
     initialize()
@@ -870,6 +872,34 @@ void refreshHubStatus() {
     }
 }
 
+private renameInstalledDevices(data) {
+    if (!autorename) { return }
+    data.each { key, value ->
+        String nid = ''
+        if (state.groups[key]) {
+            nid = networkIdForGroup(key)
+        } else if (state.sensors[key]) {
+            nid = networkIdForSensor(key)
+        } else if (state.scenes[key]) {
+            nid = networkIdForScene(key)
+        } else if (state.lights[key]) {
+            nid = networkIdForLight(key)
+        } else {
+            return
+        }
+
+        def child = getChildDevice(nid)
+        if (!child) { return }
+
+        if (child.label != value.name) {
+            child.label = value.name
+        }
+        if (child.name != value.productname && value.productname) {
+            child.name = value.productname
+        }
+    }
+}
+
 private enumerateGroups() {
 
     def url = "${apiUrl}/groups"
@@ -886,7 +916,10 @@ private enumerateGroups() {
             if (data.error?.description) {
                 if (logEnable) { log.error "${data.error.description[0]}" }
             } else {
-                if (data) { state.groups = data }
+                if (data) { 
+                    state.groups = data
+                    renameInstalledDevices(state.groups)
+                 }
                 parseGroups(data)
             }
         }
@@ -910,7 +943,10 @@ private enumerateLights() {
             if (data.error?.description) {
                 if (logEnable) { log.error "${data.error.description[0]}" }
             } else {
-                if (data) { state.lights = data }
+                if (data) {
+                    state.lights = data
+                    renameInstalledDevices(state.lights)
+                }
                 parseLights(data)
             }
         }
@@ -923,7 +959,7 @@ private enumerateScenes() {
 
     httpGet([uri: url,
              contentType: 'application/json',
-             ignoreSSLIssues: true, 
+             ignoreSSLIssues: true,
              requestContentType: 'application/json']) { response ->
         if (!response.isSuccess()) { return }
 
@@ -932,7 +968,10 @@ private enumerateScenes() {
             if (data.error?.description) {
                 if (logEnable) { log.error "${data.error.description[0]}" }
             } else {
-                if (data) { state.scenes = data }
+                if (data) { 
+                    state.scenes = data
+                    renameInstalledDevices(state.scenes)
+                }
                 parseScenes(data)
             }
         }
@@ -947,7 +986,7 @@ private enumerateSensors() {
 
     httpGet([uri: url,
              contentType: 'application/json',
-             ignoreSSLIssues: true, 
+             ignoreSSLIssues: true,
              requestContentType: 'application/json']) { response ->
         if (!response.isSuccess()) { return }
 
@@ -956,14 +995,39 @@ private enumerateSensors() {
             if (data.error?.description) {
                 if (logEnable) { log.error "${data.error.description[0]}" }
             } else {
-                if (data) { state.sensors = data }
+                if (data) {
+                    state.sensors = fixupSensorNames(data)
+                    renameInstalledDevices(state.sensors)
+                }
+                
                 parseSensors(data)
             }
         }
     }
 }
 
-@Field static Map eventQueue = null
+private fixupSensorNames(data) {
+    Map uniqueids = data.findAll { key, value -> value.uniqueid ==~ /^(\p{XDigit}{2}:){7}\p{XDigit}{2}.*/ && !value.name.startsWith(value.productname)}
+                        .sort { a, b -> (a.key as int) <=> (b.key as int) }
+                        .collectEntries { entry ->
+                            String mac = uniqueIdMAC(entry.value.uniqueid)
+                            [(mac): entry.value.name.replaceFirst(/(?i: \w+ sensor)$/, '')]
+                        }
+    data.each { key, value ->
+        if (value.uniqueid?.size() >= 23) {
+            String mac = uniqueIdMAC(value.uniqueid)
+            if (uniqueids[mac]) {
+                String suffix = value.productname.replaceFirst(/^.* (?i:)(\S+ sensor)$/, /$1/)
+                if (suffix) { value.name = "${uniqueids[mac]} ${suffix}" }
+            }
+        }
+    }
+    return data
+}
+
+private String uniqueIdMAC(String uniqueid) {
+    uniqueid.replaceFirst(/^(.{23}).*/, /$1/)
+}
 
 void setDeviceState(def child, Map deviceState) {
 
@@ -1111,6 +1175,10 @@ public String networkIdForGroup(id) {
 public String networkIdForLight(id) {
     String type=bulbTypeForLight(id)
     "hueBulb${type}:${app.getId()}/${id}"
+}
+public networkIdForScene(sceneId) {
+    String groupId = state.scenes[sceneId]?.group
+    "hueScene:${app.getId()}/${groupId}/${sceneId}"
 }
 public networkIdForScene(groupId,sceneId) {
     "hueScene:${app.getId()}/${groupId}/${sceneId}"
