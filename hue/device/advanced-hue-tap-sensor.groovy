@@ -1,6 +1,6 @@
 /**
- * Advanced Hue Light Sensor 
- * Version 1.0.1
+ * Advanced Hue Tap Sensor 
+ * Version 1.0.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -33,15 +33,17 @@ import groovy.transform.Field
 @Field static final String SETTING_LOG_ENABLE        = 'logEnable'
 @Field static final String SETTING_DBG_ENABLE        = 'debug'
 
+@Field static final Map SCHEDULE_NON_PERSIST = [overwrite: true, misfire:'ignore']
+
 metadata {
     definition (
-        name:      'AdvancedHueLightSensor',
+        name:      'AdvancedHueTapSensor',
         namespace: 'apwelsh',
         author:    'Armand Welsh',
-        importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-light-sensor.groovy') {
+        importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-tap-sensor.groovy') {
 
-        capability 'Battery'
-        capability 'IlluminanceMeasurement'
+        // capability 'Battery'
+        capability 'PushableButton'
         capability 'Refresh'
 
         attribute  'status', 'string'  // expect enabled/disabled
@@ -82,7 +84,6 @@ def updated() {
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
 }
 
-
 /*
  * Device Capability Interface Functions
  */
@@ -94,9 +95,9 @@ void refresh() {
 }
 
 void setHueProperty(Map args) {
-    if (args.name == 'Illuminance') {
-        parent.sendChildEvent(this, [name: 'Illuminance', value: value ? 'on' : 'off'])
-    }
+    // if (args.name == 'Illuminance') {
+    //     parent.sendChildEvent(this, [name: 'Illuminance', value: value ? 'on' : 'off'])
+    // }
 }
 
 

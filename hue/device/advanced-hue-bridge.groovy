@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge 
- * Version 1.3.10
+ * Version 1.3.11
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -118,7 +118,6 @@ def updated() {
 
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
     runIn(1, connect)
-    log.info "Parent logging enable? ${parent.newEnable}"
 }
 
 void connect() {
@@ -135,6 +134,7 @@ void connect() {
     interfaces.eventStream.connect(url, [
         ignoreSSLIssues: true,
         rawData: true,
+        pingInterval: 5,
         readTimeout: 3600,
         'headers': headers])
 }
@@ -142,6 +142,24 @@ void connect() {
 void disconnect() {
     interfaces.eventStream.close()
     parent.getVolatileAtomicState(this).WebSocketSubscribed = false
+}
+
+void eventStreamStatus(String message) {
+    // log.trace "${message}"
+
+    if (message.startsWith('STOP:')) {
+        parent.getVolatileAtomicState(this).WebSocketSubscribed = false
+        resetRefreshSchedule()
+        sendEvent(name: 'networkStatus', value: 'offline')
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream disconnected' }
+    } else if (message.startsWith('START:')) {
+        parent.getVolatileAtomicState(this).WebSocketSubscribed = true
+        sendEvent(name: 'networkStatus', value: 'online')
+        unschedule(refresh)
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream connected' }
+    } else {
+        if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled Event Stream status message: ${message}" }
+    }
 }
 
 void parse(String text) {
@@ -165,7 +183,7 @@ void parse(String text) {
                 def data = event.data[0]
                 String idV1 = (data.id_v1.split('/') as List).last()
                 String dataType = data.type
-                Map events = [state:[:], action:[:]]
+                Map events = [state:[:], action:[:], config:[:]]
                 switch (event.type) {
                     case 'add':
                         if (parent.newEnable) {
@@ -189,6 +207,8 @@ void parse(String text) {
                                 if (!light) { break }
 
                                 events.state << mapEventState(data)
+                                events.config << events.state.config
+                                events.state.remove('config')
 
                                 parent.setHueProperty(light, events)
                                 runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on affected groups
@@ -201,6 +221,8 @@ void parse(String text) {
                                 if (!group) { break }
                                 
                                 events.action << mapEventState(data)
+                                events.config << events.action.config
+                                events.action.remove('config')
 
                                 parent.setHueProperty(group, events)
                                 runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])  // temporary.  Need to add logic to force refresh on affected groups
@@ -216,6 +238,8 @@ void parse(String text) {
                                 if (!sensor) { break }
 
                                 events.state << mapEventState(data)
+                                events.config << events.state.config
+                                events.state.remove('config')
 
                                 parent.setHueProperty(sensor, events)
                                 break
@@ -256,7 +280,7 @@ void parse(String text) {
 
 private Map mapEventState(data) {
 
-    Map result = [:]
+    Map result = [config:[:]]
     if (data.on)      { result << data.on }
     if (data.dimming) { result << data.dimming }
     if (data.color)   {
@@ -271,26 +295,12 @@ private Map mapEventState(data) {
     if (data.motion?.motion_valid)           { result << [presence:    data.motion.motion] }
     if (data.temperature?.temperature_valid) { result << [temperature: data.temperature.temperature * 100.0] }
     if (data.light?.light_level_valid)       { result << [lightlevel:  data.light.light_level] }
-    if (data.power_state)                    { result << [battery:     data.power_state.battery_level]}
 
+    // device health attributes
+    if (data.power_state)                    { result.config << [battery:   data.power_state.battery_level] }
+    if (data.enabled != null)                { result.config << [on:        data.enabled] }
+    if (data.status != null)                 { result.config << [reachable: data.status == 'connected'] }
     return result
-}
-
-void eventStreamStatus(String message) {
-    // log.trace message
-    if (message ==~ /STOP:.*/) {
-        parent.getVolatileAtomicState(this).WebSocketSubscribed = false
-        resetRefreshSchedule()
-        sendEvent(name: 'networkStatus', value: 'offline')
-        if (this[SETTING_DBG_ENABLE]) { log.info 'Event Stream disconnected' }
-    } else if (message ==~ /START:.*/) {
-        parent.getVolatileAtomicState(this).WebSocketSubscribed = true
-        sendEvent(name: 'networkStatus', value: 'online')
-        unschedule(refresh)
-        if (this[SETTING_DBG_ENABLE]) { log.info 'Event Stream connected' }
-    } else {
-        if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled Event Stream status message: ${message}" }
-    }
 }
 
 

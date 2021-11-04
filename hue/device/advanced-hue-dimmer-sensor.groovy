@@ -47,7 +47,10 @@ metadata {
         capability 'HoldableButton'
         capability 'ReleasableButton'
         capability 'Refresh'
-    }
+ 
+        attribute  'status', 'string'  // expect enabled/disabled
+        attribute  'health', 'string'  // reachable/unreachable
+   }
 }
 
 preferences {
@@ -64,6 +67,11 @@ preferences {
 
 }
 
+void updateSetting(String name, Object value) {
+    device.updateSetting(name, value)
+    this[name] = value
+}
+
 /**
  * Hubitat DTH Lifecycle Functions
  **/
@@ -72,15 +80,13 @@ def installed() {
     updated()
 }
 
-void updateSetting(String name, Object value) {
-    device.updateSetting(name, value)
-    this[name] = value
-}
-
 def updated() {
     if (this[SETTING_LOG_ENABLE] == null) { updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE) }
     if (this[SETTING_DBG_ENABLE] == null) { updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE) }
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
+
+    String id = parent.deviceIdNode(device.deviceNetworkId)
+    log.info "${this} = ${id}; ${device.id}"
 }
 
 /*
@@ -94,9 +100,9 @@ void refresh() {
 }
 
 void setHueProperty(Map args) {
-    if (args.name == 'Illuminance') {
-        parent.sendChildEvent(this, [name: 'Illuminance', value: value ? 'on' : 'off'])
-    }
+    // if (args.name == 'Illuminance') {
+    //     parent.sendChildEvent(this, [name: 'Illuminance', value: value ? 'on' : 'off'])
+    // }
 }
 
 

@@ -1,5 +1,5 @@
 /**
- * AdvancedHueGroup
+ * AdvancedHueGroup v1.5.7
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device for the Advanced Hue Bridge Integeration app.  This device is used to manage hue zones and rooms

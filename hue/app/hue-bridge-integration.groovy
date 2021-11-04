@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.5
+ * Version 1.4.6
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -337,9 +337,14 @@ def findLights(){
     return dynamicPage(name:PAGE_FIND_LIGHTS, title:'Light Discovery Started!', nextPage:nextPage, refreshInterval:refreshInterval) {
         section('Let\'s find some lights.') {
             input 'selectedLights', 'enum', required:false, title:"Select additional lights to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-            if (!installed.isEmpty()) {
-                paragraph 'Previously added Hue Lights'
-                paragraph "[${installedLights.join(', ')}]"
+        }
+        if (selectedLights) {
+            section {
+                paragraph "Click the Next button to add the selected light${selectedLights.size() > 1 ? 's' : ''} to your Hubitat hub."
+            }
+        } else if (installed) {
+                section('Installed lights') {
+                installedLights.each { child -> buttonLink child }
             }
         }
     }
@@ -423,9 +428,14 @@ def findGroups(params){
     return dynamicPage(name:PAGE_FIND_GROUPS, title:'Group Discovery Started!', nextPage:nextPage, refreshInterval:refreshInterval) {
         section('Let\'s find some groups.') {
             input 'selectedGroups', 'enum', required:false, title:"Select additional rooms / zones to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-            if (!installed.isEmpty()) {
-                paragraph 'Previously added Hue Groups'
-                paragraph "[${installed.join(', ')}]"
+        }
+        if (selectedGroups) {
+            section {
+                paragraph "Click the Next button to add the selected group${selectedGroups.size() > 1 ? 's' : ''} to your Hubitat hub."
+            }
+        } else if (installed) {
+                section('Installed groups') {
+                installedGroups.each { child -> buttonLink child }
             }
         }
     }
@@ -523,10 +533,15 @@ def findScenes(params){
             input 'selectedGroup',  'enum', required:true,  title:"Select the group to add scenes to (${groupOptions.size()} installed)", multiple:false, options:groupOptions, submitOnChange: true
             if (selectedGroup) {
                 input 'selectedScenes', 'enum', required:false, title:"Select additional scenes to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-                if (installed && !installed.isEmpty()) {
-                    paragraph "Previously added Hue Scenes for ${group.label}"
-                    paragraph "[${installed.join(', ')}]"
-                }
+            }
+        }
+        if (selectedScenes) {
+            section {
+                paragraph "Click the Next button to add the selected Scene${selectedScenes.size() > 1 ? 's' : ''} to your Hubitat hub."
+            }
+        } else if (installed && selectedGroup) {
+                section('Installed scenes') {
+                group.getChildDevices().each { child -> buttonLink child }
             }
         }
     }
@@ -609,13 +624,26 @@ def findSensors(){
     return dynamicPage(name:PAGE_FIND_SENSORS, title:'Sensor Discovery Started!', nextPage:nextPage, refreshInterval:refreshInterval) {
         section('Let\'s find some sensors.') {
             input 'selectedSensors', 'enum', required:false, title:"Select additional sensors to add (${numFound} available)", multiple:true, options:options, submitOnChange: true
-            if (!installed.isEmpty()) {
-                paragraph 'Previously added Hue Sensors'
-                paragraph "[${installedSensors.join(', ')}]"
+        }
+        if (selectedSensors) {
+            section {
+                paragraph "Click the Next button to add the selected sensor${selectedSensors.size() > 1 ? 's' : ''} to your Hubitat hub."
+            }
+        } else if (!installed.isEmpty()) {
+                section('Installed sensors') {
+                installedSensors.each { child -> buttonLink child }
             }
         }
     }
 
+}
+
+private buttonLink(child) {
+    Map map = stateForNetworkId(child.device.deviceNetworkId)
+    Boolean ena = map?.config?.on ?: map?.state?.reachable
+    paragraph """<button type="button" class="btn btn-default btn-lg btn-block hrefElem ${ena ? 'btn-state-complete' : '' } mdl-button--raised mdl-shadow--2dp" style="text-align:left;width:100%" onclick="window.location.href='/device/edit/${child.device.id}'">
+                    <span style="text-align:left;white-space:pre-wrap">${child.label} (${child.name})</span>
+                </button>"""
 }
 
 def addSensors(Map params=[:]){
@@ -872,20 +900,21 @@ void refreshHubStatus() {
     }
 }
 
-private renameInstalledDevices(data) {
+private renameInstalledDevices(type, data) {
     if (!autorename) { return }
     data.each { key, value ->
         String nid = ''
-        if (state.groups[key]) {
-            nid = networkIdForGroup(key)
-        } else if (state.sensors[key]) {
-            nid = networkIdForSensor(key)
-        } else if (state.scenes[key]) {
-            nid = networkIdForScene(key)
-        } else if (state.lights[key]) {
-            nid = networkIdForLight(key)
-        } else {
-            return
+        switch (type) {
+            case 'groups':
+                nid = networkIdForGroup(key);  break
+            case 'sensors':
+                nid = networkIdForSensor(key); break
+            case 'scenes':
+                nid = networkIdForScene(key);  break
+            case 'lights':
+                nid = networkIdForLight(key);  break
+            default:
+                return
         }
 
         def child = getChildDevice(nid)
@@ -918,7 +947,7 @@ private enumerateGroups() {
             } else {
                 if (data) { 
                     state.groups = data
-                    renameInstalledDevices(state.groups)
+                    renameInstalledDevices('groups', state.groups)
                  }
                 parseGroups(data)
             }
@@ -945,7 +974,7 @@ private enumerateLights() {
             } else {
                 if (data) {
                     state.lights = data
-                    renameInstalledDevices(state.lights)
+                    renameInstalledDevices('lights', state.lights)
                 }
                 parseLights(data)
             }
@@ -970,7 +999,7 @@ private enumerateScenes() {
             } else {
                 if (data) { 
                     state.scenes = data
-                    renameInstalledDevices(state.scenes)
+                    renameInstalledDevices(scenes, state.scenes)
                 }
                 parseScenes(data)
             }
@@ -997,7 +1026,7 @@ private enumerateSensors() {
             } else {
                 if (data) {
                     state.sensors = fixupSensorNames(data)
-                    renameInstalledDevices(state.sensors)
+                    renameInstalledDevices(sensors, state.sensors)
                 }
                 
                 parseSensors(data)
@@ -1149,10 +1178,8 @@ void getDeviceState(def child) {
                     data.state.remove('on')
                     data.action.remove('on')
                 }
-                if (type == 'sensors') {
-                    if (data.config.battery) { (type ==~ /groups|hubs/ ? data.action : data.state) << [battery: data.config.battery] }
-                }
-                setHueProperty(child, [state: data.state, action: data.action])
+                setHueProperty(child, [state: data.state ?: [:], action: data.action ?: [:], config: data.config ?: [:]])
+                
             } else {
                 if (dbgEnable) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
             }
@@ -1187,6 +1214,18 @@ public networkIdForSensor(sensorId) {
     "hueSensor:${app.getId()}/${sensorId}"
 }
 
+public stateForNetworkId(deviceNetworkId) {
+    def (String type, String address) = deviceNetworkId.split(':',2)
+    String hueId = address.split('/').last()
+    switch (type) {
+        case 'hueGroup':   return state.groups[hueId];
+        case ~/hueBulb.*/: return state.lights[hueId];
+        case 'hueScene':   return state.scenes[hueId];
+        case 'hueSensor':  return state.sensors[hueId];
+    }
+    return null
+}
+
 private String bulbTypeForLight(id) {
     if (!state.lights) { return null }
     def type=state.lights[id]?.type
@@ -1211,7 +1250,7 @@ private String driverTypeForSensor(id) {
     def type=state.sensors[id]?.type
     switch (type) {
         case 'ZGPSWITCH':
-            return 'Tap' // 4 button controller (push only, maybe optionally release)
+            return 'Tap' // 4 button controller (push only)
         case 'ZLLSwitch':
             return 'Dimmer' // 4 button controller (PHR)
         case 'ZLLPresence':
@@ -1500,7 +1539,18 @@ void setHueProperty(def child, Map args) {
             case 'temperature': ['temperature':      convertHETemperature(value)]; break
             default:           [key, value]
         }
-    }.findAll { key, value -> child.hasAttribute("$key")}
+    }.findAll { key, value -> child.hasAttribute("$key") }
+
+    if (args.config) {
+        events << args.config.collectEntries { key, value ->
+            switch (key) {
+                case 'on':          ['status':           value ? 'enabled'   : 'disabled']; break
+                case 'reachable':   ['health':           value ? 'reachable' : 'unreachable']; break
+                case 'battery':     ['battery':          value]; break
+                default: [key, value]
+            }        
+        }.findAll {key, value -> child.hasAttribute("$key") }
+    }
 
     // log.debug "Received State ($child): $devstate"
     // log.debug "Translated Events ($child): $events"
@@ -1633,11 +1683,11 @@ Number convertHEColortemp(Number value) {
 }
 
 Number convertHELightLevel(Number lightLevel) {
-    Math.pow(10, ((lightLevel-1)/10000.0)) as int
+    Math.pow(10, ((lightLevel?:1-1)/10000.0)) as int
 }
 
 Number convertHETemperature(Number temperature) {
-    (((location.temperatureScale == 'C') ? temperature : ((temperature * 1.8) as int) + 3200)) / 100
+    (((location.temperatureScale == 'C') ? temperature : ((temperature?:0 * 1.8) as int) + 3200)) / 100
 }
 
 String convertHBColorMode(String value) {
@@ -1647,3 +1697,6 @@ String convertHBColorMode(String value) {
     return ''
 }
 
+void syncState(List devices) {
+    
+}
