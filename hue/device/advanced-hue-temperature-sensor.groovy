@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Temperature Sensor 
- * Version 1.0.1
+ * Version 1.0.2
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -63,17 +63,16 @@ preferences {
 
 }
 
+void updateSetting(String name, Object value) {
+    device.updateSetting(name, value)
+    this[name] = value
+}
+
 /**
  * Hubitat DTH Lifecycle Functions
  **/
 def installed() {
-    disconnect()
     updated()
-}
-
-void updateSetting(String name, Object value) {
-    device.updateSetting(name, value)
-    this[name] = value
 }
 
 def updated() {

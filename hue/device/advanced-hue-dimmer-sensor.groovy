@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Dimmer Sensor 
- * Version 1.0.0
+ * Version 1.0.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -76,7 +76,6 @@ void updateSetting(String name, Object value) {
  * Hubitat DTH Lifecycle Functions
  **/
 def installed() {
-    disconnect()
     updated()
 }
 

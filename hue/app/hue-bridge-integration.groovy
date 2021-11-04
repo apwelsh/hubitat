@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.6
+ * Version 1.4.7
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -374,6 +374,7 @@ def addLights(Map params=[:]){
             [label: "${name}", isComponent: false, name: 'AdvancedHueBulb'])
             child.updateSetting('txtEnable', false)
             lights.remove(hueId)
+            child.refresh()
 
         } catch (ex) {
             if (ex.message =~ 'A device with the same device network ID exists.*') {
@@ -459,8 +460,8 @@ def addGroups(params){
         try {
 
             addChildDevice('apwelsh', 'AdvancedHueGroup', dni, null, ['label': "${name}"])
-
             groups.remove(hueId)
+            child.refresh()
 
         } catch (ex) {
             if (ex.message =~ 'A device with the same device network ID exists.*') {
@@ -571,6 +572,7 @@ def addScenes(params){
             [label: "${name}", isComponent: false, name: 'AdvancedHueScene'])
             child.updateSetting('txtEnable', false)
             scenes.remove(hueId)
+            child.refresh()
 
         } catch (ex) {
             if (ex.message =~ 'A device with the same device network ID exists.*') {
@@ -674,6 +676,7 @@ def addSensors(Map params=[:]){
                 def child = addChildDevice('apwelsh', "AdvancedHue${type}Sensor", "${dni}",
                 [label: "${name}", isComponent: false, name: "${model}"])
                 sensors.remove(hueId)
+                child.refresh()
 
             } catch (ex) {
                 if (ex.message =~ 'A device with the same device network ID exists.*') {
