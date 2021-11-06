@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge 
- * Version 1.3.11
+ * Version 1.3.12
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -184,7 +184,7 @@ void parse(String text) {
                 String idV1 = (data.id_v1.split('/') as List).last()
                 String dataType = data.type
                 Map events = [state:[:], action:[:], config:[:]]
-                switch (event.type) {
+                switch (data.type) {
                     case 'add':
                         if (parent.newEnable) {
                             log.warn "Discovered new device added to Hue hub of type: ${dataType}"
