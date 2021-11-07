@@ -1,6 +1,6 @@
 /**
- * Advanced Hue Bridge 
- * Version 1.3.11
+ * Advanced Hue Bridge
+ * Version 1.3.12
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -50,10 +50,10 @@ metadata {
         capability 'Switch'
         capability 'Refresh'
         capability 'Initialize'
-        
+
         command 'connect'
         command 'disconnect'
-        
+
         attribute 'networkStatus', 'string'
     }
 }
@@ -94,12 +94,12 @@ preferences {
 /**
  * Hubitat DTH Lifecycle Functions
  **/
-def installed() {
+void installed() {
     disconnect()
     updated()
 }
 
-def initialize() {
+void initialize() {
     disconnect()
     updated()
     runIn(1, refresh)
@@ -110,7 +110,7 @@ void updateSetting(String name, Object value) {
     this[name] = value
 }
 
-def updated() {
+void updated() {
     if (this[SETTING_AUTO_REFRESH]     == null) { updateSetting(SETTING_AUTO_REFRESH,     DEFAULT_AUTO_REFRESH) }
     if (this[SETTING_REFRESH_INTERVAL] == null) { updateSetting(SETTING_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL) }
     if (this[SETTING_ANY_ON]           == null) { updateSetting(SETTING_ANY_ON,           DEFAULT_ANY_ON) }
@@ -169,94 +169,32 @@ void parse(String text) {
 
     def (String type, String message) = text.split(':', 2)
     try {
-        
+
         if (type == 'id') {
                 if (this[SETTING_DBG_ENABLE]) { log.debug "Received message with ID ${message}" }
                 return
         }
         if (type == 'data') {
+            Map hubEvents = [:]
             parseJson(message).each { event ->
-                if (this[SETTING_DBG_ENABLE]) { 
+                if (this[SETTING_DBG_ENABLE]) {
                     log.debug "Parsing event: ${event}"
                 }
 
-                def data = event.data[0]
-                String idV1 = (data.id_v1.split('/') as List).last()
-                String dataType = data.type
-                Map events = [state:[:], action:[:], config:[:]]
+                Map data = event.data[0]
                 switch (event.type) {
                     case 'add':
-                        if (parent.newEnable) {
-                            log.warn "Discovered new device added to Hue hub of type: ${dataType}"
-                            log.debug "$event"
-                        }
+                        addEventHandler(data)
                         break
                     case 'delete':
-                        // if (parent.newEnable) {
-                        //     log.warn "Discovered a device was deleted from Hue hub of type: ${dataType}"
-                        //     log.debug "$event"
-                        // }
+                        deleteEventHandler(data)
                         break
                     case 'update':
-
-                        switch (dataType) {
-                            case 'light':
-                                // log.info "Parsing event: ${event}"
-
-                                def light = parent.getChildDevice(parent.networkIdForLight(idV1))
-                                if (!light) { break }
-
-                                events.state << mapEventState(data)
-                                events.config << events.state.config
-                                events.state.remove('config')
-
-                                parent.setHueProperty(light, events)
-                                runInMillis(500, refresh, [overwrite: true, misfire:'ignore']) // temporary.  Need to add logic to force refresh on affected groups
-                                break
-
-                            case 'grouped_light':
-                                // log.info "Parsing event: ${event}"
-
-                                def group = parent.getChildDevice(parent.networkIdForGroup(idV1))
-                                if (!group) { break }
-                                
-                                events.action << mapEventState(data)
-                                events.config << events.action.config
-                                events.action.remove('config')
-
-                                parent.setHueProperty(group, events)
-                                runInMillis(500, refresh, [overwrite: true, misfire:'ignore'])  // temporary.  Need to add logic to force refresh on affected groups
-                                break
-
-                            case 'motion':
-                            case 'temperature':
-                            case 'light_level':
-                            case 'device_power':
-                                //log.info "Parsing event: ${event}"
-
-                                def sensor = parent.getChildDevice(parent.networkIdForSensor(idV1))
-                                if (!sensor) { break }
-
-                                events.state << mapEventState(data)
-                                events.config << events.state.config
-                                events.state.remove('config')
-
-                                parent.setHueProperty(sensor, events)
-                                break
-
-                            case 'button':
-                                // log.info 'Unhandled button event'
-                                break
-
-                            case 'zigbee_connectivity':
-                                break
-
-                            default:
-                                if (this[SETTING_DBG_ENABLE]) {
-                                    log.warn "Unhandeled event data type: ${dataType}"
-                                    log.debug "$event"
-                                }
+                        updateEventHandler(data).each { nid, props ->
+                            hubEvents[nid] = hubEvents[nid] ?: [(nid): [:]]
+                            hubEvents[nid] << props
                         }
+
                         break
 
                     default:
@@ -266,7 +204,17 @@ void parse(String text) {
                         }
                 }
 
-                }
+            }
+            
+            hubEvents.each { nid, props ->
+                def child = parent.getChildDevice(nid)
+                parent.setHueProperty(child, props)
+            }
+            if (hubEvents) {
+                // temporary.  Need to add logic to force refresh on affected groups
+                runInMillis(300, refresh, [overwrite: true, misfire:'ignore']) 
+            }
+
             return
         }
 
@@ -276,6 +224,93 @@ void parse(String text) {
         log.error(ex)
         log.info text
     }
+}
+
+private void addEventHandler(Map data) {
+    String dataType = data.type
+
+    if (parent.newEnable) {
+        log.warn "Discovered new device added to Hue hub of type: ${dataType}"
+        log.debug "$event"
+    }
+
+}
+
+private void deleteEventHandler(Map data) {
+    // if (parent.newEnable) {
+    //     log.warn "Discovered a device was deleted from Hue hub of type: ${dataType}"
+    //     log.debug "$event"
+    // }
+}
+
+private Map updateEventHandler(Map data) {
+
+    Map event = [state:[:], action:[:], config:[:]]
+    String idV1 = (data.id_v1.split('/') as List).last()
+
+    String dataType = data.type
+    switch (dataType) {
+        case 'light':
+            // log.info "Parsing event: ${event}"
+
+            String nid = parent.networkIdForLight(idV1)
+            if (!parent.getChildDevice(nid)) { break }
+
+            event.state << mapEventState(data)
+            event.config << event.state.config
+            event.state.remove('config')
+
+            return [(nid): event]
+
+        case 'grouped_light':
+            // log.info "Parsing event: ${event}"
+
+            String nid = parent.networkIdForGroup(idV1)
+            if (!parent.getChildDevice(nid)) { break }
+            
+            event.action << mapEventState(data)
+            event.config << event.action.config
+            event.action.remove('config')
+
+            return [(nid): event]
+
+        case 'motion':
+        case 'temperature':
+        case 'light_level':
+        case 'device_power':
+            //log.info "Parsing event: ${event}"
+
+            String nid = parent.networkIdForSensor(idV1)
+            if (!parent.getChildDevice(nid)) { break }
+
+            event.state << mapEventState(data)
+            event.config << event.state.config
+            event.state.remove('config')
+
+            return [(nid): event]
+
+        case 'button':
+            String nid = parent.networkIdForSensor(idV1)
+            def child = parent.getChildDevice(nid)
+            if (!child) { break }
+            
+            Map props = [
+                id: data.id,
+                last_event: data.button.last_event
+            ]
+            child.setHueProperty(props)
+            break
+
+        case 'zigbee_connectivity':
+            break
+
+        default:
+            if (this[SETTING_DBG_ENABLE]) {
+                log.warn "Unhandeled event data type: ${dataType}"
+                log.debug "$event"
+            }
+    }
+    return [:]
 }
 
 private Map mapEventState(data) {
@@ -340,3 +375,4 @@ void setHueProperty(Map args) {
         parent.sendChildEvent(this, [name: 'switch', value: value ? 'on' : 'off'])
     }
 }
+

@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Tap Sensor 
- * Version 1.0.1
+ * Version 1.0.2
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -26,14 +26,14 @@
  **/
 
 import groovy.transform.Field
+import java.util.concurrent.ConcurrentHashMap
+
 
 @Field static final Boolean DEFAULT_LOG_ENABLE       = true
 @Field static final Boolean DEFAULT_DBG_ENABLE       = false
 
 @Field static final String SETTING_LOG_ENABLE        = 'logEnable'
 @Field static final String SETTING_DBG_ENABLE        = 'debug'
-
-@Field static final Map SCHEDULE_NON_PERSIST = [overwrite: true, misfire:'ignore']
 
 metadata {
     definition (
@@ -42,13 +42,14 @@ metadata {
         author:    'Armand Welsh',
         importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-tap-sensor.groovy') {
 
-        // capability 'Battery'
+        capability 'Battery'
         capability 'PushableButton'
         capability 'Refresh'
-
+        capability 'Initialize'
+ 
         attribute  'status', 'string'  // expect enabled/disabled
         attribute  'health', 'string'  // reachable/unreachable
-    }
+   }
 }
 
 preferences {
@@ -75,12 +76,34 @@ void updateSetting(String name, Object value) {
  **/
 def installed() {
     updated()
+    initialize()
+    refresh()
+
+    mapButtons()
+
+}
+
+def initialize() {
+    String id = parent.deviceIdNode(device.deviceNetworkId)
+    Long buttons = parent.state.sensors[id]?.capabilities?.inputs?.size()?:0
+    parent.sendChildEvent(this, [name: 'numberOfButtons', value: buttons])
 }
 
 def updated() {
     if (this[SETTING_LOG_ENABLE] == null) { updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE) }
     if (this[SETTING_DBG_ENABLE] == null) { updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE) }
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
+    mapButtons()
+}
+
+void mapButtons() {
+    String id = parent.deviceIdNode(device.deviceNetworkId)
+
+    state.buttonMap = parent.enumerateResourcesV2().findAll { resource ->
+        resource.type == 'button' && resource.id_v1 == "/sensors/${id}"
+    }.collectEntries { button -> 
+        [(button.id): button.metadata.control_id]
+    }
 }
 
 /*
@@ -94,9 +117,13 @@ void refresh() {
 }
 
 void setHueProperty(Map args) {
-    // if (args.name == 'Illuminance') {
-    //     parent.sendChildEvent(this, [name: 'Illuminance', value: value ? 'on' : 'off'])
-    // }
+    log.trace "setHueProperty: ${args}"
+    if (args.last_event && args.id) {
+        Number btn = state.buttonMap?.(args.id) ?: 0
+        if (args.last_event == 'initial_press') { push(btn) }
+    }
 }
 
-
+void push(Number buttonNumber) {
+    sendEvent([name: 'pushed',   value: buttonNumber])
+}

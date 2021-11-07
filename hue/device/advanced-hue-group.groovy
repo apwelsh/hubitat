@@ -1,5 +1,5 @@
 /**
- * AdvancedHueGroup v1.5.7
+ * AdvancedHueGroup v1.5.8
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device for the Advanced Hue Bridge Integeration app.  This device is used to manage hue zones and rooms
@@ -107,14 +107,19 @@ metadata {
         capability 'ColorMode'
         capability 'ColorTemperature'
         capability 'Refresh'
+        capability 'Initialize'
 
         command 'activateScene', [[name: 'Scene Identitier*', type: 'STRING', description: 'Enter a scene name or the scene number as defined by the Hue Bridge']]
     }
 }
 
 def installed() {
-    parent.getDeviceState(this)
     updated()
+    initialize()
+}
+
+def initialize() {
+    refresh()
 }
 
 def updated() {
@@ -129,7 +134,6 @@ def updated() {
     if (settings.logEnable       == null)  { device.updateSetting('logEnable',       DEFAULT_LOG_ENABLE) }
 
     if (logEnable) { log.debug 'Preferences updated' }
-    parent.getDeviceState(this)
     refresh()
 
 }
