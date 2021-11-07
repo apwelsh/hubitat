@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.8
+ * Version 1.4.9
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1282,7 +1282,7 @@ private String driverTypeForSensor(id) {
     if (!state.sensors) { return null }
     def type=state.sensors[id]?.type
     switch (type) {
-        case 'ZGPSWITCH':
+        case 'ZGPSwitch':
             return 'Tap' // 4 button controller (push only)
         case 'ZLLSwitch':
             return 'Dimmer' // 4 button controller (PHR)
