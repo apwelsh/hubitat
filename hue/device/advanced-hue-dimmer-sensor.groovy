@@ -95,7 +95,6 @@ def updated() {
     if (this[SETTING_LOG_ENABLE] == null) { updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE) }
     if (this[SETTING_DBG_ENABLE] == null) { updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE) }
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
-    mapButtons()
 }
 
 void mapButtons() {
@@ -119,7 +118,6 @@ void refresh() {
 }
 
 void setHueProperty(Map args) {
-    log.trace "setHueProperty: ${args}"
     if (args.last_event && args.id) {
         Number btn = state.buttonMap?.(args.id) ?: 0
         switch(args.last_event) {
