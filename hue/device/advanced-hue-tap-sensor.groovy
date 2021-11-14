@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Tap Sensor 
- * Version 1.0.2
+ * Version 1.0.3
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -123,5 +123,5 @@ void setHueProperty(Map args) {
 }
 
 void push(Number buttonNumber) {
-    sendEvent([name: 'pushed',   value: buttonNumber])
+    sendEvent([name: 'pushed',   value: buttonNumber, isStateChange:true])
 }
