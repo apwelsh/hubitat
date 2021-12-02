@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.9
+ * Version 1.4.10
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1106,8 +1106,9 @@ void setDeviceState(def child, Map deviceState) {
     }
 
     Map newState = deviceState.scene ? deviceState : eventQueue[(deviceNetworkId)]
+    if (newState.scene) { newState['on'] = true } // Hue no longer turns lights on when scene is activated.
     eventQueue.remove(deviceNetworkId)
-    eventQueue = eventQueue ?: null // flush memory is list is empty, allows for garbage collection
+    eventQueue = eventQueue ?: null // flush memory if list is empty, allows for garbage collection
 
     String hubId = deviceIdHub(deviceNetworkId)
     String type
