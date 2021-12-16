@@ -1,6 +1,6 @@
 /**
  * Roku Connect
- * Version 1.2.1
+ * Version 1.3.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is an integration app for Hubitat designed to locate, and install any/all attached Roku devices.
@@ -215,14 +215,9 @@ def configureDevice(params) {
 
     app.updateSetting('deviceNetworkId', networkId)
 
-    def rokuApps = child.getInstalledApps()
-    def installedApps = child.getChildDevices().collect { it.deviceNetworkId}.findAll { it =~ /^.*\-\d+$/ }
-    def selectedApps = settings["${networkId}_selectedApps"] ?: []
-
-    // check the input for selected Apps to see if defined, and if not, pre-load the values
-    // if (!settings["${networkId}_selectedApps"]) {
-    //     installedApps.each { selectedApps << it }
-    // }
+    Map rokuApps = child.getInstalledApps()
+    List installedApps = child.getChildDevices().collect { it.deviceNetworkId}.findAll { it =~ /^.*\-\d+$/ }
+    List selectedApps = settings["${networkId}_selectedApps"] ?: []
 
     // Remove unselected apps as children
     installedApps?.findAll { !selectedApps.contains(it) }.each { appId ->
@@ -239,6 +234,32 @@ def configureDevice(params) {
 
     app.updateSetting("${networkId}_selectedApps", selectedApps)
 
+
+    Map rokuInputs = [:]
+    List installedInputs = []
+    List selectedInputs = []
+    if (child.getState().isTV) { 
+        rokuInputs = child.getRokuInputs()
+        installedInputs = child.getChildDevices().collect { it.deviceNetworkId }.findAll { it =~ /^.*\-(AV1|Tuner|hdmi\d)$/ }
+        selectedInputs = settings["${networkId}_selectedInputs"] ?: []
+
+        // Remove unselected apps as children
+        installedInputs?.findAll { !selectedInputs.contains(it) }.each { appId ->
+            if (logEnable)  { log.info "Removing child input device ${appId} (${rokuInputs[appId]})" }
+            child.deleteChildAppDevice(appId)
+        }
+
+        // Add selected apps as children
+        selectedInputs.findAll { !installedInputs.contains(it) }.each { appId ->
+            def appName = rokuInputs[appId]
+            if (logEnable)  { log.info "Installing child input device ${appId} (${appName})" }
+            child.createChildAppDevice(appId, appName)
+        }
+
+        app.updateSetting("${networkId}_selectedInputs", selectedInputs)
+
+    }
+
     String label = (deviceLabel(child)?:'').trim()
     String newLabel = (settings["${networkId}_label"] ?: '').trim()
     if (newLabel != '' && label != newLabel) {
@@ -251,6 +272,7 @@ def configureDevice(params) {
     }
 
     app.removeSetting("${networkId}_label")
+    
 
     return dynamicPage(name:'configureDevice', title:'Configure device', nextPage:null) {
         section() {
@@ -258,18 +280,29 @@ def configureDevice(params) {
             input "${networkId}_label", 'text', title: 'Device name', defaultValue:label, submitOnChange: true
         }
 
-        section('Add / Remove Applications') {
-            //href 'appDiscovery', title:'Add/Remove Roku Apps', description:'', params: params
-            input "${networkId}_selectedApps", 'enum', title: 'Select Apps to use as switch devices, unlselect Apps to remove the switch device', required: flase, multiple: true, options: rokuApps, submitOnChange: true
-        }
+        section('<B>Add / Remove Child Devices</B>') {
+            input "${networkId}_selectedApps", 'enum', title: '<B>Select Apps to use as switch devices, unlselect Apps to remove the switch device</B>', required: false, multiple: true, options: rokuApps, submitOnChange: true
 
-        section('Manage installed apps') {
-            child.getChildDevices()?.sort({ a, b -> a['label'] <=> b['label'] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
-                def desc = it.label != it.name ? it.name : ''
-                href 'manageApp', title:"<img src='${child.iconPathForApp(it.deviceNetworkId)}' style='width:auto; height:1em'/> ${desc}", description:'', params: [netId: networkId, appId: it.deviceNetworkId]
-
+            if (child.getState().isTV) { 
+                input "${networkId}_selectedInputs", 'enum', title: '<B>Select Inputs to use as switch devices, unlselect Inputs to remove the switch device</B>', required: false, multiple: true, options: rokuInputs, submitOnChange: true
             }
         }
+
+        section() {
+            paragraph '<B>Manage Installed Apps</B>'
+            child.getChildDevices()?.sort({ a, b -> a['name'] <=> b['name'] }).findAll { it.deviceNetworkId =~ /^.*\-\d+$/ }.each {
+                def desc = it.label != it.name ? it.name : ''
+                href 'manageApp', title:"<img src='${child.iconPathForDevice(it)}' style='width:auto; height:1em'/> ${desc}", description:'', params: [netId: networkId, appId: it.deviceNetworkId]
+            }
+            if (child.getState().isTV) { 
+                paragraph '<B>Manage TV Inputs</B>'
+                child.getChildDevices()?.sort({ a, b -> a['name'] <=> b['name'] }).findAll { it.deviceNetworkId =~ /^.*\-(AV1|hdmi\d|Tuner)$/ }.each {
+                    def desc = it.label != it.name ? it.name : ''
+                    href 'manageApp', title:"<img src='${child.iconPathForDevice(it)}' style='width:auto; height:1em; filter: invert(100%)'/> ${desc}", description:'', params: [netId: networkId, appId: it.deviceNetworkId]
+                }
+            }
+        }
+
     }
 }
 
@@ -286,7 +319,7 @@ def manageApp(params) {
     if (!child)
         return mainPage()
 
-    // track state to backup to.
+    // track state to backup.
     app.updateSetting('deviceNetworkId', networkId)
 
     def device = child.getChildDevice(appId)
@@ -299,11 +332,13 @@ def manageApp(params) {
     }
     app.removeSetting("${appId}_label")
 
+    String filter = (appId =~ /^.*\-(AV1|hdmi\d|Tuner)$/) ? "filter: invert(100%)" : ""
+
     return dynamicPage(name: 'manageApp', title:"Manage Installed Apps for ${deviceLabel(child)}", nextPage:null) {
         section() {
             paragraph "Use this section to set the ${device.name} application name for ${deviceLabel(child)}"
             input "${appId}_label", 'text', title: 'Application name', defaultValue:label, submitOnChange: true
-            paragraph "<img src='${child.iconPathForApp(appId)}'/>"
+            paragraph "<img src='${child.iconPathForDevice(device)}' style='border: none; ${filter}'/>"
 
         }
     }

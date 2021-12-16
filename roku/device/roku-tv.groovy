@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.13
+ * Version 2.7.14
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -27,6 +27,7 @@
 
 import groovy.transform.Field
 import groovy.json.JsonBuilder
+import java.util.regex.Matcher
 import java.util.concurrent.ConcurrentHashMap
 
 @Field static final String  REFRESH_UNIT_SECONDS = 'Seconds'
@@ -251,7 +252,7 @@ Object currentValue(String attributeName) {
 void unschedule(handlerMethod = null) {
     if (handlerMethod == null) {
         volatileAtomicState.findAll { it.key ==~ /^(query[A-Z].*|pingDevice)/ }.each {
-            volatileAtomicState[it.value] = false
+            volatileAtomicState[it.key] = false
             this.delegate.unschedule(it.key)
         }
     } else {
@@ -421,7 +422,6 @@ void scheduleQueryDeviceInfo() {
 }
 
 void scheduleQueryActiveApp() {
-
     if (volatileAtomicState.queryActiveApp) {
         return
     }
@@ -516,8 +516,36 @@ String appIdForNetworkId(String netId) {
     netId.replaceAll(~/.*\-/,"")
 }
 
-String iconPathForApp(String netId) {
-    apiPath("query/icon/${appIdForNetworkId(netId)}")
+String iconPathForDevice(def childDevice) {
+    //def childDevice = getChildDevice(netId)
+    if (childDevice) {
+        String appId = translateDeviceToRokuAppId(childDevice)
+        if (appId) {
+            String iconPath = apiPath("query/icon/${appId}")
+            if (childDevice.device.getDataValue('iconPath') != iconPath) {
+                childDevice.device.updateDataValue('iconPath', iconPath)
+            }
+            return iconPath
+        }
+    } else {
+        return null
+    }
+}
+
+String translateDeviceToRokuAppId(def childDevice) {
+    String appName = childDevice.name
+    if (appName ==~ /AV|HDMI \d|Antenna TV/) {
+        switch (appName) {
+            case 'AV':           return 'tvinput.cvbs'
+            case 'Antenna TV':   return 'tvinput.dtv'
+            case ~/^HDMI (\d)$/: return "tvinput.hdmi${Matcher.lastMatcher[0][1]}"
+        }
+    }
+    String netId = childDevice.deviceNetworkId
+    if (appIdForNetworkId(netId) ==~ /^\d+$/ ) {
+        return appIdForNetworkId(netId)
+    }
+    return null
 }
 
 /*
@@ -849,6 +877,15 @@ String translateAppToInput(appName) {
     return appName
 }
 
+String traslateInputToDeviceName(mediaInputSource) {
+    switch (mediaSource) {
+        case 'InputAV1':         return 'AV'
+        case 'InputTuner':       return 'Antenna TV'
+        case ~/^InputHDMI(\d)$/: return "HDMI ${Matcher.lastMatcher[0][1]}"
+    }
+    return mediaSource
+}
+
 void setCurrentApplication(currentApp) {
     def previousApp = currentValue('application')
     sendEvent(name: 'application', value: currentApp)
@@ -869,14 +906,16 @@ void setCurrentApplication(currentApp) {
             }
             // Check the Media Player ONLY when an Application is active (Assumes any app other than Roku)
             // TODO: compare current app to installed apps to determine if app is active.
-            scheduleQueryMediaPlayer()    
+            scheduleQueryMediaPlayer()
 
         }
         
+        String mediaSource = traslateInputToDeviceName(currentValue('mediaInputSource'))
+
         // update the child devices with the current state
         childDevices?.each { child ->
             def appName = "${child.name}"
-            def value = (currentApp == appName) ? 'on' : 'off'
+            def value = (mediaSource == appName) ? 'on' : 'off'
             if ("${child.currentValue('switch')}" != "${value}") {
                 child.parse([[name: 'switch', value: value, descriptionText: "${child.displayName} was turned ${value}"]])
             }
@@ -1175,6 +1214,17 @@ Map getInstalledApps() {
     return apps
 }
 
+Map getRokuInputs() {
+    Map inputs = [:]
+    if (state.isTV) {
+        def hdmiCount = this[SETTING_HDMI_PORTS] as int
+        inputs[networkIdForApp('AV1')] = 'AV'
+        inputs[networkIdForApp('Tuner')] = 'Antenna TV'
+        inputs += (1..hdmiCount).collectEntries { [(networkIdForApp("hdmi${it}")): "HDMI ${it}"] }
+    }
+    return inputs
+}
+
 void setInputSource(source) {
 
     if (source ==~ /^(Home)|Input(AV1|Tuner|HDMI\d)$/ ) {
@@ -1292,9 +1342,7 @@ void createChildAppDevice(String netId, String appName) {
             [label: "${label}-${appName}", 
              isComponent: parent ? true : false, name: "${appName}"])
         child.updateSetting('txtEnable', false)
-        if (appIdForNetworkId(netId) ==~ /^\d+$/ ) {
-            child.updateDataValue('iconPath', iconPathForApp(netId))
-        }
+        iconPathForDevice(child)
         if (this[SETTING_LOG_ENABLE]) log.debug "Created child device: ${appName} (${netId})"
     } catch(IllegalArgumentException e) {
         if (getChildDevice(netId)) {
