@@ -56,6 +56,11 @@ The goal of this project is to more tightly integrate the hue system with Hubita
 - Hue Integrated Group Manager -- Hubitat has support for groups, but adding hue lights to groups results in slow automation, as the bridge controls the light individually.  With this project, I will enable the ability to create and manage custom groups on Hue that can include Hue and HE devices.  This will enable making changes to the hue group with a single API call to hue.
 - Hue Integrated Scene Manager -- Hubitat has support for scenes, but adding hue lights to scenes results in slow and out of sync transitions.  With this project, I will enable the ability to create and manage scenes on Hue that can include Hue and HE devices.  This will make it possible to syncronize the hue devices with the HE devices as they transition.  To what extent I will be able to sync with HE and achieve the zigbee optiminizations of non-hue is not yet known.
 
+## Support the Author
+Please consider donating. This app took a lot of work to make.
+Any donations received will be used to fund additional Hue based development.
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)                  
 
 ## License
 
