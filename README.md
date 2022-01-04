@@ -1,4 +1,6 @@
-# Hubitat Drivers
+
+# Hubitat Drivers [![Donate](https://img.shields.io/badge/donate-PayPal-blue.svg?logo=paypal&style=plastic)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
+
 
 Welcome to my Hubitat Github repo.  All drivers and applications in this repo are free for use.  If you like them, please share.  If you have recommendations for updates, please open an issue, and report it.  If you have a bug-fix, or enhancement you think I might like, or others might like, please submit a pull request to merge your changes.
 
