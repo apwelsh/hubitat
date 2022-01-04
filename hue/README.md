@@ -1,6 +1,4 @@
-[![Donate](https://img.shields.io/badge/donate-PayPal-blue.svg?logo=paypal&style=plastic)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
-
-# Advanced Hue Bridge Integration for Hubitat
+# Advanced Hue Bridge Integration for Hubitat [![Donate](https://img.shields.io/badge/donate-PayPal-blue.svg?logo=paypal&style=plastic)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
 
 The Advanced Hue Bridge Integration for Hubitat brings support the Hue scenes, groups, and lights.  It minimizes hubitat complexity by leveraging the built-in Hubitat component drivers whereever possible.  Additionally, this system will pick the best fit generic component driver for each light, to ensure the devices are correctly represented in dashboards.
 
