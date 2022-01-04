@@ -1,4 +1,4 @@
-[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
+[![Donate](https://img.shields.io/badge/donate-PayPal-green.svg)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
 
 # Roku Drivers
 
