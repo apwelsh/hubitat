@@ -1,4 +1,4 @@
-[![Donate](https://img.shields.io/badge/donate-PayPal-green.svg)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
+[![Donate](https://img.shields.io/badge/donate-PayPal-green.svg?style=plastic)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
 
 # Advanced Hue Bridge Integration for Hubitat
 
