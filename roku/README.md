@@ -1,6 +1,4 @@
-[![Donate](https://img.shields.io/badge/donate-PayPal-blue.svg?logo=paypal&style=plastic)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
-
-# Roku Drivers
+# Roku Drivers [![Donate](https://img.shields.io/badge/donate-PayPal-blue.svg?logo=paypal&style=plastic)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)
 
 This is my implementation of the **Roku TV + App Control** Device handlers for Hubitat.
 
