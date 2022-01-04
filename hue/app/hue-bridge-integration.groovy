@@ -161,7 +161,7 @@ def mainPage(Map params=[:]) {
                 paragraph getFormat("line")
                 paragraph '''<div style='color:#1A77C9;text-align:center'>Advanced Hue Bridge
                     |
-                    |<a href='https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J' target='_blank'><img src='https://www.paypalobjects.com/webstatic/mktg/logo/pp_cc_mark_37x23.jpg' border='0' alt='PayPal Logo'></a>
+                    |<a href='https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J' target='_blank'><img src='https://img.shields.io/badge/donate-PayPal-blue.svg?logo=paypal&style=plastic' border='0' alt='Donate'></a>
                     |
                     |Please consider donating. This app took a lot of work to make.
                     |Any donations received will be used to purchase additional Hue products to further the development of new device support
