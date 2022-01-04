@@ -129,6 +129,6 @@ Any donations received will be used to help fund new projects
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.  Portions of this code are licensed from Eric Boehs [LICENSE.md](https://raw.githubusercontent.com/ericboehs/smartthings-roku-tv/master/LICENSE)
 
 ## Acknowledgments
-This software would not be possible without the efforts and free sharing of information provided by the original authoris of the [TCL Smartthings Roky TV](https://github.com/ericboehs/smartthings-roku-tv) created by [Eric Boehs](https://github.com/ericboehs).
+This software would not be possible without the efforts and free sharing of information provided by the original author of the [TCL Smartthings Roku TV](https://github.com/ericboehs/smartthings-roku-tv) created by [Eric Boehs](https://github.com/ericboehs), upon which I was inspired learn about the ECP protocol, and Hubitat development.
 
 Additional thanks go to Roku for freely publishing the [External Control API](https://developer.roku.com/docs/developer-program/debugging/external-control-api.md) documentation.
