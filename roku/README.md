@@ -9,17 +9,25 @@ WARNING:  Upgrading to this new version may break some of your automations, as s
 ## Getting Started
 
 To use this software, you must download just this one file:
- - [roku-tv.groovy](device/roku-tv.groovy)
+ - [roku-tv.groovy](device/roku-tv.groovy) - The primary driver for controlling, and querying Roku devices.
+   - Convert any application into a simple on/off child device
+   - Convert any remote control button press into a momentary on child device
+   - Configure simple or custom polling configurations for device state (on, off, play, pause, current application selected on tv, etc)
  
- _** Note ** that there used to be two files, but I have converted the device driver to use the built-in Generic Switch driver._
+ _** Note ** that there used to be two files, but I have converted the device driver to use the built-in `Generic Component Switch` driver._
  
- Optionally, if you choose, you may use the Roku Connect app for managing your roku devices.
- - [roku-connect.groovy](app/roku-connect.groovy)
+ _Optional (highly recommended)_
+ - [roku-connect.groovy](app/roku-connect.groovy) - A streamlined management tool to make managing your Roku devices easier.
+   - Discovers active Roku devices using the SSDP device discovery protocol, no more managing IP addresses manually.
+   - Rename your Roku devices for easier navigation in Hubitat
+   - Add, Remove, and Rename installed Roku applications
+   - Add, Remove, and Rename Roku TV input devices
 
-### Alert
-The Roku Connect application is in early alpha stages of development.  It is fullyfunctional for adding Roku Devices, and renaming those devices.  It may also be used to easily rename the installed apps for managed roku devices, but it cannot add applications yet.  There are many other conveniences planned but not yet implemented.
- 
 ## Installation
+I recommend using Hubitat Package Manager to install Roku Connect and the Roku TV device driver.
+
+The following steps are used to install the necessary code manually:
+
 Sign into your Hubitat device, and add the Roku TV device handler.  To do so, from the menu select the **"Drivers Code"** menu option.
 
 ![](../images/HubitatMenuDriversCode.png)
@@ -29,19 +37,45 @@ Next, click the **"(+) New Driver"** button
 ![](../images/NewDriverButton.png)
 
 ### Roku TV Driver
-Select the import button, and put in the URL to the [roku-tv.groovy](device/roku-tv.groovy), Click the import button, and the new driver is ready.  
+Select the import button, and put in the URL to the [roku-tv.groovy](device/roku-tv.groovy) driver. Click the import button, and the new driver is ready.  
 Click **Save**. 
 ![save button](../images/NewDriverExample.png)
+
+### Roku Connect App
+from the menu, select the **"App Code"** menu option.
+
+Next, click the **"(+) New App"** button
+
+Select the import button, and put in the URL to the [roku-connect.groovy](app/roku-connect.groovy) app.  Click the import button, and the new app is ready.
+Click **Save**.
 
 
 ## Configuration
 
-The configuration is quite simple, and tries to be as automatic as possible.  Once the two device handers are installed, you will need to add the new Roku TV devices that you want to automate, and configure the IP Address.
+The configuration is quite simple, and tries to be as automatic as possible.  Once the device hander and app are installed, you will need to add the new Roku TV devices that you want to automate, and configure the IP Address.
 
 ### Prerequisite
-For smart home automation to work reliably, all devices on your network that will be access from the Hubitat hub should be configured with a static address.  This also true for the Roku TV devices.  I cannot provide details on how to do this, as each network is unique, and different routers have a different solution.  If your devices receive their network address via the router using DHCP (Dynamica Host Configuration Protocol) -- this is most typical -- then you may need to configure your router to *reserve* the IP address assigned to the Roku device.  This way, every time the Roku device is powered on, it will always have the same IP address, and the Hubitat, and this device handler will know how to find it.
+For smart home automation to work reliably, all devices on your network that will be access from the Hubitat hub should be configured with a static address.  This also true for the Roku TV devices.  I cannot provide details on how to do this, as each network is unique, and different routers have different solutions.  If your devices receive their network address via the router using DHCP (Dynamica Host Configuration Protocol) -- this is most typical -- then you may need to configure your router to *reserve* the IP address assigned to the Roku device.  This way, every time the Roku device is powered on, it will always have the same IP address, and the Hubitat Elevation hub, and this device handler, will know how to find it.
+
+### Adding the Roku Connect App
+If you choose to use the Roku Connect App, you will not need to add the Roku TV devices individually.  Instead, you can skip the **Adding the Roku Device** section.
+
+To manage your Roku device from Roku Connect, navigate to **"Apps"** in the Hubitat menu, and select **"(+) Add User App"**.
+In the pop-up, select Roku Connect, the click the **done** button.
+
+From the list of installed applicaiton, locate **"Roku Connect"** and run it.
+
+From here you can **"Discover New Devices"**, and manage instsalled device.  
+
+If you cannot setup DHCP reservations, and static IP addresses are not an option, be sure to turn on **Auto detect IP changes of Roku devices**.  This feature will periodically ping the SSDP connected devices, even when the app is not in discovery mode, so locate and detect IP address changes for intalled Roku devices.
+
+I believe the Roku Connect application is rather simple, needs little explanation.  This is my preferred solution for managing your Roku devices.
+
 
 ### Adding the Roku Device
+If you would rather not use the Roku Connect application, you can manually install the Roku TV devices. 
+Any device installed using this manual method cannot be managed by the Roku Connect application, until the installed device is removed from hubitat first.
+
 To add your Roku device, navigate the **Devices** in the Hubitat menu, and select **Add Virtual Device**
 
 ![](../images/AddVirtualDeviceButton.png)
