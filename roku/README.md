@@ -118,6 +118,12 @@ January 20, 2020
 - Relocated device drivers to now location for better management of code
 - Created a temporary old device with new URL.  This new device should act as a bridge to migrate existing installations to using the new devices.
 
+## Support the Author
+Please consider donating. This app took a lot of work to make.
+Any donations received will be used to help fund new projects
+
+[![paypal](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate?hosted_button_id=XZXSPZWAABU8J)                  
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.  Portions of this code are licensed from Eric Boehs [LICENSE.md](https://raw.githubusercontent.com/ericboehs/smartthings-roku-tv/master/LICENSE)
