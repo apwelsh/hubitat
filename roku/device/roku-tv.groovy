@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.14
+ * Version 2.7.15
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -878,12 +878,12 @@ String translateAppToInput(appName) {
 }
 
 String traslateInputToDeviceName(mediaInputSource) {
-    switch (mediaSource) {
+    switch (mediaInputSource) {
         case 'InputAV1':         return 'AV'
         case 'InputTuner':       return 'Antenna TV'
         case ~/^InputHDMI(\d)$/: return "HDMI ${Matcher.lastMatcher[0][1]}"
     }
-    return mediaSource
+    return mediaInputSource
 }
 
 void setCurrentApplication(currentApp) {
