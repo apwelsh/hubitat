@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.10
+ * Version 1.4.11
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -459,7 +459,7 @@ def addGroups(params){
         String dni = networkIdForGroup(hueId)
         try {
 
-            addChildDevice('apwelsh', 'AdvancedHueGroup', dni, null, ['label': "${name}"])
+            def child = addChildDevice('apwelsh', 'AdvancedHueGroup', dni, null, ['label': "${name}"])
             groups.remove(hueId)
             child.refresh()
 
