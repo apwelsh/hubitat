@@ -1,10 +1,11 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "version": "1.5.2",
+  "version": "1.5.8",
   "minimumHEVersion": "0.0",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
+  "communityLink": "https://community.hubitat.com/t/release-advanced-hue-bridge-integration/51420",
   "dateReleased": "2020-01-20",
   "apps": [
     {
@@ -14,7 +15,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
-      "version": "1.2.2"
+      "version": "1.2.7"
     }
   ],
   "drivers": [
@@ -24,7 +25,7 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/device/advanced-hue-group.groovy",
       "required": true,
-      "version": "1.5.1"
+      "version": "1.5.2"
     },
     {
       "id": "1d0f66d0-afed-4fe6-a2c8-39619f5b8eaa",
@@ -35,6 +36,6 @@
       "version": "1.2.0"
     }
   ],
-  "releaseNotes": "Refactor source to implement best practices on code implementation, and simplify some logic.  Possible performance improvments. Fixed a colormap translation bug. Rewrite parser to reduce number of objects required"
+  "releaseNotes": "Fixed group state (on/off) not updating when lights in group are updated.  Fixed bug when assigning attributes to lights directly, that prevented the assignments.  Added a queuing system to track future state of hue devices commanded while device is off, so that when the device is turned on, all queued states will be issues as a single update."
 
 }
