@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.11
+ * Version 1.4.12
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -315,7 +315,7 @@ def addDevice(device) {
 def findLights(){
     enumerateLights()
 
-    List installed = getInstalledLights().collect { it.label }
+    List installed = getInstalledLights().collect { it.label ?: it.name }
     List dnilist   = getInstalledLights().collect { it.deviceNetworkId }
 
 // TODO:
@@ -364,16 +364,16 @@ def addLights(Map params=[:]){
 
     List lights = selectedLights.collect { it }
 
-    selectedLights.each { hueId ->
-        String name = state.lights[hueId].name
-        String dni = networkIdForLight(hueId)
-        String type = bulbTypeForLight(hueId)
+    selectedLights.each { lightId ->
+        String name = state.lights[lightId].name
+        String dni = networkIdForLight(lightId)
+        String type = bulbTypeForLight(lightId)
         try {
 
             def child = addChildDevice('hubitat', "Generic Component ${type}", "${dni}",
             [label: "${name}", isComponent: false, name: 'AdvancedHueBulb'])
             child.updateSetting('txtEnable', false)
-            lights.remove(hueId)
+            lights.remove(lightId)
             child.refresh()
 
         } catch (ex) {
@@ -408,7 +408,7 @@ def addLights(Map params=[:]){
 def findGroups(params){
     enumerateGroups()
 
-    def installed = getInstalledGroups().collect { it.label }
+    def installed = getInstalledGroups().collect { it.label ?: it.name }
     def dnilist = getInstalledGroups().collect { it.deviceNetworkId }
 
     Map options = [:]
@@ -454,13 +454,13 @@ def addGroups(params){
 
     def groups = selectedGroups.collect { it }
 
-    selectedGroups.each { hueId ->
-        String name = state.groups[hueId].name
-        String dni = networkIdForGroup(hueId)
+    selectedGroups.each { groupId ->
+        String name = state.groups[groupId].name
+        String dni = networkIdForGroup(groupId)
         try {
 
             def child = addChildDevice('apwelsh', 'AdvancedHueGroup', dni, null, ['label': "${name}"])
-            groups.remove(hueId)
+            groups.remove(groupId)
             child.refresh()
 
         } catch (ex) {
@@ -499,7 +499,7 @@ def findScenes(params){
     enumerateScenes()
 
     Map groupOptions = [:]
-    getInstalledGroups().each { groupOptions[deviceIdNode(it.deviceNetworkId)] = it.label }
+    getInstalledGroups().each { groupOptions[deviceIdNode(it.deviceNetworkId)] = it.label ?: it.name }
 
     Map options = [:]
     Map scenes
@@ -509,7 +509,7 @@ def findScenes(params){
     if (selectedGroup) {
         group = getChildDevice(networkIdForGroup(selectedGroup))
         if (group) {
-            installed = group.getChildDevices()?.collect { it.label }
+            installed = group.getChildDevices()?.collect { it.label ?: it.name }
             dnilist = group.getChildDevices()?.collect { it.deviceNetworkId }
         }
         scenes = scenesForGroupId(selectedGroup)
@@ -563,15 +563,15 @@ def addScenes(params){
 
     def scenes = selectedScenes.collect { it }
 
-    selectedScenes.each { hueId ->
-        String name = "${group.label} - ${state.scenes[hueId].name}"
-        String dni = networkIdForScene(selectedGroup, hueId)
+    selectedScenes.each { sceneId ->
+        String name = "${group.label ?: group.name} - ${state.scenes[sceneId].name}"
+        String dni = networkIdForScene(selectedGroup, sceneId)
         try {
 
             def child = group.addChildDevice('hubitat', 'Generic Component Switch', "${dni}",
             [label: "${name}", isComponent: false, name: 'AdvancedHueScene'])
             child.updateSetting('txtEnable', false)
-            scenes.remove(hueId)
+            scenes.remove(sceneId)
             child.refresh()
 
         } catch (ex) {
@@ -604,7 +604,7 @@ def addScenes(params){
 def findSensors(){
     enumerateSensors()
 
-    List installed = getInstalledSensors().collect { it.label }
+    List installed = getInstalledSensors().collect { it.label ?: it.name }
     List dnilist   = getInstalledSensors().collect { it.deviceNetworkId }
 
 // TODO:
@@ -644,7 +644,7 @@ private buttonLink(child) {
     Map map = stateForNetworkId(child.device.deviceNetworkId)
     Boolean ena = map?.config?.on ?: map?.state?.reachable
     paragraph """<button type="button" class="btn btn-default btn-lg btn-block hrefElem ${ena ? 'btn-state-complete' : '' } mdl-button--raised mdl-shadow--2dp" style="text-align:left;width:100%" onclick="window.location.href='/device/edit/${child.device.id}'">
-                    <span style="text-align:left;white-space:pre-wrap">${child.label} (${child.name})</span>
+                    <span style="text-align:left;white-space:pre-wrap">${child.label ?: child.name} (${child.name})</span>
                 </button>"""
 }
 
@@ -661,21 +661,21 @@ def addSensors(Map params=[:]){
 
     List sensors = selectedSensors.collect { it }
 
-    selectedSensors.each { hueId ->
-        String name = state.sensors[hueId].name
-        String dni = networkIdForSensor(hueId)
-        String type = driverTypeForSensor(hueId)
-        String model = state.sensors[hueId].productname ?: "Advanced Hue ${type} Sensor"
+    selectedSensors.each { sensorId ->
+        String name = state.sensors[sensorId].name
+        String dni = networkIdForSensor(sensorId)
+        String type = driverTypeForSensor(sensorId)
+        String model = state.sensors[sensorId].productname ?: "Advanced Hue ${type} Sensor"
         if (!type) {
             sectionText = "\nCannot install sensor ${name}; a compatible driver is not available.\n"
-            sectionText += "\nTo request support for the sensor, open a support ticket on GitHub, and include the following device details:\n\n${state.sensors[hueId]}"
+            sectionText += "\nTo request support for the sensor, open a support ticket on GitHub, and include the following device details:\n\n${state.sensors[sensorId]}"
             log.error "Failed to add sensor [${name}]; not supported"
         } else {
             try {
 
                 def child = addChildDevice('apwelsh', "AdvancedHue${type}Sensor", "${dni}",
                 [label: "${name}", isComponent: false, name: "${model}"])
-                sensors.remove(hueId)
+                sensors.remove(sensorId)
                 child.refresh()
 
             } catch (ex) {
