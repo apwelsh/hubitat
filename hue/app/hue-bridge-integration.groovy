@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.12
+ * Version 1.4.13
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1109,6 +1109,7 @@ void setDeviceState(def child, Map deviceState) {
     if (newState.scene) { newState['on'] = true } // Hue no longer turns lights on when scene is activated.
     eventQueue.remove(deviceNetworkId)
     eventQueue = eventQueue ?: null // flush memory if list is empty, allows for garbage collection
+    if (newState.colormode) { newState.remove('colormode')}
 
     String hubId = deviceIdHub(deviceNetworkId)
     String type
@@ -1644,7 +1645,6 @@ void componentSetColor(def child, Map colormap) {
     if (colormap?.level == null)      { colormap.level      = currentValue(child, 'level') ?: 100 }
 
     Map args = ['on': colormap.level > 0,
-                'colormode': 'hs',
                 'hue': convertHEHue(colormap.hue as int),
                 'sat': convertHESaturation(colormap.saturation as int),
                 'bri': convertHELevel(colormap.level as int)]
@@ -1654,17 +1654,16 @@ void componentSetColor(def child, Map colormap) {
 }
 
 void componentSetHue(def child, hue) {
-    setDeviceState(child, ['on': true, 'colormode': 'hs', 'hue': convertHEHue(hue as int)])
+    setDeviceState(child, ['on': true, 'hue': convertHEHue(hue as int)])
 }
 
 void componentSetSaturation(def child, saturation) {
-    setDeviceState(child, ['on': true, 'colormode': 'hs', 'sat': convertHESaturation(saturation as int)])
+    setDeviceState(child, ['on': true, 'sat': convertHESaturation(saturation as int)])
 }
 
 void componentSetColorTemperature(def child, colortemperature, level = null, transitionTime = null) {
     Map values = [
         'on': (level?:100) > 0,
-        'colormode': 'ct', 
         'ct': convertHEColortemp(colortemperature as int)]
     if (level)          { values['bri']            = convertHELevel(level as int) }
     if (transitionTime) { values['transitiontime'] = (transitionTime as int) * 10}
