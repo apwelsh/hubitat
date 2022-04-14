@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.7.15
+ * Version 2.8.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -118,6 +118,8 @@ metadata {
         command 'queryMediaPlayer'
         command 'queryActiveApp'
         command 'queryInstalledApps'
+
+        command 'setChannel', [[name: channel, type: 'NUMBER']]
 
         command 'search', [[name: 'Keywords*',        type: 'STRING', description: 'Search keywords (REQUIRED)'],
                            [name: 'Type*',            type: 'ENUM',   constraints: ['movie', 'tv-show', 'person', 'channel', 'game']],
@@ -704,6 +706,18 @@ void refresh() {
     }
 }
 
+void setChannel(Number channel) {
+    if (channel == null) { return }
+    if (currentValue('switch') != 'on') { return }
+    if (currentValue('mediaInputSource') != 'InputTuner') { return }
+
+    keyPress('Left')
+    channel.toString().toCharArray().flatten().each {
+        keyPress("Lit_${it}")
+    }
+    keyPress('Select')
+}
+
 /**
  * Custom DTH Command interface functions
  **/
@@ -1269,6 +1283,7 @@ void parseKeyPress(response, data) {
 }
 
 private Boolean isValidKey(key) {
+    if ( key ==~ /Lit_./ ) { return true }
     def keys = [
         'Home',      'Back',       'Select',
         'Up',        'Down',       'Left',        'Right',
