@@ -1283,9 +1283,15 @@ private String driverTypeForSensor(id) {
 
     if (!state.sensors) { return null }
     def type=state.sensors[id]?.type
+    def modelid=state.sensors[id]?.modelid // Since the RunLessWires Friends of Hue switch still says it's a ZGPSwitch gotta use modelid to find it
     switch (type) {
         case 'ZGPSwitch':
+        if (modelid == 'FOHSWITCH') {
+            return 'RunLessWires'
+        }
+        else {
             return 'Tap' // 4 button controller (push only)
+        }
         case 'ZLLSwitch':
             return 'Dimmer' // 4 button controller (PHR)
         case 'ZLLPresence':
