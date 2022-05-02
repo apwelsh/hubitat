@@ -1,10 +1,11 @@
 /**
- * Advanced Hue RunLessWires Sensor 
+ * Advanced Hue RunLessWires Sensor
  * Version 1.0.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App. Although this can work in poll mode,
  * it is highly recommended to use the event stream based push notifications.
+ * Author: Curtis Edge (@pocketgeek)
  *-------------------------------------------------------------------------------------------------------------------
  * Copyright 2020 Armand Peter Welsh
  *
