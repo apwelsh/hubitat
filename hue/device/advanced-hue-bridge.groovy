@@ -280,7 +280,7 @@ private Map updateEventHandler(Map data) {
         case 'device_power':
             //log.info "Parsing event: ${event}"
 
-            String nid = parent.networkIdForSensor(idV1)
+            String nid = parent.networkIdForSensor(this, idV1)
             if (!parent.getChildDevice(nid)) { break }
 
             event.state << mapEventState(data)
