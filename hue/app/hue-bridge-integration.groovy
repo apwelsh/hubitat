@@ -290,7 +290,7 @@ void verifyDevice(parsedEvent) {
                                 'name':         "${name}",
                                 'serialNumber': "${device.serialNumber}"]
 
-                def hubs = getHubs()
+                Map hubs = getHubs()
                 hubs << ["${ssdpUSN}": parsedEvent]
                 if (logEnable) { log.debug "Discovered new hub: ${name}" }
             }
@@ -321,7 +321,8 @@ def requestHubAccessHandler(response, args) {
     def status = response.getStatus();
     if (status < 200 || status >= 300) { return }
 
-    def data = response.json
+    def data = response.getJson()
+
     if (data) {
         if (data.error?.description) {
             if (logEnable) { log.error "${data.error.description[0]}" }
@@ -370,8 +371,10 @@ void refreshHubStatus() {
             } else {
                 parseStatus(data)
             }
+            setHueProperty(child, [state: data.state, action: data.action])
+        } else {
+            if (debug) { log.debug "Received unknown response: ${it}" }  // temporary to catch unknown result state
         }
-
     }
 }
 
