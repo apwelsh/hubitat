@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.8.0
+ * Version 2.8.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -118,6 +118,10 @@ metadata {
         command 'queryMediaPlayer'
         command 'queryActiveApp'
         command 'queryInstalledApps'
+        command 'volumeUp10'
+        command 'volumeDown10'
+
+        command 'quiter'
 
         command 'setChannel', [[name: channel, type: 'NUMBER']]
 
@@ -660,6 +664,14 @@ void channelDown() {
     keyPress('ChannelDown')
 }
 
+void volumeUp10() {
+    sequentialKeyPress((1..10).collect { 'VolumeUp' })
+}
+
+void volumeDown10() {
+    sequentialKeyPress((1..10).collect { 'VolumeDown' })
+}
+
 void volumeUp() {
     keyPress('VolumeUp')
 }
@@ -668,7 +680,7 @@ void volumeDown() {
     keyPress('VolumeDown')
 }
 
-void setVolume(Integer level) {
+void setVolume(Number level) {
     log.info 'Set volume not supported by Roku. Please report the Roku ECP protocol limitation to Roku support.'
 }
 
@@ -711,11 +723,13 @@ void setChannel(Number channel) {
     if (currentValue('switch') != 'on') { return }
     if (currentValue('mediaInputSource') != 'InputTuner') { return }
 
-    keyPress('Left')
+    List keys = []
+    keys << 'Left'
     channel.toString().toCharArray().flatten().each {
-        keyPress("Lit_${it}")
+        keys << "Lit_${it}"
     }
-    keyPress('Select')
+    keys << 'Select'
+    sequentialKeyPress(keys)
 }
 
 /**
@@ -1278,6 +1292,26 @@ void parseKeyPress(response, data) {
         refresh()
     } finally {
         if (this[SETTING_DBG_ENABLE]) log.debug "keyPress: exit"
+        scheduleRefresh()
+    }
+}
+
+void sequentialKeyPress(keys) {
+    keys.each { key ->
+        if (!isValidKey(key)) {
+            log.warn "Invalid key press: ${key}"
+            return
+        }
+    }
+    unschedule('queryDeviceInfo')
+    unschedule('queryActiveApp')
+    try {
+        keys.each { key -> 
+            if (this[SETTING_DBG_ENABLE]) log.debug "sequentialKeyPress(${key}): enter"
+            httpPost([uri:apiPath("keypress/${key}"), timeout: this[SETTING_TIMEOUT]], {}) 
+        }
+    } catch (ex) {
+        logExceptionWithPowerWarning("sequentialKeyPress", ex)
         scheduleRefresh()
     }
 }
