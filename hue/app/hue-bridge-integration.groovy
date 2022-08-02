@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.13
+ * Version 1.4.14
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -26,6 +26,7 @@
 
  import groovy.transform.Field
  import java.util.concurrent.ConcurrentHashMap
+ import java.math.RoundingMode
 
 definition(
     name:'Advanced Hue Bridge Integration',
@@ -1722,11 +1723,12 @@ Number convertHEColortemp(Number value) {
 }
 
 Number convertHELightLevel(Number lightLevel) {
-    Math.pow(10, ((lightLevel?:1-1)/10000.0)) as int
+    Math.pow(10, (((lightLevel?:1)-1)/10000.0)) as int
 }
 
 Number convertHETemperature(Number temperature) {
-    (((location.temperatureScale == 'C') ? temperature : ((temperature?:0 * 1.8) as int) + 3200)) / 100
+    Number tC = (temperature?:0) / 100
+    (location.temperatureScale == 'C' ? tC : ((tC * 1.8) + 32)).setScale(1, RoundingMode.HALF_UP)
 }
 
 String convertHBColorMode(String value) {
