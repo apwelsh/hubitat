@@ -36,11 +36,11 @@
       ]
     },
     {
+      "id": "1fb918e8-21aa-419c-a98d-828673b174dc",
       "name": "iopool EcO Pool/Spa Monitor",
       "category": "Integrations",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/iopool/packageManifest.json",
       "description": "Add support to Hubitat for iopool's EcO pool / spa water quality monitor.  iopool can also be used breath new life into the no-longer support pHin pool monitor.  The iopool EcO is used to track water pH, Oxidation-reduction potential (ora), and temperature.",
-      "id": "47535c62-aa2a-492c-a8df-0f3c7300fd11",
       "tags": [
         "Cloud",
         "LAN",
