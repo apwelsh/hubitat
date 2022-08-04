@@ -1,0 +1,33 @@
+{
+  "packageName": "iopool EcO Pool/Spa Monitor",
+  "author": "Armand Welsh",
+  "minimumHEVersion": "2.2.6",
+  "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/LICENSE.md",
+  "documentationLink": "https://raw.githubusercontent.com/apwelsh/hubitat/master/iopool/README.md",
+  "communityLink": "",
+  "dateReleased": "2022-07-03",
+  "apps": [
+    {
+      "id": "5e6e32c5-0b47-4b04-a230-c3f2ce73c07d",
+      "name": "iopool Connect",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/iopool/app/iopool-connect.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": true,
+      "version": "1.0.0"
+    }
+  ],
+  "drivers": [
+    {
+      "id": "a9654937-91ff-4a1d-817b-0f70faec38a0",
+      "name": "EcO Water Quality Sensor",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/iopool/device/eco-sensor",
+      "required": true,
+      "version": "1.0.0"
+    }
+  ],
+  "version": "1.0.0",
+  "releaseNotes": "1.0.0 - Initial release"
+}

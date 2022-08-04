@@ -21,6 +21,8 @@ Welcome to my Hubitat Github repo.  All drivers and applications in this repo ar
  - [Advanced Hue Hub Integration](hue/README.md)
    - This project's goal is to bridge the gap that currently exists between Hubitat and Hue Bridge.  The hubitat native support should be used whenever possible -- however, there are some things in the native hue integration that create an unpleasent user experience.  Hue Scenes are not supported in hubitat.  This *experimental*, and **in development** project's goal is to bring Hue scenes to hubitat as child devices of the hue groups.
    - This project has been expanded to also support real-time updates for hue device changes, and adds support for hue sensors, and dimmer controllers.  
+ - [iopool EcO Pool/Spa Monitor](iopool/README.md)
+   - This projects integrates the iopool EcO pool monitor with Hubitat.  iopool is pool monitoring solution that can monitor pH, temperature, and sanitization level of your pool or spa water.  
 - [Tesla Connect](tesla/README.md) **Project is dead**
    - This project's goal is to convert the SmartThings Tesla-Connect solution for Hubitat, and enhance it to provide features not available with the current SmartThings solution.  This *experimental*, and **in development** project's goal is to bring Tesla Presence based logic to Hubit and provide an alternative to Tesla HomeLink.  _** Update **_ Tesla Motors has changed how their service works, and this app no longer works.
 
