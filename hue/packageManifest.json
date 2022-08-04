@@ -14,6 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/app/hue-bridge-integration.groovy",
       "required": true,
       "oauth": false,
+      "primary": true,
       "version": "1.4.14"
     }
   ],

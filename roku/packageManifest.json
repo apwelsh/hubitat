@@ -14,6 +14,7 @@
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/roku/app/roku-connect.groovy",
       "required": false,
       "oauth": false,
+      "primary": true,
       "version": "1.3.0"
     }
   ],
