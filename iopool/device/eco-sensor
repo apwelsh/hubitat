@@ -1,0 +1,302 @@
+/**
+ * iopool EcO pool and spa water quality sensor
+ * Version 1.0.0
+ * Download: https://github.com/apwelsh/hubitat
+ * Description:
+ * This is a child device handler for the iopool manager app.  This device reports water temperature, pH level, and 
+ * Oxidation-reduction potential (ORP).  Through the use of this integration, you can integrate your iopool EcO system
+ * equiped with iopool Gateway products to monitor your pool or spa water quality.
+ *-------------------------------------------------------------------------------------------------------------------
+ * Copyright 2022 Armand Peter Welsh
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated
+ * documentation files (the 'Software'), to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software,
+ * and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all copies or substantial portions of
+ * the Software.
+ *
+ * THE SOFTWARE IS PROVIDED 'AS IS', WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO
+ * THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF
+ * CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+ * IN THE SOFTWARE.
+ *-------------------------------------------------------------------------------------------------------------------
+ **/
+
+import groovy.transform.Field
+import java.math.RoundingMode
+
+
+@Field static final Boolean DEFAULT_LOG_ENABLE = true
+@Field static final Boolean DEFAULT_DBG_ENABLE = false
+
+@Field static final Number DEFAULT_ORP_MIN       = 550
+@Field static final Number DEFAULT_ORP_LO        = 650
+@Field static final Number DEFAULT_ORP_HI        = 800
+@Field static final Number DEFAULT_ORP_MAX       = 1000
+
+@Field static final Number DEFAULT_PH_MIN    = 6.8
+@Field static final Number DEFAULT_PH_LO     = 7.1
+@Field static final Number DEFAULT_PH_HI     = 7.7
+@Field static final Number DEFAULT_PH_MAX    = 8.1
+
+@Field static final Number DEFAULT_TEMP_MINc = 30
+@Field static final Number DEFAULT_TEMP_LOc  = 33.9
+@Field static final Number DEFAULT_TEMP_HIc  = 38.3
+@Field static final Number DEFAULT_TEMP_MAXc = 40
+
+@Field static final Number DEFAULT_TEMP_MINf = 86
+@Field static final Number DEFAULT_TEMP_LOf  = 93
+@Field static final Number DEFAULT_TEMP_HIf  = 101
+@Field static final Number DEFAULT_TEMP_MAXf = 104
+
+@Field static final String SETTING_ORP_MIN     = 'orpMinThreshold'
+@Field static final String SETTING_ORP_LO      = 'orpLowThreshold'
+@Field static final String SETTING_ORP_HI      = 'orpHiThreshold'
+@Field static final String SETTING_ORP_MAX     = 'orpMaxThreshold'
+
+@Field static final String SETTING_PH_MIN      = 'pHMinThreshold'
+@Field static final String SETTING_PH_LO       = 'pHLowThreshold'
+@Field static final String SETTING_PH_HI       = 'pHHiThreshold'
+@Field static final String SETTING_PH_MAX      = 'pHMaxThreshold'
+
+@Field static final String SETTING_TEMP_MIN    = 'tempMinThreshold'
+@Field static final String SETTING_TEMP_LO     = 'tempLowThreshold'
+@Field static final String SETTING_TEMP_HI     = 'tempHiThreshold'
+@Field static final String SETTING_TEMP_MAX    = 'tempMaxThreshold'
+
+@Field static final String SETTING_LOG_ENABLE  = 'logEnable'
+@Field static final String SETTING_DBG_ENABLE  = 'debug'
+
+metadata {
+    definition (
+        name:      'EcO Water Quality Sensor',
+        namespace: 'apwelsh',
+        author:    'Armand Welsh',
+        importUrl: 'https://raw.githubusercontent.com/apwelsh/hubitat/master/iopool/device/eco-sensor.groovy') {
+
+        capability 'Sensor'
+        capability 'TemperatureMeasurement'
+        capability 'pHMeasurement'
+        capability 'Refresh'
+
+        attribute  'orp',               'number' // Oxidation-reduction Potential (Disinfection potential) Units: mV
+        attribute  'orpStatus',         'string'
+        attribute  'temperatureStatus', 'string'
+        attribute  'pHStatus',          'string'
+
+        attribute  'mode',               'string' // ENUM ["STANDARD", "OPENING", "WINTER", "INITIALIZING"]
+        attribute  'actionRequired',     'boolean'
+        attribute  'lastMeasurement',    'date'   // Date/time of last measure in UTC
+
+    }
+}
+
+preferences {
+
+    input title: '<b>Oxidation-reduction potential (ORP) condition thresholds</b>',
+          description: 'Threshold values used to determine the effectiveness of water sanitizer (chlorine/bromine)',
+          type: 'paragraph',
+          element: 'paragraph'
+
+    input name: SETTING_ORP_MIN,
+          type: 'number',
+          defaultValue: DEFAULT_ORP_MIN,
+          title: 'Minimum ORP threshold (mV)',
+          description: '<i style="color: red">Values below this reading are out of range</i>'
+
+    input name: SETTING_ORP_LO,
+          type: 'number',
+          defaultValue: DEFAULT_ORP_LO,
+          title: 'Low ORP threshold (mV)',
+          description: '<i style="color: orange">Values below this reading are out of normal range</i>'
+
+    input name: SETTING_ORP_HI,
+          type: 'number',
+          defaultValue: DEFAULT_ORP_HI,
+          title: 'High ORP threshold (mV)',
+          description: '<i style="color: orange">Values above this reading are out of normal range</i>'
+
+    input name: SETTING_ORP_MAX,
+          type: 'number',
+          defaultValue: DEFAULT_ORP_MAX,
+          title: 'Max ORP threshold (mV)',
+          description: '<i style="color: red">Values above this reading are out of range</i>'
+
+    input title: '<b>Acidity (pH) condition thresholds</b>',
+          description: 'Threshold values used to determine the overall safety of the water.  Low values reduce sanitizer effectiveness, high values cause scale formation and premature equipment failure.',
+          type: 'paragraph',
+          element: 'paragraph'
+
+    input name: SETTING_PH_MIN,
+          type: 'decimal',
+          defaultValue: DEFAULT_PH_MIN,
+          title: 'Minimum pH threshold',
+          description: '<i style="color: red">Values below this reading are out of range</i>'
+
+    input name: SETTING_PH_LO,
+          type: 'decimal',
+          defaultValue: DEFAULT_PH_LO,
+          title: 'Low pH threshold',
+          description: '<i style="color: orange">Values below this reading are out of normal range</i>'
+
+    input name: SETTING_PH_HI,
+          type: 'decimal',
+          defaultValue: DEFAULT_PH_HI,
+          title: 'High pH threshold',
+          description: '<i style="color: orange">Values above this reading are out of normal range</i>'
+
+    input name: SETTING_PH_MAX,
+          type: 'decimal',
+          defaultValue: DEFAULT_PH_MAX,
+          title: 'Max pH threshold',
+          description: '<i style="color: red">Values above this reading are out of range</i>'
+
+    input title: '<b>Temperature operating thresholds</b>',
+          description: 'Threshold values used to determine the relative safety and comfort of the water temperature.',
+          type: 'paragraph',
+          element: 'paragraph'
+
+    input name: SETTING_TEMP_MIN,
+          type: 'decimal',
+          defaultValue: DEFAULT_TEMP_MIN,
+          title: 'Minimum temp threshold',
+          description: '<i style="color: red">Values below this reading are out of range</i>'
+
+    input name: SETTING_TEMP_LO,
+          type: 'decimal',
+          defaultValue: DEFAULT_TEMP_LO,
+          title: 'Low temp threshold',
+          description: '<i style="color: orange">Values below this reading are out of normal range</i>'
+
+    input name: SETTING_TEMP_HI,
+          type: 'decimal',
+          defaultValue: DEFAULT_TEMP_HI,
+          title: 'High temp threshold',
+          description: '<i style="color: orange">Values above this reading are out of normal range</i>'
+
+    input name: SETTING_TEMP_MAX,
+          type: 'decimal',
+          defaultValue: DEFAULT_TEMP_MAX,
+          title: 'Max temp threshold',
+          description: '<i style="color: red">Values above this reading are out of range</i>'
+
+    /*
+    input title: '<b>Miscellaneous Settings</b>',
+          type: 'paragraph',
+          element: 'paragraph'
+
+    input name: SETTING_LOG_ENABLE,
+          type: 'bool',
+          defaultValue: DEFAULT_LOG_ENABLE,
+          title: 'Enable informational logging'
+
+    input name: SETTING_DBG_ENABLE,
+          type: 'bool',
+          defaultValue: DEFAULT_DBG_ENABLE,
+          title: 'Enable debug logging'
+    */
+}
+
+void updateSetting(String name, Object value) {
+    device.updateSetting(name, value)
+    this[name] = value
+}
+
+/**
+ * Hubitat DTH Lifecycle Functions
+ **/
+def installed() {
+    updated()
+    refresh()
+}
+
+def updated() {
+    if (this[SETTING_LOG_ENABLE] == null) { updateSetting(SETTING_LOG_ENABLE, DEFAULT_LOG_ENABLE) }
+    if (this[SETTING_DBG_ENABLE] == null) { updateSetting(SETTING_DBG_ENABLE, DEFAULT_DBG_ENABLE) }
+
+    if (this[SETTING_ORP_MIN] == null) { updateSetting(SETTING_ORP_MIN, DEFAULT_ORP_MIN) }
+    if (this[SETTING_ORP_LO]  == null) { updateSetting(SETTING_ORP_LO,  DEFAULT_ORP_LO) }
+    if (this[SETTING_ORP_HI]  == null) { updateSetting(SETTING_ORP_HI,  DEFAULT_ORP_HI) }
+    if (this[SETTING_ORP_MAX] == null) { updateSetting(SETTING_ORP_MAX, DEFAULT_ORP_MAX) }
+
+    if (this[SETTING_PH_MIN] == null) { updateSetting(SETTING_PH_MIN, DEFAULT_PH_MIN) }
+    if (this[SETTING_PH_LO]  == null) { updateSetting(SETTING_PH_LO,  DEFAULT_PH_LO) }
+    if (this[SETTING_PH_HI]  == null) { updateSetting(SETTING_PH_HI,  DEFAULT_PH_HI) }
+    if (this[SETTING_PH_MAX] == null) { updateSetting(SETTING_PH_MAX, DEFAULT_PH_MAX) }
+
+    if (this[SETTING_TEMP_MIN] == null) { updateSetting(SETTING_TEMP_MIN, location.temperatureScale == 'C' ? DEFAULT_TEMP_MINc : DEFAULT_TEMP_MINf) }
+    if (this[SETTING_TEMP_LO]  == null) { updateSetting(SETTING_TEMP_LO,  location.temperatureScale == 'C' ? DEFAULT_TEMP_LOc  : DEFAULT_TEMP_LOf) }
+    if (this[SETTING_TEMP_HI]  == null) { updateSetting(SETTING_TEMP_HI,  location.temperatureScale == 'C' ? DEFAULT_TEMP_HIc  : DEFAULT_TEMP_HIf) }
+    if (this[SETTING_TEMP_MAX] == null) { updateSetting(SETTING_TEMP_MAX, location.temperatureScale == 'C' ? DEFAULT_TEMP_MAXc : DEFAULT_TEMP_MAXf) }
+
+    if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
+}
+
+
+/*
+ * Device Capability Interface Functions
+ */
+
+void refresh() {
+    if (this[SETTING_DBG_ENABLE]) { log.debug "Sensor (${this}) refreshing" }
+    //parent.getDeviceState(this)
+    queryPool()
+}
+
+private String getApiKey() {
+    return parent.apiKey
+}
+
+public void parseMessage(Map message) {
+    sendEvent(name: 'mode', value: message.mode)
+    sendEvent(name: 'actionRequired', value: message.hasAnActionRequired == true)
+    if (message.latestMeasure?.isValid) {
+        Map latest = message.latestMeasure
+        if (latest.temperature) { setTemperature(latest.temperature) }
+        if (latest.ph)  { setPh(latest.ph) }
+        if (latest.orp) { setOrp(latest.orp) }
+        if (latest.measuredAt) { sendEvent(name: 'lastMeasurement', value: toDateTime(latest.measuredAt)) }
+    }
+}
+
+private void queryPool() {
+    String id = device.deviceNetworkId
+    httpGet([uri:"https://api.iopool.com/v1/pool/${id}", timeout: 20, headers: ['x-api-key': apiKey]]) { response ->
+        if (response.success) { parseMessage(response.data) }
+    }
+}
+
+private void setTemperature(Number tC) {
+    Number temp = (location.temperatureScale == 'C' ? tC : ((tC * 1.8) + 32)).setScale(1, RoundingMode.HALF_UP)
+    sendEvent(name: 'temperature', value: temp)
+    String status = 'normal'
+    if (temp <= this[SETTING_TEMP_MIN]) { status = 'low' } else
+    if (temp >= this[SETTING_TEMP_MAX]) { status = 'high' } else
+    if (temp <= this[SETTING_TEMP_LO])  { status = 'sunken' } else
+    if (temp >= this[SETTING_TEMP_HI])  { status = 'elevated' }
+    sendEvent(name: 'temperatureStatus', value: status)
+}
+
+private void setPh(Number newValue) {
+    Number ph = newValue.setScale(1, RoundingMode.HALF_UP)
+    sendEvent(name: 'pH',  value: ph)
+    String status = 'normal'
+    if (ph <= this[SETTING_PH_MIN]) { status = 'low' } else
+    if (ph >= this[SETTING_PH_MAX]) { status = 'high' } else
+    if (ph <= this[SETTING_PH_LO])  { status = 'sunken' } else
+    if (ph >= this[SETTING_PH_HI])  { status = 'elevated' }
+    sendEvent(name: 'pHStatus', value: status)
+}
+
+private void setOrp(Number orp) {
+    sendEvent(name: 'orp', value: orp)
+    String status = 'normal'
+    if (orp <= this[SETTING_ORP_MIN]) { status = 'low' } else
+    if (orp >= this[SETTING_ORP_MAX]) { status = 'high' } else
+    if (orp <= this[SETTING_ORP_LO])  { status = 'sunken' } else
+    if (orp >= this[SETTING_ORP_HI])  { status = 'elevated' }
+    sendEvent(name: 'orpStatus', value: status)
+}
