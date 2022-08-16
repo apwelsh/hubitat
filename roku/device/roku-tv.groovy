@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.8.1
+ * Version 2.8.2
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -824,7 +824,6 @@ void pingDevice() {
             if (currentValue('power') != 'Off') {
                 sendEvent(name: 'switch', value: 'off')
                 sendEvent(name: 'power', value: 'Off')
-                setCurrentApplication('Roku')
                 sendEvent(name: 'mediaInputSource', value: 'Home')
                 sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
             }
@@ -921,7 +920,7 @@ void setCurrentApplication(currentApp) {
     // only perform updated if the application is different from last check
     if (currentApp != previousApp) {
 
-        if (currentApp == 'Roku') {
+        if (currentApp ==~ /Roku|Home/) {
             unschedule('queryMediaPlayer')
             scheduleQueryDeviceInfo()
         } else  {
@@ -1185,7 +1184,6 @@ private def parsePowerState(body) {
                     sendEvent(name: 'switch', value: 'off')
                     sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
                     sendEvent(name: 'mediaInputSource', value: 'Home')
-                    setCurrentApplication('Roku')
                     scheduleQueryActiveApp()
                     unschedule('queryMediaPlayer')
                     unschedule('queryInstalledApps')
@@ -1432,7 +1430,6 @@ private void logExceptionWithPowerWarning(String method, ex) {
         }
         sendEvent(name: 'switch', value: 'off')
         sendEvent(name: 'power', value: 'Off')
-        setCurrentApplication('Roku')
         sendEvent(name: 'mediaInputSource', value: 'Home')
         sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
         schedulePingDevice()
@@ -1454,5 +1451,5 @@ private Boolean isPowerOff() {
 }
 
 private Boolean viewingHomeScreen() {
-    currentValue('application') == 'Roku'
+    currentValue('application') ==~ /Roku|home/
 }
