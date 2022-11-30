@@ -15,7 +15,7 @@
       "required": true,
       "oauth": false,
       "primary": true,
-      "version": "1.0.0"
+      "version": "1.0.1"
     }
   ],
   "drivers": [
@@ -28,6 +28,6 @@
       "version": "1.0.0"
     }
   ],
-  "version": "1.0.0",
-  "releaseNotes": "1.0.0 - Initial release"
+  "version": "1.0.1",
+  "releaseNotes": "1.0.1 - Fixed NullPointerException in app code \n1.0.0 - Initial release"
 }

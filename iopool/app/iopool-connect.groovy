@@ -1,6 +1,6 @@
 /**
  * iopool Connect
- * Version 1.0.0
+ * Version 1.0.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is an integration app for Hubitat designed to locate, and install any/all attached iopool managed devices.
@@ -174,11 +174,11 @@ private void scheduleRefresh() {
 private void queryPools() {
     try {
         httpGet([uri:'https://api.iopool.com/v1/pools', timeout: 20, headers: ['x-api-key': apiKey]]) { response ->
-            if (!resonse.success) {
+            if (!response.success) {
                 log.error "(${response.status}) ${response.statusLine}"
                 return
             }
-            refreshChildren(resonse.data)
+            refreshChildren(response.data)
         }
     } finally  {
         scheduleRefresh()
