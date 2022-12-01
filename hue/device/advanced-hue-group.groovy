@@ -1,5 +1,5 @@
 /**
- * AdvancedHueGroup v1.5.8
+ * AdvancedHueGroup v1.5.9
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device for the Advanced Hue Bridge Integeration app.  This device is used to manage hue zones and rooms
@@ -141,9 +141,9 @@ def updated() {
 /** Switch Commands **/
 
 void on() {
-    if (logEnable) { log.info "Group (${this}) turning on" }
+    if (logEnable) { log.info 'on()' }
     if (defaultScene?.trim()) {
-        if (logEnable) { log.info "Using scene to turn on group (${this})" }
+        if (logEnable) { log.info 'Using scene to turn on group' }
         activateScene(defaultScene)
     } else {
         parent.componentOn(this)
@@ -152,7 +152,7 @@ void on() {
 }
 
 void off() {
-    if (logEnable) { log.info "Group (${this}) turning off" }
+    if (logEnable) { log.info 'off()' }
     parent.componentOff(this)
     attributeChanged()
 }
@@ -160,19 +160,19 @@ void off() {
 /** ColorControl Commands **/
 
 void setColor(Map colormap) {
-    if (logEnable) { log.info "Setting (${this}) mapped color: ${colormap}" }
+    if (logEnable) { log.info "Setting mapped color: ${colormap}" }
     parent.componentSetColor(this, colormap)
     attributeChanged()
 }
 
 void setHue(hue) {
-    if (logEnable) { log.info "Setting (${this}) hue: ${hue}" }
+    if (logEnable) { log.info "Setting hue: ${hue}" }
     parent.componentSetHue(this, hue)
     attributeChanged()
 }
 
 void setSaturation(saturation) {
-    if (logEnable) { log.info "Setting (${this}) saturation: ${saturation}" }
+    if (logEnable) { log.info "Setting saturation: ${saturation}" }
     parent.componentSetSaturation(this, saturation)
     attributeChanged()
 }
@@ -180,7 +180,7 @@ void setSaturation(saturation) {
 /** ColorTemperature Commands **/
 
 void setColorTemperature(colortemperature, level = null, transitionTime = null) {
-    if (logEnable) { log.info "Setting (${this}) color temp: ${colortemperature}" }
+    if (logEnable) { log.info "Setting color temp: ${colortemperature}" }
     parent.componentSetColorTemperature(this, colortemperature, level, transitionTime)
     attributeChanged()
 }
@@ -188,7 +188,7 @@ void setColorTemperature(colortemperature, level = null, transitionTime = null) 
 /** SwitchLevel Commands **/
 
 void setLevel(level, duration=null) {
-    if (logEnable) { log.info "Setting (${this}) level: ${level}" }
+    if (logEnable) { log.info "Setting level: ${level}" }
     parent.componentSetLevel(this, level, duration)
     attributeChanged()
 }
@@ -196,20 +196,20 @@ void setLevel(level, duration=null) {
 /** ChangeLevel Commands **/
 
 void startLevelChange(String direction) {
-    if (logEnable) { log.info "Starting (${this}) level change: ${direction}" }
+    if (logEnable) { log.info "Starting level change: ${direction}" }
     parent.componentStartLevelChange(this, direction)
     attributeChanged()
 }
 
 void stopLevelChange() {
-    if (logEnable) { log.info "Stopping (${this}) level change" }
+    if (logEnable) { log.info 'Stopping level change' }
     parent.componentStopLevelChange(this)
     attributeChanged()
 }
 
 /** Refresh Commands **/
 void refresh() {
-    if (debug) { log.debug "Bridge (${this}) refreshing" }
+    if (debug) { log.debug 'Refreshing state' }
     parent.getDeviceState(this)
     resetRefreshSchedule()
 }

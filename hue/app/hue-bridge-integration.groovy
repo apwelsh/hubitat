@@ -1,6 +1,6 @@
 /**
  * Advanced Philips Hue Bridge Integration application
- * Version 1.4.14
+ * Version 1.4.15
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -879,7 +879,7 @@ def requestHubAccessHandler(response, args) {
 }
 
 String getApiUrl() {
-    "https://${bridgeHost}/api/${state.username}/"
+    "https://${bridgeHost}/api/${state.username}"
 }
 
 String getApiV2Url() {
@@ -1111,6 +1111,11 @@ void setDeviceState(def child, Map deviceState) {
     eventQueue.remove(deviceNetworkId)
     eventQueue = eventQueue ?: null // flush memory if list is empty, allows for garbage collection
     if (newState.colormode) { newState.remove('colormode')}
+    
+    if (newState.containsKey('hue') || newState.containsKey('sat')) {
+        if (!newState.containsKey('hue')) { newState.hue = convertHEHue(currentValue(child, 'hue')) }
+        if (!newState.containsKey('sat')) { newState.sat = convertHESaturation(currentValue(child, 'saturation')) }
+    }
 
     String hubId = deviceIdHub(deviceNetworkId)
     String type
@@ -1597,6 +1602,17 @@ void setHueProperty(def child, Map args) {
     // log.debug "Received State ($child): $devstate"
     // log.debug "Translated Events ($child): $events"
     
+    if (child.hasAttribute("colorName")) {
+        String cm = events.colorMode ?: currentValue(child, 'colorMode')
+        if (cm == 'CT') {
+            events.colorName = convertTemperatureToGenericColorName(events.colorTemperature)
+        } else if (cm == 'RGB') {
+            int hue = events.hue ?: currentValue(child, 'hue')
+            int sat = events.saturation ?: currentValue(child, 'saturation')
+            events.colorName = convertHueToGenericColorName(hue, sat)
+        }
+    } 
+    
     events.each { key, value -> sendChildEvent(child, [name: key, value: value]) }
 
     // child.getCapabilities().each { log.info "${it.name} = ${it.reference} :: ${it.toString()}" }
@@ -1715,11 +1731,12 @@ Number convertHESaturation(Number value) {
 }
 
 Number convertHBColortemp(Number value) {
-    Math.round(((500 - value) * (4500 / 347)) + 2000 )
+    // 4500 / 347 = 12.968 (but 12.96 scales better)
+    valueBetween(Math.round(((500 - value) * 12.96) + 2000 ), 2000, 6500)
 }
 
 Number convertHEColortemp(Number value) {
-    valueBetween(Math.round(500 - ((value - 2000) / (4500 / 347))), 153, 500)
+    valueBetween(Math.round(500 - ((value - 2000) / 12.96)), 153, 500)
 }
 
 Number convertHELightLevel(Number lightLevel) {
