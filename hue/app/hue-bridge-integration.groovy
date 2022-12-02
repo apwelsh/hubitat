@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.4.16
+    * Version 1.4.17
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1602,7 +1602,7 @@
         // log.debug "Received State ($child): $devstate"
         // log.debug "Translated Events ($child): $events"
         
-        if (child.hasAttribute("colorName")) {
+        if (child.hasAttribute('colorName')) {
             String cm = events.colorMode ?: currentValue(child, 'colorMode')
             if (cm == 'CT') {
                 events.colorName = convertTemperatureToGenericColorName(events.colorTemperature)
@@ -1611,7 +1611,13 @@
                 int sat = events.saturation ?: currentValue(child, 'saturation')
                 events.colorName = convertHueToGenericColorName(hue, sat)
             }
-        } 
+        }
+
+        if (child.hasAttribute('level')) {
+            String sw = events.switch ?: currentValue(child, 'switch')
+            events.level = valueBetween(events.level, (sw == 'on' ? 1 : 0), 100)
+        }
+
         
         events.each { key, value -> 
             sendChildEvent(child, [name: key, value: value]) 
@@ -1712,7 +1718,7 @@
     }
 
     Integer convertHBLevel(Number value) {
-        Math.round(value / 2.54)
+        valueBetween(Math.round(value / 2.54), 0, 100)
     }
 
     Integer convertHELevel(Integer value) {
