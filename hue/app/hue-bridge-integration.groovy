@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.4.17
+    * Version 1.4.18
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1113,8 +1113,8 @@
         if (newState.colormode) { newState.remove('colormode')}
         
         if (newState.containsKey('hue') || newState.containsKey('sat')) {
-            if (!newState.containsKey('hue')) { newState.hue = convertHEHue(currentValue(child, 'hue')) }
-            if (!newState.containsKey('sat')) { newState.sat = convertHESaturation(currentValue(child, 'saturation')) }
+            if (!newState.containsKey('hue') && currentValue(child, 'hue') != null) { newState.hue = convertHEHue(currentValue(child, 'hue')) }
+            if (!newState.containsKey('sat') && currentValue(child, 'saturation') != null) { newState.sat = convertHESaturation(currentValue(child, 'saturation')) }
         }
 
         String hubId = deviceIdHub(deviceNetworkId)
@@ -1609,15 +1609,16 @@
             } else if (cm == 'RGB') {
                 int hue = events.hue ?: currentValue(child, 'hue')
                 int sat = events.saturation ?: currentValue(child, 'saturation')
-                events.colorName = convertHueToGenericColorName(hue, sat)
+                if (hue != null && sat != null) {
+                    events.colorName = convertHueToGenericColorName(hue, sat)
+                }
             }
         }
 
-        if (child.hasAttribute('level')) {
+        if (events.level && child.hasAttribute('level')) {
             String sw = events.switch ?: currentValue(child, 'switch')
             events.level = valueBetween(events.level, (sw == 'on' ? 1 : 0), 100)
         }
-
         
         events.each { key, value -> 
             sendChildEvent(child, [name: key, value: value]) 
@@ -1630,6 +1631,7 @@
         
         // Fast-fail here to abort additional processing if this is not a color capable device
         if (!child.hasCapability('ColorControl')) { return }
+
         // Fast-fail here to abort additional processing if this is not an XY color change
         String colorMode = events.colorMode?:currentValue(child, 'ColorMode')
         if (colorMode != 'RGB' || !devstate.xy) { return }
