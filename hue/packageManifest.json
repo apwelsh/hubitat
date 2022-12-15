@@ -15,7 +15,7 @@
       "required": true,
       "oauth": false,
       "primary": true,
-      "version": "1.4.18"
+      "version": "1.4.19"
     }
   ],
   "drivers": [
@@ -84,6 +84,6 @@
       "version": "1.0.0"
     }
   ],
-  "version": "1.9.5",
-  "releaseNotes": "1.9.x revisions:\n1.9.5 - Fix Null pointer when updating some groups lighting values.\n1.9.4 - Change minimum level reported to HE to 1, if hue device is on\n1.9.3 - Fixed scene bug to turn off active scene when group is turned off.\n1.9.2 - Fixed Hue Group handling of color / saturation changes not working on hue hub.  Added support for colorName reporting.  Removed redundant device info from group logging.\n1.9.1 - Fixed bug resulting in wrong temperatures reported on temp sensors.\n1.9.0 - Added RunLessWires Friends of Hue switch. (Thanks to @pocketgeek)\n1.8.x revisions:\n1.8.6 - Removed colormode state assignment, which has been removed from the Hue API, and no longer works.  With this change in Hue, some non-hue lighs will no longer work in groups correctly.  I do not have a fix for this Hue change.\n1.8.5 - Modified the main app to support devices w/o label defined.\n1.8.4 - Fixed errors reported in log when adding a new hue group.\n1.8.3 - Fix for default scene of group that prevents the group from turning on when scened default scene is defined.  This appears to be a change in Hue hub behavior, possibly related to v2 API updates. \n1.8.2 - Update dimmer and tap devices to allow pressing the same button multiple times, without losing the press event. \n1.8.1 - Correct the Hue Tap device name so the applicaiton can correctly associate the Tap button device to the device driver."
+  "version": "1.9.6",
+  "releaseNotes": "1.9.x revisions:\n1.9.6 - Fix type cast conversion error on line 1610.\n1.9.5 - Fix Null pointer when updating some groups lighting values.\n1.9.4 - Change minimum level reported to HE to 1, if hue device is on\n1.9.3 - Fixed scene bug to turn off active scene when group is turned off.\n1.9.2 - Fixed Hue Group handling of color / saturation changes not working on hue hub.  Added support for colorName reporting.  Removed redundant device info from group logging.\n1.9.1 - Fixed bug resulting in wrong temperatures reported on temp sensors.\n1.9.0 - Added RunLessWires Friends of Hue switch. (Thanks to @pocketgeek)\n1.8.x revisions:\n1.8.6 - Removed colormode state assignment, which has been removed from the Hue API, and no longer works.  With this change in Hue, some non-hue lighs will no longer work in groups correctly.  I do not have a fix for this Hue change.\n1.8.5 - Modified the main app to support devices w/o label defined.\n1.8.4 - Fixed errors reported in log when adding a new hue group.\n1.8.3 - Fix for default scene of group that prevents the group from turning on when scened default scene is defined.  This appears to be a change in Hue hub behavior, possibly related to v2 API updates. \n1.8.2 - Update dimmer and tap devices to allow pressing the same button multiple times, without losing the press event. \n1.8.1 - Correct the Hue Tap device name so the applicaiton can correctly associate the Tap button device to the device driver."
 }
