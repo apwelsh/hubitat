@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.3.12
+ * Version 1.3.13
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -163,6 +163,9 @@ void eventStreamStatus(String message) {
 }
 
 void parse(String text) {
+    
+    if (!text) { return }
+
     if (text.startsWith(':')) {
         return
     }
@@ -246,6 +249,11 @@ private void deleteEventHandler(Map data) {
 private Map updateEventHandler(Map data) {
 
     Map event = [state:[:], action:[:], config:[:]]
+
+    if (!data.id_v1) {
+        if (this[SETTING_DBG_ENABLE]) { log.debug "Received unparsable message; missing id_v1: ${data}" }
+        return [:]
+    }
     String idV1 = (data.id_v1.split('/') as List).last()
 
     String dataType = data.type
