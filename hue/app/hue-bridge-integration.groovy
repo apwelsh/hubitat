@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.4.19
+    * Version 1.4.20
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1602,7 +1602,7 @@
         // log.debug "Received State ($child): $devstate"
         // log.debug "Translated Events ($child): $events"
         
-        if (child.hasAttribute('colorName')) {
+        if (child.hasAttribute('colorName') && isHubVersion('2.3.2')) {
             String cm = events.colorMode ?: currentValue(child, 'colorMode')
             if (cm == 'CT') {
                 events.colorName = convertTemperatureToGenericColorName(events.colorTemperature)
@@ -1768,6 +1768,20 @@
         return ''
     }
 
+    boolean isHubVersion(String versionString) {
+        if (!(versionString ==~ /^\d+(\.\d+){2,3}$/)) { return false }
+        List minVer = versionString.split('\\.')
+        List curVer = getLocation().getHub().firmwareVersionString.split('\\.')
+        if (curVer.size < minVer.size) { return false }
+        for (int i=0; i< minVer.size(); i++) {
+            int c=curVer[i] as int, m=minVer[i] as int
+            if (c > m) { return true }
+            if (c < m) { return false }
+        }
+        return true
+    }
+
     void syncState(List devices) {
         
     }
+
