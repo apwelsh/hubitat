@@ -1,7 +1,7 @@
 {
   "packageName": "Advanced Hue Hub Integration",
   "author": "Armand Welsh",
-  "minimumHEVersion": "2.2.9",
+  "minimumHEVersion": "2.3.2",
   "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/hue/LICENSE.md",
   "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/hue",
   "communityLink": "https://community.hubitat.com/t/release-advanced-hue-bridge-integration/51420",
