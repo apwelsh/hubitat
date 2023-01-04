@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.0
+ * Version 1.4.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -196,6 +196,7 @@ void parse(String text) {
         }
         if (type == 'data') {
             Map hubEvents = [:]
+            List refreshList = []
             parseJson(message).each { event ->
                 if (this[SETTING_DBG_ENABLE]) {
                     log.debug "Parsing event: ${event}"
@@ -215,6 +216,18 @@ void parse(String text) {
                                 if (props.action) { hubEvents[nid].action << props.action }
                                 if (props.state)  { hubEvents[nid].state << props.state }
                                 if (props.config) { hubEvents[nid].config << props.config }
+                                String dataType = data.type
+                                if (data.type == 'light') {
+                                    def id = parent.deviceIdNode(nid)
+                                    refreshList << parent.state.groups.findAll { it.value.lights?.contains(id) 
+                                    }.keySet().collect { gid -> 
+                                        parent.networkIdForGroup(gid)
+                                    }
+                                    refreshList << nid  // force a refresh of the lights (xy color not yet supported in my code)
+                                }
+                                if (data.type == 'grouped_light') {
+                                    refreshList << nid  // force a refresh of the group (colors not sent on event stream)
+                                }
                             }
 
                             break
@@ -230,6 +243,9 @@ void parse(String text) {
             hubEvents.each { nid, props ->
                 def child = parent.getChildDevice(nid)
                 parent.setHueProperty(child, props)
+            }
+            if (refreshList) {
+                parent.queueDeviceRefresh(refreshList.flatten().unique())
             }
 
             return

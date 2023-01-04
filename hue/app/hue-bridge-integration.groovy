@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.5.0
+    * Version 1.5.1
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -57,7 +57,8 @@
     @Field static final String PAGE_ADD_SENSORS = 'addSensors'
 
     @Field static Map volatileAtomicStateByDeviceId = new ConcurrentHashMap()
-    @Field static Map eventQueue = null
+    @Field static Map volatileAtomicQueuebyDeviceId = new ConcurrentHashMap()
+    @Field static Map volatileAtomicRefreshQueue = new ConcurrentHashMap()
 
     preferences {
         page(name: PAGE_MAINPAGE)
@@ -82,6 +83,26 @@
         if (result == null) {
             result = new ConcurrentHashMap()
             volatileAtomicStateByDeviceId[deviceId] = result
+        }
+        return result
+    }
+
+    synchronized Map getVolatileAtomicQueue(def device) { 
+        Integer deviceId = device.deviceId ?: device.device.deviceId
+        Map result = volatileAtomicQueuebyDeviceId.get(deviceId)
+        if (result == null) {
+            result = new ConcurrentHashMap()
+            volatileAtomicQueuebyDeviceId[deviceId] = result
+        }
+        return result
+    }
+
+    synchronized Map getRefreshQueue() { 
+        Integer appId = app.getId()
+        Map result = volatileAtomicRefreshQueue.get(appId)
+        if (result == null) {
+            result = new ConcurrentHashMap()
+            volatileAtomicRefreshQueue[appId] = result
         }
         return result
     }
@@ -1096,20 +1117,19 @@
 
         String deviceNetworkId = child.device.deviceNetworkId
         // Establish the eventQueue for the device.
-        eventQueue = eventQueue ?: [(deviceNetworkId): deviceState]
-        eventQueue[(deviceNetworkId)] = (eventQueue[(deviceNetworkId)] ?: [:]) + deviceState
+        Map eventQueue = getVolatileAtomicQueue(child)
+        eventQueue.putAll(deviceState)
 
         // If device state does not contain the value on, then determine if we must queue the state for a future call
-        if (!deviceState.on && ! deviceState.scene) {
+        if (!deviceState.on && !deviceState.scene) {
             if ((currentValue(child, 'switch') ?: 'on') == 'off') {
                 return
             }
         }
 
-        Map newState = deviceState.scene ? deviceState : eventQueue[(deviceNetworkId)]
+        Map newState = [:] + (deviceState.scene ? deviceState : eventQueue)
+        eventQueue.clear()
         if (newState.scene) { newState['on'] = true } // Hue no longer turns lights on when scene is activated.
-        eventQueue.remove(deviceNetworkId)
-        eventQueue = eventQueue ?: null // flush memory if list is empty, allows for garbage collection
         if (newState.colormode) { newState.remove('colormode')}
         
         if (newState.containsKey('hue') || newState.containsKey('sat')) {
@@ -1174,6 +1194,23 @@
         }
     }
 
+    void queueDeviceRefresh(List deviceIds) {
+        unschedule(dispatchRefresh)
+        Map queue = volatileAtomicRefreshQueue
+        deviceIds.each { id -> queue[(id)] = true }
+        runIn(1, dispatchRefresh)
+    }
+
+    void dispatchRefresh() {
+        List nids = volatileAtomicRefreshQueue.keySet() as ArrayList
+        volatileAtomicRefreshQueue.clear()
+        nids.each { nid ->
+            def child = getChildDevice(nid)
+            if (child) {
+                getDeviceState(child)
+            }
+        }
+    }
 
     void getDeviceState(def child) {
         String deviceNetworkId = child.device.deviceNetworkId
@@ -1423,7 +1460,6 @@
             def group = getChildDevice(networkIdForGroup(id))
             if (group) {
                 if (dbgEnable) { log.debug "Parsing response: $data for $id" }
-                group.resetRefreshSchedule()
                 if (data.state?.all_on || data.state?.any_on) data.state.remove('on')
                 if (data.state?.all_on || data.state?.any_on) data.action.remove('on')
                 setHueProperty(group, [state: data.state, action: data.action])
@@ -1437,7 +1473,6 @@
             def light = getChildDevice(networkIdForLight(id))
             if (light) {
                 if (dbgEnable) { log.debug "Parsing response: $data for $id" }
-                light.unschedule()
                 setHueProperty(light, [state: data.state, action: data.action])
             }
         }
@@ -1530,7 +1565,6 @@
 
     void setHueProperty(def child, Map args) {
         String type = deviceIdType(child.device.deviceNetworkId) ?: 'device'
-
         Map devstate = args.state
 
         if (type ==~ /group|hub/) {

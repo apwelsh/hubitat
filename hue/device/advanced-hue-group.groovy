@@ -1,5 +1,5 @@
 /**
- * AdvancedHueGroup v1.6.0
+ * AdvancedHueGroup v1.6.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device for the Advanced Hue Bridge Integeration app.  This device is used to manage hue zones and rooms
@@ -232,7 +232,7 @@ void refresh() {
 
 void resetRefreshSchedule() {
     unschedule(refresh)
-    if (settings.refreshInterval) {
+    if (settings.autoRefresh) {
         switch (settings.refreshInterval as int) {
             case 60:
                 runEvery1Minute('refresh')
