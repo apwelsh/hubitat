@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.4.20
+    * Version 1.5.0
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1138,7 +1138,6 @@
 
         // Disabling scheduled refreshes for hub.
         def hub = getChildDeviceForMac(selectedDevice)
-        hub.resetRefreshSchedule()
 
         String url = "${apiUrl}/${type}/${node}/${action}"
         if (dbgEnable) { log.debug "URL: ${url}" }
@@ -1170,10 +1169,6 @@
                     }
                     def device = type == 'group' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
                     setHueProperty(device, [(result[3]): [(result[4]): value]])
-                    if (getVolatileAtomicState(hub).WebSocketSubscribed != true) {
-                        hub.runInMillis(500, 'refresh', [overwrite: true, misfire:'ignore'])
-                    }
-
                 }
             }
         }
@@ -1215,7 +1210,6 @@
                 if (node) {
                     child = getChildDevice(deviceNetworkId)
                     if (type == 'groups') {
-                        child.resetRefreshSchedule()
                         data.state.remove('on')
                         data.action.remove('on')
                     }

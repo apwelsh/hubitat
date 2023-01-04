@@ -1,5 +1,5 @@
 /**
- * AdvancedHueGroup v1.5.9
+ * AdvancedHueGroup v1.6.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device for the Advanced Hue Bridge Integeration app.  This device is used to manage hue zones and rooms
@@ -34,9 +34,17 @@ import groovy.transform.Field
 @Field static final String  DEFAULT_SCENE_MODE       = 'trigger'
 @Field static final Boolean DEFAULT_SCENE_OFF        = false
 @Field static final Boolean DEFAULT_AUTO_REFRESH     = false
-@Field static final Number  DEFAULT_REFRESH_INTERVAL = 60
+@Field static final Number  DEFAULT_REFRESH_INTERVAL = 300
 @Field static final Boolean DEFAULT_ANY_ON           = true
 @Field static final Boolean DEFAULT_LOG_ENABLE       = false
+
+@Field static final Map OPTIONS_REFRESH_INTERVAL     = [   60: '1 Minute',
+                                                          300: '5 Minutes',
+                                                          600: '10 Minutes',
+                                                          900: '15 Minutes',
+                                                         1800: '30 Minutes',
+                                                         3600: '1 Hour',
+                                                        10800: '3 Hours']
 
 @Field static final Map     EVENT_SWITCH_ON          = [name: 'switch', value: 'on']
 @Field static final Map     EVENT_SWITCH_OFF         = [name: 'switch', value: 'off']
@@ -74,10 +82,11 @@ preferences {
 
     if (autoRefresh) {
         input name:         'refreshInterval',
-              type:         'number',
+              type:         'enum',
               defaultValue: DEFAULT_REFRESH_INTERVAL,
               title:        'Refresh Inteval',
-              description:  'Number of seconds to refresh the group state'
+              options:      OPTIONS_REFRESH_INTERVAL,
+              required:     true
     }
 
     input name:         'anyOn',
@@ -114,11 +123,11 @@ metadata {
 }
 
 def installed() {
-    updated()
     initialize()
 }
 
 def initialize() {
+    updated()
     refresh()
 }
 
@@ -133,9 +142,17 @@ def updated() {
     if (settings.anyOn           == null)  { device.updateSetting('anyOn',           DEFAULT_ANY_ON) }
     if (settings.logEnable       == null)  { device.updateSetting('logEnable',       DEFAULT_LOG_ENABLE) }
 
-    if (logEnable) { log.debug 'Preferences updated' }
-    refresh()
+    if (!OPTIONS_REFRESH_INTERVAL[settings.refreshInterval as int]) { 
+        log.warn "Refresh interval is invalid.  Changing refresh interval from ${this[SETTING_REFRESH_INTERVAL]} seconds to default interval of ${OPTIONS_REFRESH_INTERVAL[DEFAULT_REFRESH_INTERVAL]}"
+        updateSetting(settings.refreshInterval, DEFAULT_REFRESH_INTERVAL)
+    }
+    if (settings.autoRefresh) {
+        resetRefreshSchedule()
+    } else {
+        unschedule()
+    }
 
+    if (logEnable) { log.debug 'Preferences updated' }
 }
 
 /** Switch Commands **/
@@ -211,12 +228,35 @@ void stopLevelChange() {
 void refresh() {
     if (debug) { log.debug 'Refreshing state' }
     parent.getDeviceState(this)
-    resetRefreshSchedule()
 }
 
 void resetRefreshSchedule() {
-    unschedule()
-    if (autoRefresh) { runIn(refreshInterval ?: DEFAULT_REFRESH_INTERVAL, refresh, SCHEDULE_NON_PERSIST) }
+    unschedule(refresh)
+    if (settings.refreshInterval) {
+        switch (settings.refreshInterval as int) {
+            case 60:
+                runEvery1Minute('refresh')
+                break
+            case 300:
+                runEvery5Minutes('refresh')
+                break
+            case 600:
+                runEvery10Minutes('refresh')
+                break
+            case 900:
+                runEvery15Minutes('refresh')
+                break
+            case 1800:
+                runEvery30Minutes('refresh')
+                break
+            case 3600:
+                runEvery1Hour('refresh')
+                break
+            case 10800:
+                runEvery3Hours('refresh')
+                break
+        }
+    }
 }
 
 void attributeChanged() {
@@ -289,7 +329,7 @@ void componentOff(def child) {
     if (logEnable) { log.info "Scene (${child}) turning off" }
     // Only change the state to off, there is not action to actually be performed.
     if (sceneMode == 'switch') {
-        if (parent.currentValue(child, 'switch') == 'on') off()
+        if (parent.currentValue(child, 'switch') == 'on') { off() }
     } else {
         parent.sendChildEvent(child, EVENT_SWITCH_OFF)
     }
