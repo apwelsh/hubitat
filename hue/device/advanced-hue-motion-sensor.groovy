@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Motion Sensor 
- * Version 1.0.3
+ * Version 1.0.4
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -32,6 +32,7 @@ import groovy.transform.Field
 
 @Field static final String SETTING_LOG_ENABLE        = 'logEnable'
 @Field static final String SETTING_DBG_ENABLE        = 'debug'
+@Field static final String SETTING_SENSITIVITY       = 'sensitivity'
 
 metadata {
     definition (
@@ -60,7 +61,30 @@ preferences {
           type: 'bool',
           defaultValue: DEFAULT_DBG_ENABLE,
           title: 'Enable debug logging'
+    
+    def sensitivitymax = 1
+    try {
+        Map config = parent.stateForNetworkId(deviceInstance.deviceNetworkId)?.config
+        sensitivitymax = config?.sensitivitymax?:1
+        int s = config?.sensitivity == null ? sensitivitymax : config.sensitivity
+        if (this[SETTING_SENSITIVITY] != s) {
+            updateSetting(SETTING_SENSITIVITY, s)
+        }
+    } catch (ex) {
+        log.error "${ex}"
+    }
+    
+    input name: SETTING_SENSITIVITY,
+          type: 'number',
+          defaultValue: sensitivitymax,
+          range: 0..sensitivitymax,
+          title: 'Motion Sensitivity',
+          description: "Enter a value from 0 to ${sensitivitymax}"
 
+}
+
+private getDeviceInstance() {
+    parent.getChildDeviceById(device.deviceId)
 }
 
 void updateSetting(String name, Object value) {
@@ -80,8 +104,14 @@ def updated() {
     if (this[SETTING_LOG_ENABLE] == null) { updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE) }
     if (this[SETTING_DBG_ENABLE] == null) { updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE) }
     if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
-}
 
+    Map configs = [:]
+    Map devcfg = parent.stateForNetworkId(device.deviceNetworkId)?.config
+
+    if (this[SETTING_SENSITIVITY] != devcfg[SETTING_SENSITIVITY]) { configs[SETTING_SENSITIVITY] = this[SETTING_SENSITIVITY] }
+    
+    parent.setDeviceConfig(this, configs)
+}
 
 /*
  * Device Capability Interface Functions
@@ -95,3 +125,4 @@ void refresh() {
 
 void setHueProperty(Map args) {
 }
+

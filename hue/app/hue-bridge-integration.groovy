@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.5.1
+    * Version 1.5.2
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1113,6 +1113,52 @@
         uniqueid.replaceFirst(/^(.{23}).*/, /$1/)
     }
 
+void setDeviceConfig(def child, Map deviceConfig) {
+
+        String deviceNetworkId = child.device.deviceNetworkId
+
+        String hubId = deviceIdHub(deviceNetworkId)
+        String action='config'
+
+        if ("${hubId}" != "${app.getId()}") { // hub validation by validating the device belongs to current app instance
+            log.warn "Received setDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
+            return
+        } 
+
+        // all other updates
+        String type = "${deviceIdType(deviceNetworkId)}s"
+        switch (type) {
+            case 'hubs':
+            case 'groups':
+            case 'scenes':
+                return
+        }
+        String node = deviceIdNode(deviceNetworkId)
+
+        String url = "${apiUrl}/${type}/${node}/${action}"
+        if (dbgEnable) { log.debug "URL: ${url}" }
+        if (dbgEnable) { log.debug "args: ${deviceConfig}" }
+        httpPut([uri: url,
+                contentType: 'application/json',
+                ignoreSSLIssues: true, 
+                requestContentType: 'application/json',
+                body: deviceConfig]) { response ->
+
+            if (!response.success) { return }
+
+            response.data?.each { item ->
+                if (item.error?.description) {
+                    if (dbgEnable) { log.error "set state: ${item.error.description[0]}" }
+
+                }
+                item.success?.each { key, value ->
+                    List result = key.split('/')
+                    state.(result[1]).(result[2]).(result[3]).(result[4]) = value
+                }
+            }
+        }
+    }
+
     void setDeviceState(def child, Map deviceState) {
 
         String deviceNetworkId = child.device.deviceNetworkId
@@ -1142,16 +1188,16 @@
         String node
         String action='action'
 
-        if ( deviceNetworkId ==~ /hue\-[0-9A-F]{12}/ ) {
+        if ( deviceNetworkId ==~ /hue\-[0-9A-F]{12}/ ) { // All lights (group 0) doesn't have app ID identified in nid
             type = 'groups'
             node = '0'
-        } else if ("${hubId}" != "${app.getId()}") {
+        } else if ("${hubId}" != "${app.getId()}") { // hub validation by validating the device belongs to current app instance
             log.warn "Received setDeviceState request for invalid hub ID ${hubId}.  Current hub ID is ${app.getId()}"
             return
-        } else {
+        } else {  // all other updates
             type = "${deviceIdType(deviceNetworkId)}s"
             node = deviceIdNode(deviceNetworkId)
-            if (type == 'lights') {
+            if (type == 'lights') { // defined url to use action for lights, instead of state
                 action = 'state'
             }
         }
@@ -1250,6 +1296,8 @@
                         data.state.remove('on')
                         data.action.remove('on')
                     }
+                
+                    stateForNetworkId(deviceNetworkId).putAll(data)
                     setHueProperty(child, [state: data.state ?: [:], action: data.action ?: [:], config: data.config ?: [:]])
                     
                 } else {
@@ -1296,6 +1344,10 @@
             case 'hueSensor':  return state.sensors[hueId];
         }
         return null
+    }
+
+    public getChildDeviceById(Long id) {
+        getChildDevices().find { child -> child.device.deviceId == id }
     }
 
     private String bulbTypeForLight(id) {
