@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.5.2
+    * Version 1.5.3
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1297,7 +1297,7 @@ void setDeviceConfig(def child, Map deviceConfig) {
                         data.action.remove('on')
                     }
                 
-                    stateForNetworkId(deviceNetworkId).putAll(data)
+                    if (!(deviceNetworkId ==~ /hue\-\w+/) ) { stateForNetworkId(deviceNetworkId).putAll(data) }
                     setHueProperty(child, [state: data.state ?: [:], action: data.action ?: [:], config: data.config ?: [:]])
                     
                 } else {
