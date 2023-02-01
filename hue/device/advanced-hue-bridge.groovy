@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.2
+ * Version 1.4.3
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -168,7 +168,7 @@ void disconnect() {
 
 void watchdog() {
     if (parent.getVolatileAtomicState(this).WebSocketSubscribed) {
-        if (parent.getVolatileAtomicState(child).networkStatus != 'online') {
+        if (parent.getVolatileAtomicState(this).networkStatus != 'online') {
             connect()
         }
     }
