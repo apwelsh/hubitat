@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.5.6
+    * Version 1.5.7
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -146,7 +146,7 @@
         if (selectedDevice) {
             discoveredHubs()[selectedDevice]
             title=discoveredHubs()[selectedDevice]
-            if (!state.hub) {
+            if (!getHubForMac(selectedDevice)) {
                 ssdpSubscribe()
                 ssdpDiscover()
             } else {
@@ -248,6 +248,11 @@
         state.remove('hub')
         state.remove('username')
         state.remove('clientkey')
+        if (selectedDevice) {
+            def hub = getHubForMac(selectedDevice)
+            hub.remove('username')
+            hub.remove('clientkey')
+        }
         selectedDevice = ''
 
         return dynamicPage(name:PAGE_UNLINK, title:'Unlink bridge', nextPage:null, uninstsall: false) {
