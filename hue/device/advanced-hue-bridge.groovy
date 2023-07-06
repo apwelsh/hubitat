@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.3
+ * Version 1.4.4
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -26,12 +26,14 @@
 
 import groovy.transform.Field
 
+@Field static final Boolean DEFAULT_WATCHDOG         = false
 @Field static final Boolean DEFAULT_AUTO_REFRESH     = true
 @Field static final Integer DEFAULT_REFRESH_INTERVAL = 600
 @Field static final Boolean DEFAULT_ANY_ON           = true
 @Field static final Boolean DEFAULT_LOG_ENABLE       = true
 @Field static final Boolean DEFAULT_DBG_ENABLE       = false
 
+@Field static final String SETTING_WATCHDOG          = 'watchdog'
 @Field static final String SETTING_AUTO_REFRESH      = 'autoRefresh'
 @Field static final String SETTING_REFRESH_INTERVAL  = 'refreshInterval'
 @Field static final String SETTING_ANY_ON            = 'anyOn'
@@ -81,6 +83,11 @@ preferences {
               options: OPTIONS_REFRESH_INTERVAL,
               required: true
     }
+    input name: SETTING_WATCHDOG,
+        type: 'bool',
+        defaultValue: DEFAULT_WATCHDOG,
+        title: 'Connection Watchdog',
+        description: 'If enabled, the system will agressively watch for connection state chagnes, and try to reconnect every 10 seconds'
 
     input name: SETTING_ANY_ON,
           type: 'bool',
@@ -107,9 +114,9 @@ void installed() {
 }
 
 void initialize() {
-    disconnect()
+    sendEvent(name: 'networkStatus', value: 'offline')
     updated()
-    runIn(1, refresh)
+    runIn(1, connect)
 }
 
 void updateSetting(String name, Object value) {
@@ -118,6 +125,7 @@ void updateSetting(String name, Object value) {
 }
 
 void updated() {
+    if (this[SETTING_WATCHDOG]         == null) { updateSetting(SETTING_WATCHDOG,         DEFAULT_WATCHDOG) }
     if (this[SETTING_AUTO_REFRESH]     == null) { updateSetting(SETTING_AUTO_REFRESH,     DEFAULT_AUTO_REFRESH) }
     if (this[SETTING_REFRESH_INTERVAL] == null) { updateSetting(SETTING_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL) }
     if (this[SETTING_ANY_ON]           == null) { updateSetting(SETTING_ANY_ON,           DEFAULT_ANY_ON) }
@@ -139,7 +147,9 @@ void updated() {
 
 void connect() {
     if (parent.getVolatileAtomicState(this).WebSocketSubscribed == true) {
-        return
+        if (parent.getVolatileAtomicState(this).networkStatus == 'online') {
+            return
+        }
     }
 
     unschedule(watchdog)
@@ -157,12 +167,16 @@ void connect() {
         readTimeout: 3600,
         'headers': headers])
 
-    runEvery1Minute(watchdog)
+    if (this[SETTING_WATCHDOG] == true) {
+        runIn(10, watchdog, [overwrite: true])
+    } else {
+        runIn(60, watchdog, [overwrite: true])
+    }
 }
 
 void disconnect() {
-    interfaces.eventStream.close()
     parent.getVolatileAtomicState(this).WebSocketSubscribed = false
+    interfaces.eventStream.close()
     unschedule(watchdog)
 }
 
@@ -179,14 +193,20 @@ void eventStreamStatus(String message) {
 
     if (message.startsWith('STOP:')) {
         parent.getVolatileAtomicState(this).WebSocketSubscribed = false
-        resetRefreshSchedule()
         sendEvent(name: 'networkStatus', value: 'offline')
         if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream disconnected' }
+        resetRefreshSchedule()
+        if (parent.getVolatileAtomicState(this).WebSocketSubscribed == true) {
+            if (this[SETTING_WATCHDOG] == true) {
+                runIn(1, connect)
+            }
+        }
     } else if (message.startsWith('START:')) {
         parent.getVolatileAtomicState(this).WebSocketSubscribed = true
         sendEvent(name: 'networkStatus', value: 'online')
-        resetRefreshSchedule()
         if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream connected' }
+        resetRefreshSchedule()
+        unschedule(watchdog)
     } else {
         if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled Event Stream status message: ${message}" }
     }
