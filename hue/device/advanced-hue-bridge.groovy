@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.4
+ * Version 1.4.5
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -146,6 +146,7 @@ void updated() {
 }
 
 void connect() {
+    // don't connect if already connected, and supposed to be connected
     if (parent.getVolatileAtomicState(this).WebSocketSubscribed == true) {
         if (parent.getVolatileAtomicState(this).networkStatus == 'online') {
             return
@@ -175,6 +176,7 @@ void connect() {
 }
 
 void disconnect() {
+    // Set desired state to unsubscribed, so watchdog is not in effect
     parent.getVolatileAtomicState(this).WebSocketSubscribed = false
     interfaces.eventStream.close()
     unschedule(watchdog)
@@ -189,19 +191,17 @@ void watchdog() {
 }
 
 void eventStreamStatus(String message) {
-    // log.trace "${message}"
-
     if (message.startsWith('STOP:')) {
-        parent.getVolatileAtomicState(this).WebSocketSubscribed = false
         sendEvent(name: 'networkStatus', value: 'offline')
         if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream disconnected' }
         resetRefreshSchedule()
         if (parent.getVolatileAtomicState(this).WebSocketSubscribed == true) {
             if (this[SETTING_WATCHDOG] == true) {
-                runIn(1, connect)
+                run(1, connect)
             }
         }
     } else if (message.startsWith('START:')) {
+        // record that web socket connected and should be subscribed.
         parent.getVolatileAtomicState(this).WebSocketSubscribed = true
         sendEvent(name: 'networkStatus', value: 'online')
         if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream connected' }
