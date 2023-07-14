@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.5.7
+    * Version 1.5.8
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1705,10 +1705,16 @@ void setDeviceConfig(def child, Map deviceConfig) {
             }
         }
 
-        if (events.level && child.hasAttribute('level')) {
-            String sw = events.switch ?: currentValue(child, 'switch')
-            events.level = valueBetween(events.level, (sw == 'on' ? 1 : 0), 100)
+        if (events.level != null) {
+            if (!events.switch && events.level < 1) {
+                setDeviceState(child, ['on': false])
+            }
+            else if (child.hasAttribute('level')) {
+                String sw = events.switch ?: currentValue(child, 'switch')
+                events.level = valueBetween(events.level, (sw == 'on' ? 1 : 0), 100)
+            }
         }
+
         
         events.each { key, value -> 
             sendChildEvent(child, [name: key, value: value]) 
@@ -1756,8 +1762,11 @@ void setDeviceConfig(def child, Map deviceConfig) {
         Integer level = 0
         if (direction == 'up')        { level =  254 }
         else if (direction == 'down') { level = -254 }
-
-        setDeviceState(child, ['bri_inc': level, 'transitiontime': transitionTime() * 10])
+        Map value = ['bri_inc': level, 'transitiontime': transitionTime() * 10]
+        if (direction == 'up' && currentValue(child, 'switch') != 'on') {
+            value['on'] = true
+        }
+        setDeviceState(child, value)
 
     }
 
