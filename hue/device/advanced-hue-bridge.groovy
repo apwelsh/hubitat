@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.5
+ * Version 1.4.6
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -138,22 +138,46 @@ void updated() {
     if (this[SETTING_AUTO_REFRESH]) {
         resetRefreshSchedule()
     } else {
-        unschedule()
+        unschedule(refresh)
     }
-    
-    if (this[SETTING_LOG_ENABLE]) { log.debug 'Preferences updated' }
+
+    if (this[SETTING_LOG_ENABLE]) { log.info 'Preferences updated' }
+
+    if (this[SETTING_WATCHDOG]) {
+        schedule('0/10 * * ? * *', 'watchdog', [overwrite: true])
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog timer set for every 10 seconds' }
+    } else {
+        schedule('0 * * ? * *', 'watchdog', [overwrite: true])
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog timer set for every 1 minute' }
+    }
     runIn(1, connect)
+
+}
+
+void sendEvent(Map properties) {
+    
+    // Overrides driver.sendEvent() to populate cached values
+    if (currentValue(properties.name) != properties.value) {
+        device.sendEvent(properties)
+        parent.getVolatileAtomicState(this)[properties.name] = properties.value
+    }
+}
+
+Object currentValue(String attributeName) {
+    def result = parent.getVolatileAtomicState(this)[attributeName]
+    if (result != null) {
+        return result
+    }
+    result = device.currentValue(attributeName)
+    if (result != null) {
+        parent.getVolatileAtomicState(this)[attributeName] = result
+    }
+    return result
 }
 
 void connect() {
-    // don't connect if already connected, and supposed to be connected
-    if (parent.getVolatileAtomicState(this).WebSocketSubscribed == true) {
-        if (parent.getVolatileAtomicState(this).networkStatus == 'online') {
-            return
-        }
-    }
+    disconnect()
 
-    unschedule(watchdog)
     String url = "https://${parent.getBridgeHost()}/eventstream/clip/v2"
 
     String apiKey = parent.state.username.trim()
@@ -167,46 +191,36 @@ void connect() {
         pingInterval: 5,
         readTimeout: 3600,
         'headers': headers])
-
-    if (this[SETTING_WATCHDOG] == true) {
-        runIn(10, watchdog, [overwrite: true])
-    } else {
-        runIn(60, watchdog, [overwrite: true])
-    }
 }
 
 void disconnect() {
     // Set desired state to unsubscribed, so watchdog is not in effect
-    parent.getVolatileAtomicState(this).WebSocketSubscribed = false
     interfaces.eventStream.close()
-    unschedule(watchdog)
 }
 
 void watchdog() {
-    if (parent.getVolatileAtomicState(this).WebSocketSubscribed) {
-        if (parent.getVolatileAtomicState(this).networkStatus != 'online') {
-            connect()
-        }
+    if (currentValue('networkStatus') != 'online') {
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog event: Event Stream offline, attempting reconnect' }
+        connect()
     }
 }
 
 void eventStreamStatus(String message) {
     if (message.startsWith('STOP:')) {
-        sendEvent(name: 'networkStatus', value: 'offline')
-        if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream disconnected' }
-        resetRefreshSchedule()
-        if (parent.getVolatileAtomicState(this).WebSocketSubscribed == true) {
-            if (this[SETTING_WATCHDOG] == true) {
-                run(1, connect)
-            }
+        if (parent.getVolatileAtomicState(this).WebSocketSubscribed != false) {
+            parent.getVolatileAtomicState(this).WebSocketSubscribed = false
+            sendEvent(name: 'networkStatus', value: 'offline')
+            if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream disconnected' }
         }
+
     } else if (message.startsWith('START:')) {
-        // record that web socket connected and should be subscribed.
-        parent.getVolatileAtomicState(this).WebSocketSubscribed = true
-        sendEvent(name: 'networkStatus', value: 'online')
-        if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream connected' }
-        resetRefreshSchedule()
-        unschedule(watchdog)
+        if (parent.getVolatileAtomicState(this).WebSocketSubscribed != true) {
+            parent.getVolatileAtomicState(this).WebSocketSubscribed = true
+            // record that web socket connected and should be subscribed.
+            sendEvent(name: 'networkStatus', value: 'online')
+            if (this[SETTING_LOG_ENABLE]) { log.info 'Event Stream connected' }
+            refresh  // followed by a refresh to bring all devices back in-sync with hub state
+        }
     } else {
         if (this[SETTING_DBG_ENABLE]) { log.debug "Received unhandled Event Stream status message: ${message}" }
     }
@@ -430,29 +444,28 @@ void refresh() {
 }
 
 void resetRefreshSchedule() {
-    unschedule(refresh)
     if (this[SETTING_AUTO_REFRESH]) {
         switch (this[SETTING_REFRESH_INTERVAL] as int) {
             case 60:
-                runEvery1Minute('refresh')
+                runEvery1Minute('refresh', [overwrite: true])
                 break
             case 300:
-                runEvery5Minutes('refresh')
+                runEvery5Minutes('refresh', [overwrite: true])
                 break
             case 600:
-                runEvery10Minutes('refresh')
+                runEvery10Minutes('refresh', [overwrite: true])
                 break
             case 900:
-                runEvery15Minutes('refresh')
+                runEvery15Minutes('refresh', [overwrite: true])
                 break
             case 1800:
-                runEvery30Minutes('refresh')
+                runEvery30Minutes('refresh', [overwrite: true])
                 break
             case 3600:
-                runEvery1Hour('refresh')
+                runEvery1Hour('refresh', [overwrite: true])
                 break
             case 10800:
-                runEvery3Hours('refresh')
+                runEvery3Hours('refresh', [overwrite: true])
                 break
         }
     }
