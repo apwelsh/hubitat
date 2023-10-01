@@ -6,7 +6,11 @@
  * Making it work with rules is more difficult than it should be though, since HE does not seem to support this yet.
  * As such, I implement the PushableButton as well to be able to trigger an event when the timer has expired.  This is a
  * very simple timer based on a cron type schedule.  It is now an accurate timer, that is rather light-weight.
- * To use the timer, first set the TimeRemaining attribute, then start the timer.
+ * To use the timer, first set the TimeRemaining attribute, then start the timer.  When the timer has expired, it
+ * will issue a button push.  To use this in ruless to trigger timer completion, create a rule on Button 1 Pushed.
+ * 
+ * I have updated the driver to allow upates of every 1 second, every 5 seconds, or dynamic (every 10 seconds at most)
+ * This update includes improved timer scheduler logic
  *-------------------------------------------------------------------------------------------------------------------
  * Copyright 2020 Armand Peter Welsh
  * 
@@ -37,7 +41,7 @@ preferences {
     if (useDefault) {
         input name: 'defaultTime',
             type: 'number', title: 'Default Timer',
-            description: 'The number of seconds to set the timer to, if not the timer is not set.'
+            description: 'The number of seconds to set the timer to, if the timeRemaining value is zero (0).'
             defaultValue: null
     }
     input name: 'cancelWhenOff',
@@ -48,6 +52,11 @@ preferences {
           type: 'bool', title: 'Logging',        
           description: 'Enable debug logging', 
           defaultValue: false
+    input name: 'updateMode',
+          type: 'enum', title: 'Update Mode',
+          options: ['aggressive': 'Aggressive - Every seconds', 'moderate': 'Moderate - Every 5 seconds', 'dynamic': 'Dynamic - More aggressive as time nears completion'],
+          description: 'If enabled, the time remaining will be updated every single second.',
+          defaultValue: 'dynamic'
 }
 
 metadata {
@@ -103,11 +112,11 @@ def pause() {
 def scheduleTimerEvent(secondsRemaining) {
     def refreshInterval = 1
 
-    if (secondsRemaining > 60) {
+    if (secondsRemaining > 60 && updateMode == 'dynamic') {
         if ((secondsRemaining as int) % 10 == 0) refreshInterval = 10
         else return
     }
-    else if (secondsRemaining > 10) {
+    else if (secondsRemaining > 10 && updateMode != 'aggressive') {
         if ((secondsRemaining as int) % 5 == 0)  refreshInterval = 5
         else return
     }
@@ -129,27 +138,12 @@ def setTimeRemaining(seconds) {
     }
 
     if (state.alerttime) {
-
-        if (state.alerttime < now() + (seconds * 1000)) {
-            if (logEnable) log.info "Resetting time remaining to ${seconds} seconds"
-            unschedule()
-            
-            runIn(seconds as int, timerDone,[overwrite:false, misfire: 'ignore'])
-            state.alerttime = now() + (seconds * 1000)
-
-            state.refreshInterval = 1
-            schedule('* * * * * ?', timerEvent, [misfire: 'ignore', overwrite: false])
-        } else {
-            scheduleTimerEvent(seconds as int)
-        }
-
+        scheduleTimerEvent(seconds as int)
     }
     
     def hours = (seconds / 3600) as int
-    if (hours > 0)
-        seconds = seconds.intValue() % 3600 // remove the hours component
-    def mins = (seconds / 60) as int
-    def secs = (seconds.intValue() % 60) as int
+    def mins  = ((seconds.intValue() % 3600) / 60) as int
+    def secs  = (seconds.intValue() % 60) as int
     if (hours > 0) {
         remaining = String.format('%d:%02d:%02d', hours, mins, secs)
     } else {
@@ -178,12 +172,12 @@ def start() {
 
     setStatus('running')
     
-    runIn(timeRemaining, timerDone,[overwrite:false, misfire: 'ignore'])
+    runIn(timeRemaining, timerDone,[overwrite:true, misfire: 'ignore'])
     state.alerttime = now() + (timeRemaining * 1000)
 
     def refreshInterval = 1
     state.refreshInterval = refreshInterval
-    schedule('* * * * * ?', timerEvent, [misfire: 'ignore', overwrite: false])
+    schedule('* * * * * ?', timerEvent, [misfire: 'ignore', overwrite: true])
 }
 
 def off() {
@@ -230,9 +224,9 @@ def resetDisplay() {
 
 def timerDone() {
     if (device.currentValue('switch') == 'on') {
+        unschedule()
         state.remove('alerttime')
         state.remove('refreshInterval')
-        unschedule()
         if (device.latestValue('sessionStatus') != 'canceled') {
             sendEvent(name: 'timeRemaining', value: 0)
             setStatus('stopped')
