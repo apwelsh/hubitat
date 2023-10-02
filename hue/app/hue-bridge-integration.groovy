@@ -1,6 +1,6 @@
     /**
     * Advanced Philips Hue Bridge Integration application
-    * Version 1.5.8
+    * Version 1.5.9
     * Download: https://github.com/apwelsh/hubitat
     * Description:
     * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1677,6 +1677,9 @@ void setDeviceConfig(def child, Map deviceConfig) {
                 default:           [key, value]
             }
         }.findAll { key, value -> child.hasAttribute("$key") }
+        if (events.level < 1 && ! events.switch) {
+            events.level = 1
+        }
 
         if (args.config) {
             events << args.config.collectEntries { key, value ->
@@ -1706,12 +1709,12 @@ void setDeviceConfig(def child, Map deviceConfig) {
         }
 
         if (events.level != null) {
-            if (!events.switch && events.level < 1) {
-                setDeviceState(child, ['on': false])
-            }
-            else if (child.hasAttribute('level')) {
-                String sw = events.switch ?: currentValue(child, 'switch')
-                events.level = valueBetween(events.level, (sw == 'on' ? 1 : 0), 100)
+            if (events.level < 1) {
+                events.level = 0
+                // events.switch = 'off'
+            } else {
+                events.level = valueBetween(events.level, 1, 100)
+                // events.switch = 'on'
             }
         }
 
@@ -1819,11 +1822,11 @@ void setDeviceConfig(def child, Map deviceConfig) {
     }
 
     Integer convertHBLevel(Number value) {
-        valueBetween(Math.round(value / 2.54), 0, 100)
+        valueBetween(Math.round(value / 2.54), (value == 0 ? 0 : 1), 100)
     }
 
     Integer convertHELevel(Integer value) {
-        valueBetween(Math.round(value * 2.54), 1, 254)
+        valueBetween(Math.round(value * 2.54), 0, 254)
     }
 
     Number convertHBHue(Number value) {
