@@ -11,7 +11,8 @@
       "namespace": "apwelsh",
       "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/devices/timer-device.groovy",
       "required": true,
-      "version": "1.9"
+      "version": "1.10"
     }
-  ]
+  ],
+  "releaseNotes": "Version 1.10 Update fixes timeremaining overflow for very large numbers, and add display support for days"
 }

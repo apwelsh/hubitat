@@ -1,5 +1,6 @@
 /**
  * Timer Device
+ * v1.10
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a simple count-down timer I created for a friend.  I wanted to use the standard TimedSession capability.
@@ -141,10 +142,13 @@ def setTimeRemaining(seconds) {
         scheduleTimerEvent(seconds as int)
     }
     
-    def hours = (seconds / 3600) as int
-    def mins  = ((seconds.intValue() % 3600) / 60) as int
-    def secs  = (seconds.intValue() % 60) as int
-    if (hours > 0) {
+    int days  = (seconds / 86400) as int
+    int hours = ((seconds.intValue() % 86400) / 3600) as int
+    int mins  = ((seconds.intValue() % 3600) / 60) as int
+    int secs  = (seconds.intValue() % 60) as int
+    if (days > 0) {
+        remaining = String.format('%d %s %d:%02d:%02d', days, days == 1 ? 'day' : 'days', hours, mins, secs)
+    } else if (hours > 0) {
         remaining = String.format('%d:%02d:%02d', hours, mins, secs)
     } else {
         remaining = String.format('%02d:%02d', mins, secs)
@@ -163,7 +167,7 @@ def on() {
 def start() {
     if (logEnable) log.info 'Timer started'
     unschedule()
-    int timeRemaining = (device.currentValue('timeRemaining') ?: 0 as int)
+    long timeRemaining = (device.currentValue('timeRemaining') ?: 0 as long)
     if (timeRemaining == 0 && useDefault) {
         timeRemaining = defaultTime
         if (logEnable) log.info "Using default time of ${timeRemaining} seconds"
