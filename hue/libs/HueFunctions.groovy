@@ -10,9 +10,11 @@ library (
 import hubitat.helper.ColorUtils
 import java.math.RoundingMode
 
-// -----------------
-// Helper functions
-// -----------------
+import java.math.RoundingMode
+
+// -------------------------
+// Helper Functions
+// -------------------------
 
 /**
  * Clamp a value between min and max.
@@ -70,8 +72,8 @@ List<BigDecimal> clampXYtoGamut(BigDecimal x, BigDecimal y, List<List<BigDecimal
 }
 
 /**
- * Convert an RGB color to Hue & Saturation.
- * Returns [hue (0-100), saturation (0-100)].
+ * Convert RGB to Hue & Saturation.
+ * Returns [hue (0–100), saturation (0–100)].
  */
 List<BigDecimal> rgbToHS(BigDecimal r, BigDecimal g, BigDecimal b) {
     BigDecimal max = [r, g, b].max()
@@ -91,30 +93,71 @@ List<BigDecimal> rgbToHS(BigDecimal r, BigDecimal g, BigDecimal b) {
             hue = hue.add(BigDecimal.valueOf(360))
         }
     }
-    // Scale hue from degrees (0-360) to 0-100.
+    // Scale hue from degrees (0–360) to 0–100.
     hue = hue.divide(BigDecimal.valueOf(360), 10, RoundingMode.HALF_UP)
              .multiply(BigDecimal.valueOf(100))
-    // Saturation: if max is zero then saturation is 0; otherwise, delta/max.
     BigDecimal saturation = (max.compareTo(BigDecimal.ZERO) == 0) ? BigDecimal.ZERO :
         delta.divide(max, 10, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
     return [hue, saturation]
 }
 
-// ------------------------------------
-// Hue Correction Using Lagrange Interpolation
-// ------------------------------------
+/**
+ * Convert HSV (hue, saturation, brightness on a 0–100 scale) to RGB (0–255 scale).
+ * Hue is first scaled from 0–100 to degrees.
+ */
+List<Integer> hsvToRGB(double hue, double sat, double bri) {
+    double H = hue * 3.6   // Convert 0–100 to 0–360.
+    double S = sat / 100.0
+    double V = bri / 100.0
+    double C = V * S
+    double X = C * (1 - Math.abs(((H / 60.0) % 2) - 1))
+    double m = V - C
+    double r = 0, g = 0, b = 0
+    if (H < 60) {
+        r = C; g = X; b = 0
+    } else if (H < 120) {
+        r = X; g = C; b = 0
+    } else if (H < 180) {
+        r = 0; g = C; b = X
+    } else if (H < 240) {
+        r = 0; g = X; b = C
+    } else if (H < 300) {
+        r = X; g = 0; b = C
+    } else {
+        r = C; g = 0; b = X
+    }
+    int R = (int)Math.round((r + m) * 255)
+    int G = (int)Math.round((g + m) * 255)
+    int B = (int)Math.round((b + m) * 255)
+    return [R, G, B]
+}
 
 /**
- * Given a raw hue value and the static intended calibration points,
- * compute the corrected hue using Lagrange interpolation.
+ * Inverse sRGB gamma correction.
+ * Converts a gamma‐corrected channel (in [0,1]) back to linear light.
+ */
+double inverseGamma(double channel) {
+    if (channel <= 0.04045) {
+        return channel / 12.92
+    } else {
+        return Math.pow((channel + 0.055) / 1.055, 2.4)
+    }
+}
+
+// -------------------------
+// Hue Correction via Lagrange Interpolation
+// -------------------------
+
+/**
+ * Applies Lagrange interpolation to compute the corrected hue.
+ * Uses static intended calibration values:
+ *   Red: 0, Yellow: 17, Green: 33.3, Cyan: 50, Blue: 66.6, Magenta: 84.
  *
- * @param rawHue   The raw hue value (0-100 scale).
- * @param rawCalib List of raw hue calibration values (0-100 scale).
+ * @param rawHue   The raw hue value (0–100).
+ * @param rawCalib List of raw hue calibration values (0–100) for the six points.
  * @return         Corrected hue.
  */
 double applyHueCorrectionLagrange(double rawHue, List<Double> rawCalib) {
-    // Static intended calibration values:
-    // Red: 0, Yellow: 17, Green: 33.3, Cyan: 50, Blue: 66.6, Magenta: 84.
     List<Double> intendedCalib = [0.0, 17.0, 33.3, 50.0, 66.6, 84.0]
     int n = rawCalib.size()
     double result = 0.0
@@ -130,48 +173,91 @@ double applyHueCorrectionLagrange(double rawHue, List<Double> rawCalib) {
     return result
 }
 
-// -----------------------------------------------------
-// Main Conversion Function: XY + Brightness -> HSV (0-100)
-// with hue correction applied using Lagrange interpolation
-// -----------------------------------------------------
 /**
- * Convert Philips Hue XY and brightness values back to HSV using the published Philips coefficients,
- * then apply a hue correction via Lagrange interpolation.
+ * Inverts the hue correction function.
+ * Given a corrected hue (0–100), finds the raw hue (0–100) such that
+ * applyHueCorrectionLagrange(rawHue, rawCalib) approximates the corrected hue.
+ * Assumes the mapping is monotonic.
+ */
+double invertHueCorrection(double correctedHue, List<Double> rawCalib) {
+    double low = 0.0, high = 100.0, mid = 0.0
+    double tol = 0.01
+    int iterations = 0, maxIter = 100
+    while ((high - low) > tol && iterations < maxIter) {
+        mid = (low + high) / 2.0
+        double test = applyHueCorrectionLagrange(mid, rawCalib)
+        if (test < correctedHue) {
+            low = mid
+        } else {
+            high = mid
+        }
+        iterations++
+    }
+    return mid
+}
+
+// -------------------------
+// Inverse Philips Conversion: Linear RGB -> XYZ
+// -------------------------
+/**
+ * Converts linear RGB values (each in [0,1]) to XYZ using the inverse Philips matrix.
+ * The inverse matrix here is an approximation.
+ */
+List<Double> linearRGBtoXYZ(double r_lin, double g_lin, double b_lin) {
+    // Forward Philips matrix:
+    //   r = 1.612*X - 0.203*Y - 0.302*Z
+    //   g = -0.509*X + 1.412*Y + 0.066*Z
+    //   b = 0.026*X - 0.072*Y + 0.962*Z
+    // An approximate inverse is:
+    double m00 = 0.6496, m01 = 0.1034, m02 = 0.1970
+    double m10 = 0.2340, m11 = 0.7430, m12 = 0.0226
+    double m20 = -0.00003, m21 = 0.0529, m22 = 1.0363
+    double X = m00 * r_lin + m01 * g_lin + m02 * b_lin
+    double Y = m10 * r_lin + m11 * g_lin + m12 * b_lin
+    double Z = m20 * r_lin + m21 * g_lin + m22 * b_lin
+    return [X, Y, Z]
+}
+
+// -------------------------
+// Forward Conversion: XY+Bri -> Corrected HSV
+// -------------------------
+/**
+ * Convert Philips Hue XY and brightness values to corrected HSV (0–100 scale).
+ * Returns a list: [corrected hue, saturation, brightness].
+ * Brightness is passed through.
  *
- * The returned HSV values are all between 0 and 100.
+ * This function performs gamut clamping, Philips conversion (XYZ→RGB + gamma correction),
+ * then computes raw HSV and applies hue correction via Lagrange interpolation.
  *
  * @param x        The x chromaticity coordinate.
  * @param y        The y chromaticity coordinate.
- * @param bri      The brightness level (0-100).
+ * @param bri      The brightness value (0–100).
  * @param gamut    A map defining the light's gamut with keys "red", "green", and "blue".
- * @param rawCalib A List<Double> of raw hue calibration values (0-100 scale) for:
- *                 [Red, Yellow, Green, Cyan, Blue, Magenta].
- * @return         A List<Double> containing [corrected hue, saturation, brightness] on a 0-100 scale.
+ * @param rawCalib List<Double> of raw hue calibration values (0–100 scale) for six points.
+ * @return         A list [corrected hue, saturation, brightness] (all on 0–100 scale).
  */
-List<Double> xyBriToCorrectedHSV(Double x, Double y, Double bri, Map<String, Map<String, Double>> gamut,
-                                 List<Double> rawCalib) {
+List<Double> xyToHSV(Double x, Double y, Double bri, Map<String, Map<String, Double>> gamut, List<Double> rawCalib) {
     // Convert inputs to BigDecimal.
     BigDecimal X = new BigDecimal(x.toString())
     BigDecimal Y = new BigDecimal(y.toString())
     BigDecimal brightnessPct = new BigDecimal(bri.toString())
 
-    // Clamp xy to the light's gamut.
+    // Clamp XY to the gamut.
     List<List<BigDecimal>> gamutBD = parseGamut(gamut)
     List<BigDecimal> clampedXY = clampXYtoGamut(X, Y, gamutBD)
     BigDecimal clampedX = clampedXY[0]
     BigDecimal clampedY = clampedXY[1]
 
-    // Normalize brightness from percentage (0-100) to 0-1.
+    // Normalize brightness from 0–100 to 0–1.
     BigDecimal briNorm = brightnessPct.divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
 
-    // Compute XYZ values.
-    // Y (luminance) is set by briNorm; compute X and Z from chromaticity.
+    // Compute XYZ (Y set by brightness).
     BigDecimal Yval = briNorm
     BigDecimal Xval = (Yval.divide(clampedY, 10, RoundingMode.HALF_UP)).multiply(clampedX)
     BigDecimal Zval = (Yval.divide(clampedY, 10, RoundingMode.HALF_UP))
                         .multiply(BigDecimal.ONE.subtract(clampedX).subtract(clampedY))
 
-    // Convert XYZ to linear RGB using Philips' coefficients.
+    // Convert XYZ to linear RGB using Philips coefficients.
     BigDecimal r = Xval.multiply(BigDecimal.valueOf(1.612))
                       .subtract(Yval.multiply(BigDecimal.valueOf(0.203)))
                       .subtract(Zval.multiply(BigDecimal.valueOf(0.302)))
@@ -181,24 +267,21 @@ List<Double> xyBriToCorrectedHSV(Double x, Double y, Double bri, Map<String, Map
     BigDecimal bVal = Xval.multiply(BigDecimal.valueOf(0.026))
                          .subtract(Yval.multiply(BigDecimal.valueOf(0.072)))
                          .add(Zval.multiply(BigDecimal.valueOf(0.962)))
-
-    // Clamp negative values to zero.
+    // Clamp negatives.
     r = r.max(BigDecimal.ZERO)
     g = g.max(BigDecimal.ZERO)
     bVal = bVal.max(BigDecimal.ZERO)
-
-    // Normalize if any channel is > 1.
+    // Normalize if any channel > 1.
     BigDecimal maxRGB = [r, g, bVal].max()
     if (maxRGB.compareTo(BigDecimal.ONE) > 0) {
          r = r.divide(maxRGB, 10, RoundingMode.HALF_UP)
          g = g.divide(maxRGB, 10, RoundingMode.HALF_UP)
          bVal = bVal.divide(maxRGB, 10, RoundingMode.HALF_UP)
     }
-
-    // Apply gamma correction (sRGB-like, gamma ~2.4).
+    // Apply sRGB gamma correction.
     def gammaCorrect = { BigDecimal channel ->
         if (channel.compareTo(BigDecimal.valueOf(0.0031308)) > 0) {
-            return BigDecimal.valueOf(1.055 * Math.pow(channel.doubleValue(), 1.0 / 2.4) - 0.055)
+            return BigDecimal.valueOf(1.055 * Math.pow(channel.doubleValue(), 1.0/2.4) - 0.055)
         } else {
             return channel.multiply(BigDecimal.valueOf(12.92))
         }
@@ -206,23 +289,63 @@ List<Double> xyBriToCorrectedHSV(Double x, Double y, Double bri, Map<String, Map
     r = gammaCorrect(r)
     g = gammaCorrect(g)
     bVal = gammaCorrect(bVal)
-
-    // Clamp gamma-corrected values to 0–1.
     r = clamp(r, BigDecimal.ZERO, BigDecimal.ONE)
     g = clamp(g, BigDecimal.ZERO, BigDecimal.ONE)
     bVal = clamp(bVal, BigDecimal.ZERO, BigDecimal.ONE)
-
-    // Convert RGB to raw Hue and Saturation.
+    
+    // Convert RGB to raw hue and saturation.
     List<BigDecimal> hs = rgbToHS(r, g, bVal)
-    double rawHue = hs[0].doubleValue()  // on a 0-100 scale.
+    double rawHue = hs[0].doubleValue() // on 0–100 scale.
     double saturation = hs[1].doubleValue()
     
-    // Apply Lagrange interpolation for hue correction.
+    // Apply hue correction.
     double correctedHue = applyHueCorrectionLagrange(rawHue, rawCalib)
     correctedHue = Math.max(0, Math.min(100, correctedHue))
     
     return [correctedHue, saturation, brightnessPct.doubleValue()]
 }
+
+// -------------------------
+// Reverse Conversion: Corrected HSV -> XY+Bri
+// -------------------------
+/**
+ * Convert corrected HSV (0–100 scale) to XY and brightness.
+ * Inverts the hue correction via binary search, converts raw HSV to RGB,
+ * applies inverse gamma correction, inverts Philips conversion, and computes chromaticity.
+ *
+ * @param correctedHue Corrected hue (0–100).
+ * @param sat          Saturation (0–100).
+ * @param bri          Brightness (0–100).
+ * @param rawCalib     List<Double> of raw hue calibration values (0–100) for six points.
+ * @return             A list [x, y, brightness].
+ */
+List<Double> hsvToXY(double correctedHue, double sat, double bri, List<Double> rawCalib) {
+    // 1. Invert hue correction to obtain raw hue.
+    double rawHue = invertHueCorrection(correctedHue, rawCalib)
+    
+    // 2. Convert raw HSV to RGB.
+    List<Integer> rgb = hsvToRGB(rawHue, sat, bri)  // RGB in 0–255.
+    double R = rgb[0] / 255.0
+    double G = rgb[1] / 255.0
+    double B = rgb[2] / 255.0
+    
+    // 3. Inverse gamma correction.
+    double r_lin = inverseGamma(R)
+    double g_lin = inverseGamma(G)
+    double b_lin = inverseGamma(B)
+    
+    // 4. Convert linear RGB to XYZ using inverse Philips matrix.
+    List<Double> xyz = linearRGBtoXYZ(r_lin, g_lin, b_lin)
+    double X = xyz[0], Y = xyz[1], Z = xyz[2]
+    double sum = X + Y + Z
+    if (sum == 0) sum = 1e-6
+    double x = X / sum
+    double y = Y / sum
+    
+    return [x, y, bri]
+}
+
+
 /**
 * Ensures a value is between a minimum and maximum range.
 *
