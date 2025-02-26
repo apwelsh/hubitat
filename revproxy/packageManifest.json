@@ -1,0 +1,32 @@
+{
+  "packageName": "Simple Reverse Proxy Service",
+  "author": "Armand Welsh",
+  "minimumHEVersion": "2.4.0",
+  "licenseFile": "https://raw.githubusercontent.com/apwelsh/hubitat/master/revproxy/LICENSE.md",
+  "documentationLink": "https://github.com/apwelsh/hubitat/tree/master/revproxy",
+  "dateReleased": "2025-02-25",
+  "apps": [
+    {
+      "id": "3667c53f-55e9-4008-b56c-6ff91c9f666b",
+      "name": "Simple Reverse Proxy Service",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/revproxy/app/simple-reverse-proxy-service.groovy",
+      "required": true,
+      "oauth": false,
+      "primary": true,
+      "version": "1.0.0"
+    },
+    {
+      "id": "6c229ee3-593d-4389-8bdd-0972b44ca83c",
+      "name": "Simple Proxy Provider",
+      "namespace": "apwelsh",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/revproxy/app/simple-proxy-provider.groovy",
+      "required": true,
+      "oauth": true,
+      "primary": false,
+      "version": "1.0.0"
+    }
+  ],
+  "version": "1.0.0",
+  "releaseNotes": "v1.0.0\nEnabling the reverse proxy service may expose your Hubitat hub and connected network to significant security risks if proper precautions are not taken. Before enabling remote access, ensure that you have configured adequate network security measures (such as firewalls, VPNs, or strict access controls). By using this service, you assume full responsibility for any unauthorized access or security breaches that may occur. Use this feature only on trusted networks and at your own risk."
+}
