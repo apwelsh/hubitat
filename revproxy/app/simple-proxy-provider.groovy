@@ -23,6 +23,13 @@ preferences {
 }
 
 def mainPage(params) {
+
+    if (params?.action == "enable") {
+        initializeAppEndpoint()
+    } else if (params?.action == "disable") {
+        revokeAccessToken()
+    }
+
     dynamicPage(name: "mainPage", title: "Simple Proxy Provider", install: true, uninstall: true) {
         // Built-in label input to update the app's label.
         section("") {
@@ -34,15 +41,16 @@ def mainPage(params) {
         section("Proxy Options") {
             input "passRequestHeaders", "bool", title: "Pass Request Headers to Upstream Host", required: true, defaultValue: true
             input "appendClientQueryParams", "bool", title: "Append Client Query Parameters to Upstream URL", required: true, defaultValue: true
+            input "enableUsageLogging", "bool", title: "Enable Usage Logging", required: true, defaultValue: false
         }
         section("Remote Endpoint Control") {
             if (!state.endpoint) {
                 paragraph "Remote endpoint is currently disabled."
-                href(name: "enableEndpoint", title: "Enable Remote Endpoint", description: "Tap to enable", params: [action: "enable"], page: "mainPage")
+                href(name: "initializeAppEndpoint", title: "Enable Remote Endpoint", description: "Tap to enable", params: [action: "enable"], page: "mainPage")
             } else {
                 paragraph "Local Endpoint:\n<a href='${state.localEndpointURL}' target='_blank'>${state.localEndpointURL}</a>"
                 paragraph "Remote Endpoint:\n<a href='${state.remoteEndpointURL}' target='_blank'>${state.remoteEndpointURL}</a>"
-                href(name: "disableEndpoint", title: "Disable Remote Endpoint", description: "Tap to disable", params: [action: "disable"], page: "mainPage")
+                href(name: "revokeAccessToken", title: "Disable Remote Endpoint", description: "Tap to disable", params: [action: "disable"], page: "mainPage")
             }
         }
     }
@@ -118,11 +126,28 @@ def handleProxy() {
     // Build request headers if the toggle is enabled.
     def requestHeaders = [:]
     if (passRequestHeaders && request?.headers) {
-        request.headers.each { key, value ->
-            if (!ignoreHeaders.contains(key.toLowerCase())) {
-                requestHeaders[key] = value
+        if (request.headers instanceof Map) {
+            request.headers.each { key, value ->
+                if (!ignoreHeaders.contains(key.toLowerCase())) {
+                    requestHeaders[key] = value
+                }
+            }
+        } else if (request.headers instanceof List) {
+            request.headers.each { header ->
+                def key = header.getName()
+                if (!ignoreHeaders.contains(key.toLowerCase())) {
+                    requestHeaders[key] = header.getValue()
+                }
             }
         }
+    }
+    
+    // Log usage details if enabled
+    if (enableUsageLogging) {
+
+        String reconstructedUrl = (request.requestSource == 'local' ? localApiServerUrl : apiServerUrl)
+        reconstructedUrl += '/proxy/' + (params ? '?' + params.collect { key, value -> "${URLEncoder.encode(key, 'UTF-8')}=${URLEncoder.encode(value.toString(), 'UTF-8')}" }.join('&') : '')
+        log.info "${app.getLabel()} (${request.requestSource})  ${reconstructedUrl}"
     }
     
     try {
@@ -166,4 +191,45 @@ def handleProxy() {
     } catch (Exception e) {
         render contentType: "application/json", data: [error: "Exception: ${e.message}"]
     }
+}
+
+/**
+ * Initializes the remote endpoint by creating an access token and storing endpoint URLs.
+ * The hub automatically stores the access token in state.accessToken.
+ * The access token is appended as a query parameter named "apikey".
+ */
+def initializeAppEndpoint() {
+    if (!state.endpoint) {
+        try {
+            def token = createAccessToken()
+            if (token) {
+                state.endpoint = true
+                state.localEndpointURL = getFullLocalApiServerUrl() + "/proxy?access_token=${state.accessToken}"
+                state.remoteEndpointURL = getFullApiServerUrl() + "/proxy?access_token=${state.accessToken}"
+            }
+        } catch(e) {
+            state.endpoint = null
+        }
+    }
+    return state.endpoint
+}
+
+/**
+ * Revokes the remote endpoint by clearing the stored token and endpoint URLs.
+ */
+def revokeAccessToken() {
+    try {
+        state.endpoint = false
+        state.localEndpointURL = null
+        state.remoteEndpointURL = null
+        state.accessToken = null
+    } catch(e) {
+    }
+}
+
+/**
+ * Called when the app's preferences are updated.
+ */
+def updated() {
+    // No additional label update is necessary since the built-in label is used.
 }
