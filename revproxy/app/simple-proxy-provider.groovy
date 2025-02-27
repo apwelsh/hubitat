@@ -1,3 +1,5 @@
+import java.util.regex.Pattern
+
 /**
  *  Simple Proxy Provider
  *
@@ -27,7 +29,7 @@ def mainPage(params) {
             label title: "Name", required: true
         }
         section("Proxy Settings") {
-            input "targetUrl", "text", title: "Target URL", required: true
+            input "targetUrl", "text", title: "Target URL", required: true, submitOnChange: true
         }
         section("Proxy Options") {
             input "passRequestHeaders", "bool", title: "Pass Request Headers to Upstream Host", required: true, defaultValue: true
@@ -38,8 +40,8 @@ def mainPage(params) {
                 paragraph "Remote endpoint is currently disabled."
                 href(name: "enableEndpoint", title: "Enable Remote Endpoint", description: "Tap to enable", params: [action: "enable"], page: "mainPage")
             } else {
-                paragraph "Local Endpoint: ${getFullLocalApiServerUrl()}/proxy?apikey=${state.accessToken}"
-                paragraph "Remote Endpoint: ${state.remoteEndpointURL}"
+                paragraph "Local Endpoint:\n<a href='${state.localEndpointURL}' target='_blank'>${state.localEndpointURL}</a>"
+                paragraph "Remote Endpoint:\n<a href='${state.remoteEndpointURL}' target='_blank'>${state.remoteEndpointURL}</a>"
                 href(name: "disableEndpoint", title: "Disable Remote Endpoint", description: "Tap to disable", params: [action: "disable"], page: "mainPage")
             }
         }
@@ -54,13 +56,34 @@ mappings {
     }
 }
 
+def isValidUrl(url) {
+    try {
+        def uri = new URI(url)
+        return uri.scheme in ["http", "https"] && uri.host != null
+    } catch (URISyntaxException e) {
+        return false
+    }
+}
+
+def sanitizeQueryParam(value) {
+    return URLEncoder.encode(value, "UTF-8")
+}
+
+def sanitizeUrl(url) {
+    try {
+        return new URI(url).toASCIIString()
+    } catch (Exception e) {
+        return ""
+    }
+}
+
 def handleProxy() {
-    if (!targetUrl) {
-        render contentType: "application/json", data: [error: "Target URL is not configured."]
+    if (!targetUrl || !isValidUrl(targetUrl)) {
+        log.warn "Invalid or missing target URL: ${targetUrl}" + (targetUrl ? " - Fails validation" : " - Target URL is empty")
+        render contentType: "application/json", data: [error: "Invalid or missing target URL. Must be a valid HTTP/HTTPS URL."]
         return
     }
     
-    // Manually parse the targetUrl: split into baseUrl and query string.
     def baseUrl = targetUrl
     def upstreamQueryMap = [:]
     if (targetUrl.contains("?")) {
@@ -69,26 +92,25 @@ def handleProxy() {
         def queryString = parts[1]
         queryString.split("&").each { pair ->
             def kv = pair.split("=")
-            upstreamQueryMap[kv[0]] = (kv.size() > 1 ? kv[1] : "")
+            upstreamQueryMap[kv[0]] = (kv.size() > 1 ? sanitizeQueryParam(kv[1]) : "")
         }
     }
     
-    // Merge query parameters: use those from targetUrl, then add incoming ones if toggle is enabled.
     def mergedParams = [:]
     mergedParams.putAll(upstreamQueryMap)
-    if (appendClientQueryParams && params) {
+    if (appendClientQueryParams && params != null) {
         params.each { key, value ->
             if (key.toLowerCase() != "access_token" && !upstreamQueryMap.containsKey(key)) {
-                mergedParams[key] = value
+                mergedParams[key] = sanitizeQueryParam(value.toString())
             }
         }
     }
     
     def queryStringFinal = mergedParams.collect { key, value ->
-        "${URLEncoder.encode(key, 'UTF-8')}=${URLEncoder.encode(value.toString(), 'UTF-8')}"
+        "${URLEncoder.encode(key, 'UTF-8')}=${URLEncoder.encode(value, 'UTF-8')}"
     }.join("&")
     
-    def upstreamUrl = baseUrl + (queryStringFinal ? "?" + queryStringFinal : "")
+    def upstreamUrl = sanitizeUrl(baseUrl + (queryStringFinal ? "?" + queryStringFinal : ""))
     
     // Define the list of headers to ignore.
     def ignoreHeaders = ["connection", "access_token", "cookie", "host", "upgrade-insecure-requests"]
@@ -96,18 +118,9 @@ def handleProxy() {
     // Build request headers if the toggle is enabled.
     def requestHeaders = [:]
     if (passRequestHeaders && request?.headers) {
-        if (request.headers instanceof Map) {
-            request.headers.each { key, value ->
-                if (!ignoreHeaders.contains(key.toLowerCase())) {
-                    requestHeaders[key] = value
-                }
-            }
-        } else if (request.headers instanceof List) {
-            request.headers.each { header ->
-                def key = header.getName()
-                if (!ignoreHeaders.contains(key.toLowerCase())) {
-                    requestHeaders[key] = header.getValue()
-                }
+        request.headers.each { key, value ->
+            if (!ignoreHeaders.contains(key.toLowerCase())) {
+                requestHeaders[key] = value
             }
         }
     }
@@ -135,9 +148,6 @@ def handleProxy() {
                 def segments = targetUrl.tokenize("/")
                 def fileName = segments ? segments[-1].split('\\?')[0] : null
                 if (fileName) {
-                    if (fileName.toLowerCase().endsWith(".ics")) {
-                        fileName = fileName.replaceAll(/(?i)\.ics$/, ".ical")
-                    }
                     headerMap['Content-Disposition'] = "attachment; filename=\"${fileName}\""
                 }
             }
@@ -156,45 +166,4 @@ def handleProxy() {
     } catch (Exception e) {
         render contentType: "application/json", data: [error: "Exception: ${e.message}"]
     }
-}
-
-/**
- * Initializes the remote endpoint by creating an access token and storing endpoint URLs.
- * The hub automatically stores the access token in state.accessToken.
- * The access token is appended as a query parameter named "apikey".
- */
-def initializeAppEndpoint() {
-    if (!state.endpoint) {
-        try {
-            def token = createAccessToken()
-            if (token) {
-                state.endpoint = getApiServerUrl() + "/proxy?apikey=${state.accessToken}"
-                state.localEndpointURL = getFullLocalApiServerUrl() + "/proxy?apikey=${state.accessToken}"
-                state.remoteEndpointURL = getFullApiServerUrl() + "/proxy?apikey=${state.accessToken}"
-            }
-        } catch(e) {
-            state.endpoint = null
-        }
-    }
-    return state.endpoint
-}
-
-/**
- * Revokes the remote endpoint by clearing the stored token and endpoint URLs.
- */
-def revokeAccessToken() {
-    try {
-        state.endpoint = null
-        state.localEndpointURL = null
-        state.remoteEndpointURL = null
-        state.accessToken = null
-    } catch(e) {
-    }
-}
-
-/**
- * Called when the app's preferences are updated.
- */
-def updated() {
-    // No additional label update is necessary since the built-in label is used.
 }
