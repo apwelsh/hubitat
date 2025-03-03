@@ -49,6 +49,18 @@
         "Pools & Spas",
         "Water"
       ]
+    },
+    {
+      "id": "e34b1f40-315c-49f2-8ac7-68566d4dfd2a",
+      "name": "Simple Reverse Proxy Service",
+      "category": "Integrations",
+      "location": "https://raw.githubusercontent.com/apwelsh/hubitat/master/revproxy/packageManifest.json",
+      "description": "A simple reverse proxy service. This service is designed to allow you to access http resources on your Hubitat hub's network from outside your network.  This is not a full-featured reverse proxy, but it is a simple one that can be used to access specific web based endpoints without the need for complex VPNs, and without opening up your firewall directly to the internal resource.  This is useful for accessing webhooks, or other web-based services that are not directly accessible from the internet.",
+      "tags": [
+        "Security",
+        "LAN",
+        "Remote Access"
+      ]
     }
   ]
 }
