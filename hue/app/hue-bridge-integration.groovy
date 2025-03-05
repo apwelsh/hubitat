@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
-* Version 1.6.1
+* Version 1.6.2
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -45,6 +45,7 @@ definition(
 
 @Field static final String PAGE_MAINPAGE = 'mainPage'
 @Field static final String PAGE_BRIDGE_DISCOVERY = 'bridgeDiscovery'
+@Field static final String PAGE_HUB_REFRESH = 'hubRefresh'
 @Field static final String PAGE_ADD_DEVICE = 'addDevice'
 @Field static final String PAGE_BRIDGE_LINKING = 'bridgeLinking'
 @Field static final String PAGE_UNLINK = 'unlink'
@@ -61,9 +62,13 @@ definition(
 @Field static Map atomicQueueByDeviceId = new ConcurrentHashMap()
 @Field static Map refreshQueue = new ConcurrentHashMap()
 
+@Field static final Integer DEVICE_REFRESH_DISCOVER_INTERVAL = 3
+@Field static final Integer DEVICE_REFRESH_MAX_COUNT = 60
+
 preferences {
     page(name: PAGE_MAINPAGE)
     page(name: PAGE_BRIDGE_DISCOVERY, title: 'Device Discovery', refreshTimeout:PAGE_REFRESH_TIMEOUT)
+    page(name: PAGE_HUB_REFRESH,      title: 'Refresh Hub Metadata', refreshTimeout:1)
     page(name: PAGE_ADD_DEVICE,       title: 'Add Hue Bridge')
     page(name: PAGE_UNLINK,           title: 'Unlink your Hue')
     page(name: PAGE_BRIDGE_LINKING,   title: 'Linking with your Hue', refreshTimeout:5)
@@ -110,19 +115,14 @@ synchronized Map getRefreshQueue() {
 }
 
 public String getBridgeHost() {
-    if (!settings.bridgeHost) { 
-        if (state.bridgeHost) {
-            setBridgeHost(state.bridgeHost)
-            state.remove('bridgeHost')
-        } else {
-            return null;
-        }
-    }
     String host = settings.bridgeHost
-    if (host?.endsWith(':80')) {
-        host = "${host.substring(0,host.size()-3)}:443"
+    if (!host) {
+        host = state.remove('bridgeHost')
+        if (!host) { return null }
         setBridgeHost(host)
     }
+    host = host.replaceAll(/:80$/, ":443").replaceAll(/(?<!:\d+)\z/, ":443")
+    setBridgeHost(host)
     return host
 }
 
@@ -181,18 +181,23 @@ def mainPage(Map params=[:]) {
             }
 
         if (selectedDevice == null) {
-            section('Setup'){
+            section('Setup') {
                 paragraph 'To begin, select Find Bridge to start searching for your Hue Bride.'
                 href PAGE_BRIDGE_DISCOVERY, title:'Find Bridge', description:''//, params: [pbutton: i]
             }
         } else {
-            section('Configure'){
+            section('Configure') {
 
                 href PAGE_FIND_LIGHTS, title:'Find Lights', description:''
                 href PAGE_FIND_GROUPS, title:'Find Groups', description:''
                 href PAGE_FIND_SCENES, title:'Find Scenes', description:''
                 href PAGE_FIND_SENSORS, title:'Find Sensors', description:''
-                href selectedDevice ? PAGE_BRIDGE_LINKING : PAGE_BRIDGE_DISCOVERY, title:title, description:'', state:selectedDevice? 'complete' : null //, params: [nextPage: PAGE_BRIDGE_LINKING]
+                if (state.clientkey) {
+                    href PAGE_HUB_REFRESH, title:title, description:'', state:selectedDevice ? 'complete' : null , params: [reset: true]
+                    paragraph 'Your hub is linked.  Pressing this button will pause all hub activity, refresh the metadata for your hub, then resume listening.'
+                } else {
+                    href PAGE_BRIDGE_LINKING, title:title, description:'', state:selectedDevice ? 'complete' : null
+                }
             }
             section('Options') {
                 input name: 'logEnable',  type: 'bool', defaultValue: true,  title: 'Enable informational logging'
@@ -221,8 +226,66 @@ def getFormat(type, myText="") {            // Borrowed from @dcmeglio HPM code
     if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"
 }
 
-@Field static final Integer DEVICE_REFRESH_DISCOVER_INTERVAL = 3
-@Field static final Integer DEVICE_REFRESH_MAX_COUNT = 30
+def hubRefresh(Map params=[:]) {
+    log.debug "hubRefresh called with params: ${params}"
+
+    String nextPage = ''
+    String title = 'Hue Hub Metadata Refresh'
+    String paragraphText
+    Integer refreshInterval = 0
+
+    // Invalidate the bridgeHost, so we can find the new one.
+    if (params.reset) {
+        def hub = getChildDeviceForMac(selectedDevice)
+        hub.disconnect() // un-subscribe from the hub events
+        refreshInterval = 1
+        app.removeSetting('bridgeHost') // remove the bridgeHost setting, to force re-discovery of host address
+        params.remove('reset')          // remove the reset param, so we don't keep resetting the bridgeHost
+        params.sync = true
+
+        paragraphText = 'Pausing hub event stream, and initiating search for hub on network.'
+
+    } else if (!getBridgeHost()) {
+        refreshInterval = 2
+        nextPage = PAGE_HUB_REFRESH
+        ssdpSubscribeUpdate()
+        ssdpDiscover()
+        paragraphText = 'Looking for hub on network.'
+        params.sync = true
+    } else {
+        if (params.sync) {
+            refreshInterval = 2
+            nextPage = PAGE_HUB_REFRESH
+            paragraphText = 'Found hub on network.  Proceeding with metadata refresh.'
+            if (logEnable) { log.debug paragraphText }
+            params.remove('sync')
+        } else {
+            enumerateLights()
+            enumerateGroups()
+            enumerateScenes()
+            enumerateDevices()
+            enumerateSensors()
+            enumerateLightsV2()
+            enumerateGroupsV2()
+            enumerateScenesV2()
+
+            def hub = getChildDeviceForMac(selectedDevice)
+            hub.connect() // re-subscribe to the hub events
+            hub.refresh() // for a hub refresh
+
+            nextPage = PAGE_MAINPAGE
+            paragraphText = 'Metadata refresh completed.  Press Next to return to the main page.'
+        }
+    }
+
+    log.debug "$title: $paragraphText"
+
+    return dynamicPage(name:PAGE_HUB_REFRESH, title:title, nextPage:nextPage, refreshInterval: refreshInterval, params:params) {
+        section('') {
+            paragraph "${paragraphText}"
+        }
+    }
+}
 
 def bridgeDiscovery(Map params=[:]) {
     if (selectedDevice) {
@@ -308,7 +371,7 @@ def bridgeLinking() {
                 return addDevice(hub)
             }
             if (hub?.networkAddress) {
-                setBridgeHost(hub.networkAddress)
+                setBridgeHost("${hub.networkAddress}:${hub.deviceAddress}")
             }
 
             if (hub) {
@@ -348,6 +411,8 @@ def addDevice(device) {
         refreshHubStatus()
     }
 
+    String nextPage = PAGE_HUB_REFRESH
+    Map params = [sync: true]
     if (!d && device != null) {
         if (logEnable) { log.debug "Creating Hue Bridge device with dni: ${dni}" }
         try {
@@ -357,11 +422,13 @@ def addDevice(device) {
                 sectionText = 'Cannot add hub.  A device with the same device network ID already exists.'
                 title = 'Problem detected'
                 app.removeSetting('bridgeHost')
+                nextpage = PAGE_MAINPAGE
+                params = [:]
             }
         }
     }
 
-    return dynamicPage(name:PAGE_ADD_DEVICE, title:title, nextPage:PAGE_MAINPAGE) {
+    return dynamicPage(name:PAGE_ADD_DEVICE, title:title, nextPage:nextPage, params: params) {
         section() {
             paragraph sectionText
         }
@@ -873,8 +940,8 @@ def ssdpUpdateHandler(evt) {
     def hub = evt?.hubId
     if (parsedEvent.networkAddress) {
         parsedEvent << ['hub':hub,
-                        'networkAddress': convertToHuexToIP(parsedEvent.networkAddress),
-                        'deviceAddress': convertToHuexToInt(parsedEvent.deviceAddress)]
+                        'networkAddress': convertHexToIP(parsedEvent.networkAddress),
+                        'deviceAddress': convertHexToInt(parsedEvent.deviceAddress)]
 
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
         if ("${parsedEvent.mac}" == "${selectedDevice}") {
@@ -993,6 +1060,11 @@ Map getApiV2Header() {
 void refreshHubStatus() {
 
     def url = apiUrl
+    if (url == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
+
     httpGet([uri: url,
             contentType: 'application/json',
             ignoreSSLIssues: true,
@@ -1075,6 +1147,10 @@ private renameInstalledDevicesV2(type, data) {
 
 private enumerateGroups() {
 
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
     def url = "${apiUrl}/groups"
 
     httpGet([uri: url,
@@ -1178,6 +1254,10 @@ private enumerateDevices() {
 
 private enumerateLights() {
 
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
     def url = "${apiUrl}/lights"
 
     httpGet([uri: url,
@@ -1233,6 +1313,10 @@ private enumerateLightsV2() {
 
 private enumerateScenes() {
 
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
     def url = "${apiUrl}/scenes"
 
     httpGet([uri: url,
@@ -1299,6 +1383,10 @@ private enumerateScenesV2() {
 
 private enumerateSensors() {
 
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
     def url = "${apiUrl}/sensors"
 
     httpGet([uri: url,
@@ -1371,6 +1459,11 @@ private String uniqueIdMAC(String uniqueid) {
 
 void setDeviceConfig(def child, Map deviceConfig) {
 
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
+
     String deviceNetworkId = child.device.deviceNetworkId
 
     String hubId = deviceIdHub(deviceNetworkId)
@@ -1416,6 +1509,10 @@ void setDeviceConfig(def child, Map deviceConfig) {
 }
 
 void setDeviceState(def child, Map deviceState) {
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
+        return
+    }
 
     String deviceNetworkId = child.device.deviceNetworkId
     // Establish the eventQueue for the device.
@@ -1519,7 +1616,8 @@ void dispatchRefresh() {
 }
 
 void getDeviceState(def child) {
-    if (!selectedDevice || !getBridgeHost()) {
+    if (apiUrl == null) {
+        log.warn "Hub communications are offline, due to missing bridge host."
         return
     }
     String deviceNetworkId = child.device.deviceNetworkId

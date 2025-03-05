@@ -87,7 +87,7 @@ def mainPage() {
     if (!state) {
         return dynamicPage(name: 'mainPage', title: 'Roku Connect', uninstall: true, install: true) {
             section {
-                paragraph 'Hit Done to to install the Roku Connect Integration.\nRe-open to setup.'
+                paragraph 'Click Done to install the Roku Connect Integration.\nRe-open to setup.'
             }
         }
     } else {
