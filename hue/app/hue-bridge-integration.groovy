@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
-* Version 1.6.3
+* Version 1.6.4
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -1259,7 +1259,6 @@ private enumerateLights() {
         return
     }
     def url = "${apiUrl}/lights"
-    if (logEnable) { log.debug "Making HTTP GET request to URL: ${url}" }
     httpGet([uri: url,
             contentType: 'application/json',
             ignoreSSLIssues: true,
