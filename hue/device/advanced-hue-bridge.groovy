@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.8
+ * Version 1.4.9
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -155,13 +155,7 @@ void updated() {
 
     if (this[SETTING_LOG_ENABLE]) { log.info 'Preferences updated' }
 
-    if (this[SETTING_WATCHDOG]) {
-        schedule('0/10 * * ? * *', 'watchdog', [overwrite: true])
-        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog timer set for every 10 seconds' }
-    } else {
-        schedule('0 * * ? * *', 'watchdog', [overwrite: true])
-        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog timer set for every 1 minute' }
-    }
+    scheduleWatchdog()
     runIn(1, connect)
 
 }
@@ -225,6 +219,8 @@ void connect() {
         pingInterval: 5,
         readTimeout: 3600,
         'headers': headers])
+
+    scheduleWatchdog()
 }
 
 /**
@@ -236,8 +232,25 @@ void connect() {
 void disconnect() {
     // Set desired state to unsubscribed, so watchdog is not in effect
     interfaces.eventStream.close()
+    unschedule(watchdog)
 }
 
+/**
+ * Schedules the watchdog timer based on the watchdog setting.
+ *
+ * This method schedules the watchdog timer to run every 10 seconds if the watchdog setting is enabled,
+ * and every 1 minute if the watchdog setting is disabled. It logs an informational message indicating
+ * the timer setting.
+ */
+void scheduleWatchdog() {
+    if (this[SETTING_WATCHDOG]) {
+        schedule('0/10 * * ? * *', 'watchdog', [overwrite: true])
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog timer set for every 10 seconds' }
+    } else {
+        schedule('0 * * ? * *', 'watchdog', [overwrite: true])
+        if (this[SETTING_LOG_ENABLE]) { log.info 'Watchdog timer set for every 1 minute' }
+    }
+}
 /**
  * Monitors the network status and attempts to reconnect if the status is offline.
  *

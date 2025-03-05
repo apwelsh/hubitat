@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
-* Version 1.6.2
+* Version 1.6.3
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -119,7 +119,6 @@ public String getBridgeHost() {
     if (!host) {
         host = state.remove('bridgeHost')
         if (!host) { return null }
-        setBridgeHost(host)
     }
     host = host.replaceAll(/:80$/, ":443").replaceAll(/(?<!:\d+)\z/, ":443")
     setBridgeHost(host)
@@ -129,7 +128,6 @@ public String getBridgeHost() {
 public void setBridgeHost(String host) {
     if (!host) {
         app.removeSetting('bridgeHost')
-        return
     } else {
         if (host?.endsWith(':80')) {
             host = "${host.substring(0,host.size()-3)}:443"
@@ -227,10 +225,8 @@ def getFormat(type, myText="") {            // Borrowed from @dcmeglio HPM code
 }
 
 def hubRefresh(Map params=[:]) {
-    log.debug "hubRefresh called with params: ${params}"
 
-    String nextPage = ''
-    String title = 'Hue Hub Metadata Refresh'
+    String title = 'Metadata Refresh'
     String paragraphText
     Integer refreshInterval = 0
 
@@ -241,46 +237,51 @@ def hubRefresh(Map params=[:]) {
         refreshInterval = 1
         app.removeSetting('bridgeHost') // remove the bridgeHost setting, to force re-discovery of host address
         params.remove('reset')          // remove the reset param, so we don't keep resetting the bridgeHost
-        params.sync = true
-
-        paragraphText = 'Pausing hub event stream, and initiating search for hub on network.'
+        title = 'Stop Hub Event Stream'
+        paragraphText = 'Stopping hub event stream.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
 
     } else if (!getBridgeHost()) {
         refreshInterval = 2
         nextPage = PAGE_HUB_REFRESH
         ssdpSubscribeUpdate()
         ssdpDiscover()
-        paragraphText = 'Looking for hub on network.'
-        params.sync = true
+        title = 'Hub Discovery'
+        paragraphText = 'Looking for hub on network.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
     } else {
-        if (params.sync) {
+        if (!params.synced) {
             refreshInterval = 2
             nextPage = PAGE_HUB_REFRESH
-            paragraphText = 'Found hub on network.  Proceeding with metadata refresh.'
-            if (logEnable) { log.debug paragraphText }
-            params.remove('sync')
+            params.synced = true
+            paragraphText = 'Found hub on network.  Proceeding with metadata refresh.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
         } else {
-            enumerateLights()
-            enumerateGroups()
-            enumerateScenes()
-            enumerateDevices()
-            enumerateSensors()
-            enumerateLightsV2()
-            enumerateGroupsV2()
-            enumerateScenesV2()
+            try {
+                enumerateLights()
+                enumerateGroups()
+                enumerateScenes()
+                enumerateDevices()
+                enumerateSensors()
+                enumerateLightsV2()
+                enumerateGroupsV2()
+                enumerateScenesV2()
 
-            def hub = getChildDeviceForMac(selectedDevice)
-            hub.connect() // re-subscribe to the hub events
-            hub.refresh() // for a hub refresh
+                def hub = getChildDeviceForMac(selectedDevice)
+                hub.connect() // re-subscribe to the hub events
+                if (hub.watchdog) {
+                    hub.scheduleWatchdog()
+                }
+                hub.refresh() // force a hub refresh
 
-            nextPage = PAGE_MAINPAGE
-            paragraphText = 'Metadata refresh completed.  Press Next to return to the main page.'
+                paragraphText = 'Metadata refresh completed. Press Done to return to the main page.'
+            } catch (Exception e) {
+                log.error "Error refreshing hub metadata: ${e}"
+                paragraphText = 'Error during metadata refresh. Please check the logs for more details.'
+            }
         }
     }
 
-    log.debug "$title: $paragraphText"
+    if (logEnable) { log.debug "$title: $paragraphText" }
 
-    return dynamicPage(name:PAGE_HUB_REFRESH, title:title, nextPage:nextPage, refreshInterval: refreshInterval, params:params) {
+    return dynamicPage(name:PAGE_HUB_REFRESH, title:title, refreshInterval: refreshInterval, params:params) {
         section('') {
             paragraph "${paragraphText}"
         }
@@ -342,7 +343,7 @@ def unlink() {
 
 }
 
-def bridgeLinking() {
+def bridgeLinking(Map params=[:]) {
 
     String nextPage = ''
     String title = 'Linking with your Hue'
@@ -353,7 +354,7 @@ def bridgeLinking() {
     if (selectedDevice && !getBridgeHost()) {
         ssdpSubscribeUpdate()
         ssdpDiscover()
-        paragraphText = 'Looking for hub on network.'
+        paragraphText = 'Looking for hub on network.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
 
     } else {
         ssdpUnsubscribe()  // force-stop all SSDP discovery, to reduce network chatter
@@ -375,7 +376,7 @@ def bridgeLinking() {
             }
 
             if (hub) {
-                if((linkRefreshcount % 2) == 0 && (!state.username || !state.clientkey)) {
+                if ((linkRefreshcount % 2) == 0 && (!state.username || !state.clientkey)) {
                     requestHubAccess(selectedDevice)
                 }
             }
@@ -396,7 +397,7 @@ def bridgeLinking() {
 }
 
 def addDevice(device) {
-    String sectionText = 'Linking to your hub was a success! Please click \'Next\'!\r\n'
+    String sectionText = 'Linking to your hub was a success! Please click \'Done\'!\r\n'
     String title = 'Success'
     String dni = deviceNetworkId(device?.mac)
 
@@ -411,19 +412,16 @@ def addDevice(device) {
         refreshHubStatus()
     }
 
-    String nextPage = PAGE_HUB_REFRESH
-    Map params = [sync: true]
     if (!d && device != null) {
         if (logEnable) { log.debug "Creating Hue Bridge device with dni: ${dni}" }
         try {
             addChildDevice('apwelsh', 'AdvancedHueBridge', dni, null, ['label': device.name])
         } catch (ex) {
-            if (ex.message =~ 'A device with the same device network ID exists.*') {
-                sectionText = 'Cannot add hub.  A device with the same device network ID already exists.'
+            if (ex.message =~ 'A device with the same device network ID exists.') {
+                sectionText = 'Cannot add hub..'
                 title = 'Problem detected'
                 app.removeSetting('bridgeHost')
                 nextpage = PAGE_MAINPAGE
-                params = [:]
             }
         }
     }
@@ -1046,11 +1044,13 @@ def requestHubAccessHandler(response, args) {
 }
 
 String getApiUrl() {
-    "https://${getBridgeHost()}/api/${state.username}"
+    String host = getBridgeHost()
+    return host ? "https://${host}/api/${state.username}" : null
 }
 
 String getApiV2Url() {
-        uri: "https://${getBridgeHost()}/clip/v2"
+    String host = getBridgeHost()
+    return host ? "https://${host}/clip/v2" : null
 }
 
 Map getApiV2Header() {
@@ -1259,7 +1259,7 @@ private enumerateLights() {
         return
     }
     def url = "${apiUrl}/lights"
-
+    if (logEnable) { log.debug "Making HTTP GET request to URL: ${url}" }
     httpGet([uri: url,
             contentType: 'application/json',
             ignoreSSLIssues: true,
@@ -2509,7 +2509,7 @@ List<Integer> hsvToRGB(double hue, double sat, double bri) {
         r = X; g = C; b = 0
     } else if (H < 180) {
         r = 0; g = C; b = X
-    } else if (H < 240) {
+    } else if (H < 240) {        
         r = 0; g = X; b = C
     } else if (H < 300) {
         r = X; g = 0; b = C
