@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Bridge
- * Version 1.4.9
+ * Version 1.5.0
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device manage the hub directly for
@@ -110,7 +110,7 @@ preferences {
  * Hubitat DTH Lifecycle Functions
  **/
 void installed() {
-    initialize()
+    sendEvent(name: 'networkStatus', value: 'offline')
 }
 
 void initialize() {

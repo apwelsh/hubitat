@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
-* Version 1.6.5
+* Version 1.6.6
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -41,7 +41,7 @@ definition(
     iconX3Url: ''
 )
 
-@Field static final Integer PAGE_REFRESH_TIMEOUT = 10
+@Field static final Integer PAGE_REFRESH_TIMEOUT = 2
 
 @Field static final String PAGE_MAINPAGE = 'mainPage'
 @Field static final String PAGE_BRIDGE_DISCOVERY = 'bridgeDiscovery'
@@ -62,8 +62,8 @@ definition(
 @Field static Map atomicQueueByDeviceId = new ConcurrentHashMap()
 @Field static Map refreshQueue = new ConcurrentHashMap()
 
-@Field static final Integer DEVICE_REFRESH_DISCOVER_INTERVAL = 3
-@Field static final Integer DEVICE_REFRESH_MAX_COUNT = 60
+@Field static final Integer DEVICE_REFRESH_DISCOVER_INTERVAL = 2
+@Field static final Integer DEVICE_REFRESH_MAX_COUNT = 5
 
 preferences {
     page(name: PAGE_MAINPAGE)
@@ -194,7 +194,7 @@ def mainPage(Map params=[:]) {
                     href PAGE_HUB_REFRESH, title:title, description:'', state:selectedDevice ? 'complete' : null , params: [reset: true]
                     paragraph 'Your hub is linked.  Pressing this button will pause all hub activity, refresh the metadata for your hub, then resume listening.'
                 } else {
-                    href PAGE_BRIDGE_LINKING, title:title, description:'', state:selectedDevice ? 'complete' : null
+                    href PAGE_BRIDGE_LINKING, title:title, description:'', state:selectedDevice ? 'complete' : null, params: [search: true]
                 }
             }
             section('Options') {
@@ -224,12 +224,15 @@ def getFormat(type, myText="") {            // Borrowed from @dcmeglio HPM code
     if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"
 }
 
-def hubRefresh(Map params=[:]) {
+def hubRefresh(Map iParams=[:]) {
+
+    Map params = iParams ?: state.hubRefreshParams ?: [:]
 
     String title = 'Metadata Refresh'
     String paragraphText
     Integer refreshInterval = 0
-
+    String nextPage = PAGE_MAINPAGE
+    
     // Invalidate the bridgeHost, so we can find the new one.
     if (params.reset) {
         def hub = getChildDeviceForMac(selectedDevice)
@@ -239,10 +242,10 @@ def hubRefresh(Map params=[:]) {
         params.remove('reset')          // remove the reset param, so we don't keep resetting the bridgeHost
         title = 'Stop Hub Event Stream'
         paragraphText = 'Stopping hub event stream.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
-
+        nextPage = ''
     } else if (!getBridgeHost()) {
         refreshInterval = 2
-        nextPage = PAGE_HUB_REFRESH
+        nextPage = ''
         ssdpSubscribeUpdate()
         ssdpDiscover()
         title = 'Hub Discovery'
@@ -250,18 +253,26 @@ def hubRefresh(Map params=[:]) {
     } else {
         if (!params.synced) {
             refreshInterval = 2
-            nextPage = PAGE_HUB_REFRESH
+            nextPage = ''
             params.synced = true
             paragraphText = 'Found hub on network.  Proceeding with metadata refresh.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
         } else {
             try {
+                if (dbgEnable) log.debug "Enumerating lights..."
                 enumerateLights()
+                if (dbgEnable) log.debug "Enumerating groups..."
                 enumerateGroups()
+                if (dbgEnable) log.debug "Enumerating scenes..."
                 enumerateScenes()
+                if (dbgEnable) log.debug "Enumerating devices..."
                 enumerateDevices()
+                if (dbgEnable) log.debug "Enumerating sensors..."
                 enumerateSensors()
+                if (dbgEnable) log.debug "Enumerating lights V2..."
                 enumerateLightsV2()
+                if (dbgEnable) log.debug "Enumerating groups V2..."
                 enumerateGroupsV2()
+                if (dbgEnable) log.debug "Enumerating scenes V2..."
                 enumerateScenesV2()
 
                 def hub = getChildDeviceForMac(selectedDevice)
@@ -269,9 +280,9 @@ def hubRefresh(Map params=[:]) {
                 if (hub.watchdog) {
                     hub.scheduleWatchdog()
                 }
-                hub.refresh() // force a hub refresh
+                hub.updated()
 
-                paragraphText = 'Metadata refresh completed. Press Done to return to the main page.'
+                paragraphText = 'Metadata refresh completed. Click Next to return to the main page.'
             } catch (Exception e) {
                 log.error "Error refreshing hub metadata: ${e}"
                 paragraphText = 'Error during metadata refresh. Please check the logs for more details.'
@@ -279,9 +290,13 @@ def hubRefresh(Map params=[:]) {
         }
     }
 
-    if (logEnable) { log.debug "$title: $paragraphText" }
+    if (params) {
+        state.hubRefreshParams = params
+    } else {
+        state.remove('hubRefreshParams')
+    }
 
-    return dynamicPage(name:PAGE_HUB_REFRESH, title:title, refreshInterval: refreshInterval, params:params) {
+    return dynamicPage(name:PAGE_HUB_REFRESH, title:title, nextPage: nextPage, refreshInterval: refreshInterval) {
         section('') {
             paragraph "${paragraphText}"
         }
@@ -289,9 +304,7 @@ def hubRefresh(Map params=[:]) {
 }
 
 def bridgeDiscovery(Map params=[:]) {
-    if (selectedDevice) {
 
-    }
     if (logEnable) { log.debug 'Searching for Hub additions and updates' }
     Map hubs = discoveredHubs() // pull app state for known hubs
 
@@ -301,6 +314,10 @@ def bridgeDiscovery(Map params=[:]) {
 
     Map options = hubs ?: [:]
     Integer numFound = options.size()
+
+    if (numFound) {
+        refreshInterval = 10
+    }
 
     if (!options && state.deviceRefreshCount > DEVICE_REFRESH_MAX_COUNT) {
         /* groovylint-disable-next-line DuplicateNumberLiteral */
@@ -315,6 +332,11 @@ def bridgeDiscovery(Map params=[:]) {
 
     Boolean uninstall = getBridgeHost() ? false : true
     String nextPage = selectedDevice ? PAGE_BRIDGE_LINKING : null
+    nextPage = null
+
+    if (selectedDevice) {
+        return bridgeLinking()
+    }
 
     return dynamicPage(name:PAGE_BRIDGE_DISCOVERY, title:'Discovery Started!', nextPage:nextPage, refreshInterval:refreshInterval, uninstall:uninstall) {
         section('Please wait while we discover your Hue Bridge. Note that you must first configure your Hue Bridge and Lights using the Philips Hue application. Discovery can take five minutes or more, so sit back and relax, the page will reload automatically! Select your Hue Bridge below once discovered.') {
@@ -350,13 +372,13 @@ def unlink() {
 
 def bridgeLinking(Map params=[:]) {
 
-    String nextPage = ''
+    String nextPage = null
     String title = 'Linking with your Hue'
-    Integer refreshInterval = 2
+    Integer refreshInterval = 5
     String paragraphText
 
     // If bridge IP is undefined, wait for IP discovery before starting linking.
-    if (selectedDevice && !getBridgeHost()) {
+    if (selectedDevice && !getBridgeHost() && params.search) {
         ssdpSubscribeUpdate()
         ssdpDiscover()
         paragraphText = 'Looking for hub on network.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
@@ -369,7 +391,7 @@ def bridgeLinking(Map params=[:]) {
         state.linkRefreshcount = linkRefreshcount + 1
 
         if (selectedDevice) {
-            paragraphText = 'Press the button on your Hue Bridge to setup a link. '
+            paragraphText = 'Press the Link Button on the top of your Hue Bridge to begin pairing.'
 
             def hub = getHubForMac(selectedDevice)
             if (hub?.username && hub?.clientkey) { //if discovery worked
@@ -394,7 +416,7 @@ def bridgeLinking(Map params=[:]) {
 
     def uninstall = getBridgeHost() ? false : true
 
-    return dynamicPage(name:PAGE_BRIDGE_LINKING, title:title, nextPage:nextPage, refreshInterval:refreshInterval, uninstall: uninstall) {
+    return dynamicPage(name:PAGE_BRIDGE_LINKING, title:title, nextPage:nextPage, install: true, refreshInterval:refreshInterval, uninstall: uninstall) {
         section('') {
             paragraph "${paragraphText}"
         }
@@ -402,36 +424,40 @@ def bridgeLinking(Map params=[:]) {
 }
 
 def addDevice(device) {
-    String sectionText = 'Linking to your hub was a success! Please click \'Done\'!\r\n'
+    String sectionText = 'Linking to your hub was a success! Please click \'Next\'!\r\n'
     String title = 'Success'
-    String dni = deviceNetworkId(device?.mac)
+    Map params = [:]
+    String nextpage = null
 
-    if (logEnable) { log.info "Adding Bridge device with DNI: ${dni}" }
-
-    def d
     if (device) {
-        d = childDevices?.find { dev -> dev.deviceNetworkId == dni }
+        String dni = deviceNetworkId(device?.mac)
+        if (logEnable) { log.info "Adding Bridge device with DNI: ${dni}" }
+
         setBridgeHost("${device.networkAddress}:${device.deviceAddress}")
         state.username = "${device.username}"
         state.clientkey = "${device.clientkey}"
-        refreshHubStatus()
-    }
+        // refreshHubStatus()
 
-    if (!d && device != null) {
-        if (logEnable) { log.debug "Creating Hue Bridge device with dni: ${dni}" }
-        try {
-            addChildDevice('apwelsh', 'AdvancedHueBridge', dni, null, ['label': device.name])
-        } catch (ex) {
-            if (ex.message =~ 'A device with the same device network ID exists.') {
-                sectionText = 'Cannot add hub..'
-                title = 'Problem detected'
-                app.removeSetting('bridgeHost')
-                nextpage = PAGE_MAINPAGE
+        def d = childDevices?.find { dev -> dev.deviceNetworkId == dni }
+        if (!d) {
+            if (logEnable) { log.debug "Creating Hue Bridge device with dni: ${dni}" }
+            try {
+                addChildDevice('apwelsh', 'AdvancedHueBridge', dni, null, ['label': device.name])
+                nextpage = PAGE_HUB_REFRESH
+                params = [:]
+
+            } catch (ex) {
+                if (ex.message =~ 'A device with the same device network ID exists.') {
+                    sectionText = 'Cannot add hub..'
+                    title = 'Problem detected'
+                    app.removeSetting('bridgeHost')
+                    nextpage = null
+                }
             }
         }
     }
 
-    return dynamicPage(name:PAGE_ADD_DEVICE, title:title, nextPage:nextPage, params: params) {
+    return dynamicPage(name:PAGE_ADD_DEVICE, title:title, nextPage:nextpage, params: params) {
         section() {
             paragraph sectionText
         }
@@ -918,8 +944,8 @@ def ssdpHandler(evt) {
     def hub = evt?.hubId
     if (parsedEvent.networkAddress) {
         parsedEvent << ['hub':hub,
-                        'networkAddress': convertToHexToIP(parsedEvent.networkAddress),
-                        'deviceAddress': convertToHexToInt(parsedEvent.deviceAddress)]
+                        'networkAddress': convertHexToIP(parsedEvent.networkAddress),
+                        'deviceAddress': convertHexToInt(parsedEvent.deviceAddress)]
 
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
 
@@ -1069,24 +1095,28 @@ void refreshHubStatus() {
         log.warn "Hub communications are offline, due to missing bridge host."
         return
     }
+    try {
+        httpGet([uri: url,
+                contentType: 'application/json',
+                ignoreSSLIssues: true,
+                requestContentType: 'application/json']) { response ->
 
-    httpGet([uri: url,
-            contentType: 'application/json',
-            ignoreSSLIssues: true,
-            requestContentType: 'application/json']) { response ->
+            if (!response.isSuccess()) { return }
 
-        if (!response.isSuccess()) { return }
-
-        def data = response.data
-        if (data) {
-            if (data.error?.description) {
-                if (logEnable) { log.error "${data.error.description[0]}" }
-            } else {
-                parseStatus(data)
+            def data = response.data
+            if (data) {
+                if (data.error?.description) {
+                    if (logEnable) { log.error "${data.error.description[0]}" }
+                } else {
+                    parseStatus(data)
+                }
             }
-        }
 
+        }
+    } catch (groovyx.net.http.ResponseParseException e) {
+        log.error "Error refreshing hub status: ${e}"
     }
+
 }
 
 private renameInstalledDevices(type, data) {
@@ -1264,10 +1294,11 @@ private enumerateLights() {
         return
     }
     def url = "${apiUrl}/lights"
+
     httpGet([uri: url,
-            contentType: 'application/json',
-            ignoreSSLIssues: true,
-            requestContentType: 'application/json']) { response ->
+        contentType: 'application/json',
+        ignoreSSLIssues: true,
+        requestContentType: 'application/json']) { response ->
         if (!response.isSuccess()) { return }
 
         def data = response.data
@@ -1283,6 +1314,7 @@ private enumerateLights() {
             }
         }
     }
+
 }
 
 private enumerateLightsV2() {
