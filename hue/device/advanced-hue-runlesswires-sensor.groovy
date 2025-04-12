@@ -1,6 +1,6 @@
 /**
  * Advanced Hue RunLessWires Sensor
- * Version 1.0.0
+ * Version 1.0.1
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App. Although this can work in poll mode,
@@ -58,6 +58,7 @@ metadata {
         capability 'HoldableButton'
         capability 'Refresh'
         capability 'Initialize'
+        capability 'Sensor'
  
         attribute  'status', 'string'  // expect enabled/disabled
         attribute  'health', 'string'  // reachable/unreachable
