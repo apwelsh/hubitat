@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Light Sensor 
- * Version 1.0.3
+ * Version 1.0.4
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -43,6 +43,7 @@ metadata {
         capability 'Battery'
         capability 'IlluminanceMeasurement'
         capability 'Refresh'
+        capability 'sensor'
 
         attribute  'status', 'string'  // expect enabled/disabled
         attribute  'health', 'string'  // reachable/unreachable
