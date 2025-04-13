@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Motion Sensor 
- * Version 1.0.5
+ * Version 1.0.6
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -44,7 +44,6 @@ metadata {
         capability 'MotionSensor'
         capability 'Battery'
         capability 'Refresh'
-        capability 'Sensor'
     
         attribute  'status', 'string'  // expect enabled/disabled
         attribute  'health', 'string'  // reachable/unreachable
