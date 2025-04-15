@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.8.2
+ * Version 2.8.3
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -721,15 +721,15 @@ void refresh() {
 void setChannel(Number channel) {
     if (channel == null) { return }
     if (currentValue('switch') != 'on') { return }
-    if (currentValue('mediaInputSource') != 'InputTuner') { return }
+    if (currentValue('mediaInputSource') != 'Live TV Input') { return }
 
     List keys = []
-    keys << 'Left'
     channel.toString().toCharArray().flatten().each {
         keys << "Lit_${it}"
     }
     keys << 'Select'
     sequentialKeyPress(keys)
+    runInMillis(500, 'keyPress', [data: 'Back'])
 }
 
 /**
