@@ -1,6 +1,6 @@
 /**
  * Advanced Hue Temperature Sensor 
- * Version 1.0.6
+ * Version 1.0.7
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a child device handler for the Advance Hue Bridge Integration App.  This device reports light level
@@ -43,6 +43,7 @@ metadata {
         capability 'Battery'
         capability 'TemperatureMeasurement'
         capability 'Refresh'
+        capability 'Sensor'
 
         attribute  'status', 'string'  // expect enabled/disabled
         attribute  'health', 'string'  // reachable/unreachable
