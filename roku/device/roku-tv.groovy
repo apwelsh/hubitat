@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.8.3
+ * Version 2.8.4
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -120,8 +120,6 @@ metadata {
         command 'queryInstalledApps'
         command 'volumeUp10'
         command 'volumeDown10'
-
-        command 'quiter'
 
         command 'setChannel', [[name: channel, type: 'NUMBER']]
 
