@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
-* Version 1.6.6
+* Version 1.6.7
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -120,7 +120,7 @@ public String getBridgeHost() {
         host = state.remove('bridgeHost')
         if (!host) { return null }
     }
-    host = host.replaceAll(/:80$/, ":443").replaceAll(/(?<!:\d+)\z/, ":443")
+    host = host.replaceAll(/:80$/, ":443").replaceAll(/(?<!:\d+)?\z/, ":443")
     setBridgeHost(host)
     return host
 }
@@ -2130,7 +2130,7 @@ void setHueProperty(def child, Map args) {
     // log.debug "Received State ($child): $devstate"
     // log.debug "Translated Events ($child): $events"
 
-    if (child.hasAttribute('colorMode') && devstate.colormode == 'xy') {
+    if (child.hasAttribute('colorMode') && devstate.colormode == 'xy' && state.lights_v2) {
         if (devstate.containsKey('xy')) {
             List xy = devstate.xy
             double bri
