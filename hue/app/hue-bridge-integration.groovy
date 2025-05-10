@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
-* Version 1.6.7
+ * Version 1.6.8
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -118,9 +118,16 @@ public String getBridgeHost() {
     String host = settings.bridgeHost
     if (!host) {
         host = state.remove('bridgeHost')
-        if (!host) { return null }
+        if (!host) return null
     }
-    host = host.replaceAll(/:80$/, ":443").replaceAll(/(?<!:\d+)?\z/, ":443")
+
+    // Only add :443 if no port is present
+    if (!(host ==~ /.+:\d+$/)) {
+        host = "${host}:443"
+    } else if (host.endsWith(":80")) {
+        host = host.replaceAll(/:80$/, ":443")
+    }
+
     setBridgeHost(host)
     return host
 }
