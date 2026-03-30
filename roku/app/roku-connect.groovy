@@ -1,6 +1,6 @@
 /**
  * Roku Connect
- * Version 1.3.1
+ * Version 1.3.2
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is an integration app for Hubitat designed to locate, and install any/all attached Roku devices.
@@ -120,8 +120,12 @@ def mainPage() {
 }
 
 def getFormat(type, myText=""){            // Borrowed from @dcmeglio HPM code 
-    if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
-    if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
+    if(type == "line") {
+        return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
+    }
+    if(type == "title") {
+        return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
+    }
 }
 
 def deviceDiscovery() {
@@ -210,8 +214,9 @@ def configureDevice(params) {
     if (!networkId)  { return mainPage() }
 
     def child = getChildDevice(networkId)
-    if (!child)
+    if (!child) {
         return mainPage()
+    }
 
     app.updateSetting('deviceNetworkId', networkId)
 
@@ -238,7 +243,7 @@ def configureDevice(params) {
     Map rokuInputs = [:]
     List installedInputs = []
     List selectedInputs = []
-    if (child.getState().isTV ?: false) { 
+    if (child?.getState()?.isTV ?: false) {
         rokuInputs = child.getRokuInputs()
         installedInputs = child.getChildDevices().collect { it.deviceNetworkId }.findAll { it =~ /^.*\-(AV1|Tuner|hdmi\d)$/ }
         selectedInputs = settings["${networkId}_selectedInputs"] ?: []
@@ -283,7 +288,7 @@ def configureDevice(params) {
         section('<B>Add / Remove Child Devices</B>') {
             input "${networkId}_selectedApps", 'enum', title: '<B>Select Apps to use as switch devices, unlselect Apps to remove the switch device</B>', required: false, multiple: true, options: rokuApps, submitOnChange: true
 
-            if (child.getState().isTV ?: false) { 
+            if (child?.getState()?.isTV ?: false) { 
                 input "${networkId}_selectedInputs", 'enum', title: '<B>Select Inputs to use as switch devices, unlselect Inputs to remove the switch device</B>', required: false, multiple: true, options: rokuInputs, submitOnChange: true
             }
         }
@@ -294,7 +299,7 @@ def configureDevice(params) {
                 def desc = it.label != it.name ? it.name : ''
                 href 'manageApp', title:"<img src='${child.iconPathForDevice(it)}' style='width:auto; height:1em'/> ${desc}", description:'', params: [netId: networkId, appId: it.deviceNetworkId]
             }
-            if (child.getState().isTV ?: false) { 
+            if (child?.getState()?.isTV ?: false) { 
                 paragraph '<B>Manage TV Inputs</B>'
                 child.getChildDevices()?.sort({ a, b -> a['name'] <=> b['name'] }).findAll { it.deviceNetworkId =~ /^.*\-(AV1|hdmi\d|Tuner)$/ }.each {
                     def desc = it.label != it.name ? it.name : ''
@@ -316,8 +321,9 @@ def manageApp(params) {
 
     def child = getChildDevice(networkId)
 
-    if (!child)
+    if (!child) {
         return mainPage()
+    }
 
     // track state to backup.
     app.updateSetting('deviceNetworkId', networkId)
@@ -371,7 +377,7 @@ def ssdpHandler(event) {
                         'networkAddress': convertHexToIP(parsedEvent.networkAddress),
                         'deviceAddress': convertHexToInt(parsedEvent.deviceAddress)]
 
-        def ssdpUSN = parsedEvent.ssdpUSN.toString()
+        def ssdpUSN = parsedEvent.ssdpUSN
 
         def discovered = getDiscovered()
         if (!discovered."${ssdpUSN}") {
@@ -396,7 +402,7 @@ private verifyDevice(event) {
         if (data) {
             def device = data.device
             String model = device.modelName
-            String ssdpUSN = "${event.ssdpUSN.toString()}"
+            String ssdpUSN = event.ssdpUSN
 
             if (logEnable)  { log.debug "Identified model: ${model}" }
             def hubId = "${event.mac}"[-6..-1]
@@ -407,7 +413,7 @@ private verifyDevice(event) {
                       serialNumber: "${device.serialNumber}"]
 
             def discovered = getDiscovered()
-            discovered << ["${ssdpUSN}": event]
+            discovered << [(ssdpUSN): event]
             if (logEnable)  { log.debug "Discovered new Roku: ${name}" }
             cleanupOrphans(hubId)
         }
@@ -415,7 +421,7 @@ private verifyDevice(event) {
     }}
 
 private updateDevice(event) {
-    def ssdpUSN = event.ssdpUSN.toString()
+    def ssdpUSN = event.ssdpUSN
     def discovered = getDiscovered()
     def roku = discovered["${ssdpUSN}"]
 

@@ -1,6 +1,6 @@
 /**
  * Roku TV
- * Version 2.8.4
+ * Version 2.8.5
  * Download: https://github.com/apwelsh/hubitat
  * Description:
  * This is a parent device handler designed to manage and control a Roku TV or Player connected to the same network 
@@ -47,7 +47,7 @@ import java.util.concurrent.ConcurrentHashMap
 @Field static final Integer DEFAULT_HDMI_PORTS       = 3
 @Field static final Boolean DEFAULT_INPUT_AV         = false
 @Field static final Boolean DEFAULT_INPUT_TUNER      = false
-@Field static final Boolean DEFAULT_LOG_ENABLE       = false
+@Field static final Map     EMPTY_ENUM_SETTING       = [value: '', type: 'enum']
 @Field static final Boolean DEFAULT_DBG_ENABLE       = false
 @Field static final Integer DEFAULT_TIMEOUT          = 10
 @Field static final Boolean DEFAULT_EXPERIMENTAL     = false
@@ -155,7 +155,11 @@ preferences {
                 keys.add(key)
             }
         }
-    } catch (ex) {}
+    } catch (ex) {
+        if (this[SETTING_DBG_ENABLE]) {
+            log.trace "Ignored preferences initialization exception: ${ex.message}"
+        }
+    } // Intentionally ignore exceptions when accessing volatile state during preferences initialization
 
     Map apps=[:]
     Map installed=[:]
@@ -169,7 +173,11 @@ preferences {
                 }
             }
         }
-    } catch (ex) {}
+    } catch (ex) {
+        if (this[SETTING_DBG_ENABLE]) {
+            log.trace "Ignored preferences initialization exception: ${ex.message}"
+        }
+    } // Intentionally ignore exceptions when accessing volatile state during preferences initialization
 
     if (!parent) {
         input name: SETTING_DEVICE_IP, type: 'text', title: 'Device IP', required: true
@@ -191,7 +199,7 @@ preferences {
             input name: SETTING_INV_INTERVAL,   type: 'number', title: "Find installed apps at least every n ${this[SETTING_INV_UNITS]}. 0 disables refresh.", range: 0..240, defaultValue: DEFAULT_INV_INTERVAL, required: true        
         }
         input name: SETTING_AUTO_MANAGE,      type: 'bool',   title: 'Enable automatic management of child devices', defaultValue: DEFAULT_AUTO_MANAGE, required: true
-        if (this[SETTING_AUTO_MANAGE]?:true == true) {
+        if (this[SETTING_AUTO_MANAGE] ?: true) {
             input name: SETTING_MANAGE_APPS,      type: 'bool',   title: 'Auto-manage Roku Applications', defaultValue: DEFAULT_MANAGE_APPS, required: true
             input name: SETTING_HDMI_PORTS,       type: 'enum',   title: 'Number of HDMI inputs', options:['0','1','2','3','4'], defaultValue: DEFAULT_HDMI_PORTS, required: true
             input name: SETTING_INPUT_AV,         type: 'bool',   title: 'Enable AV Input', defaultValue: DEFAULT_INPUT_AV, required: true
@@ -199,7 +207,7 @@ preferences {
         }
         input name: SETTING_CREATE_KEY,  type: 'enum',   title: 'Select a key to add a child switch for, and save changes to add the child button for the selected key', options:keys, required: false
         input name: SETTING_DELETE_KEY,  type: 'enum',   title: 'Remove Roku Remote Control Key', options: installedKeys, required: false
-        if ((this[SETTING_AUTO_MANAGE]?:true == false || this[SETTING_MANAGE_APPS]?:true == false) && !parent) {
+        if ((!(this[SETTING_AUTO_MANAGE] ?: true) || !(this[SETTING_MANAGE_APPS] ?: true)) && !parent) {
             input name: SETTING_CREATE_APP,     type: 'enum',   title: 'Add Roku App', options: apps, required: false
             input name: SETTING_DELETE_APP,     type: 'enum',   title: 'Remove Roku App', options: installed, required: false
 
@@ -227,6 +235,13 @@ Map getVolatileAtomicState() {
  * Overridden functions
  **/
 def updateSetting(key, value) {
+    if (value == null) {
+        if (this[SETTING_DBG_ENABLE]) {
+            log.trace "Skipping updateSetting(${key}) because value is null"
+        }
+        return
+    }
+
     device.updateSetting(key, value)
     this[key] = value
 }
@@ -238,6 +253,14 @@ void sendEvent(Map properties) {
         device.sendEvent(properties)
         volatileAtomicState[properties.name] = properties.value
     }
+}
+
+private void sendNamedEvent(String name, def value) {
+    sendEvent(name: name, value: value)
+}
+
+private void sendChildSwitchEvent(def child, String value) {
+    child.sendEvent(name: 'switch', value: value)
 }
 
 Object currentValue(String attributeName) {
@@ -284,6 +307,8 @@ def initialize() {
     if (!volatileAtomicState.power) {
         volatileAtomicState.power = 'Off'
     }
+
+    cleanState()
     refresh()
 }
 
@@ -299,26 +324,26 @@ def updated() {
     refresh()
 
     // Default unset values
-    if (this[SETTING_REFRESH_UNITS]    == null) updateSetting(SETTING_REFRESH_UNITS,    DEFAULT_REFRESH_UNITS)
-    if (this[SETTING_REFRESH_INTERVAL] == null) updateSetting(SETTING_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL)
-    if (this[SETTING_APP_REFRESH]      == null) updateSetting(SETTING_APP_REFRESH,      DEFAULT_APP_REFRESH)
-    if (this[SETTING_APP_UNITS]        == null) updateSetting(SETTING_APP_UNITS,        DEFAULT_APP_UNITS)
-    if (this[SETTING_APP_INTERVAL]     == null) updateSetting(SETTING_APP_INTERVAL,     DEFAULT_APP_INTERVAL)
-    if (this[SETTING_MEDIA_UNITS]      == null) updateSetting(SETTING_MEDIA_UNITS,      DEFAULT_MEDIA_UNITS)
-    if (this[SETTING_MEDIA_INTERVAL]   == null) updateSetting(SETTING_MEDIA_INTERVAL,   DEFAULT_MEDIA_INTERVAL)
-    if (this[SETTING_INV_UNITS]        == null) updateSetting(SETTING_INV_UNITS,        DEFAULT_INV_UNITS)
-    if (this[SETTING_INV_INTERVAL]     == null) updateSetting(SETTING_INV_INTERVAL,     DEFAULT_INV_INTERVAL)
-    if (this[SETTING_AUTO_MANAGE]      == null) updateSetting(SETTING_AUTO_MANAGE,      DEFAULT_AUTO_MANAGE)
-    if (this[SETTING_MANAGE_APPS]      == null) updateSetting(SETTING_MANAGE_APPS,      DEFAULT_MANAGE_APPS)
-    if (this[SETTING_HDMI_PORTS]       == null) updateSetting(SETTING_HDMI_PORTS,       DEFAULT_HDMI_PORTS)
-    if (this[SETTING_INPUT_AV]         == null) updateSetting(SETTING_INPUT_AV,         DEFAULT_INPUT_AV)
-    if (this[SETTING_INPUT_TUNER]      == null) updateSetting(SETTING_INPUT_TUNER,      DEFAULT_INPUT_TUNER)
-    if (this[SETTING_LOG_ENABLE]       == null) updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE)
-    if (this[SETTING_DBG_ENABLE]       == null) updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE)
-    if (this[SETTING_EXPERIMENTAL]     == null) updateSetting(SETTING_EXPERIMENTAL,     DEFAULT_EXPERIMENTAL)
-    if (this[SETTING_TIMEOUT]          == null) updateSetting(SETTING_TIMEOUT,          DEFAULT_TIMEOUT)
-    if (this[SETTING_USE_POWER_ON]     == null) updateSetting(SETTING_USE_POWER_ON,     state.isTV ?: false)
-    if (this[SETTING_USE_POWER_OFF]    == null) updateSetting(SETTING_USE_POWER_OFF,    state.isTV ?: false)
+    if (this[SETTING_REFRESH_UNITS]    == null) { updateSetting(SETTING_REFRESH_UNITS,    DEFAULT_REFRESH_UNITS) }
+    if (this[SETTING_REFRESH_INTERVAL] == null) { updateSetting(SETTING_REFRESH_INTERVAL, DEFAULT_REFRESH_INTERVAL) }
+    if (this[SETTING_APP_REFRESH]      == null) { updateSetting(SETTING_APP_REFRESH,      DEFAULT_APP_REFRESH) }
+    if (this[SETTING_APP_UNITS]        == null) { updateSetting(SETTING_APP_UNITS,        DEFAULT_APP_UNITS) }
+    if (this[SETTING_APP_INTERVAL]     == null) { updateSetting(SETTING_APP_INTERVAL,     DEFAULT_APP_INTERVAL) }
+    if (this[SETTING_MEDIA_UNITS]      == null) { updateSetting(SETTING_MEDIA_UNITS,      DEFAULT_MEDIA_UNITS) }
+    if (this[SETTING_MEDIA_INTERVAL]   == null) { updateSetting(SETTING_MEDIA_INTERVAL,   DEFAULT_MEDIA_INTERVAL) }
+    if (this[SETTING_INV_UNITS]        == null) { updateSetting(SETTING_INV_UNITS,        DEFAULT_INV_UNITS) }
+    if (this[SETTING_INV_INTERVAL]     == null) { updateSetting(SETTING_INV_INTERVAL,     DEFAULT_INV_INTERVAL) }
+    if (this[SETTING_AUTO_MANAGE]      == null) { updateSetting(SETTING_AUTO_MANAGE,      DEFAULT_AUTO_MANAGE) }
+    if (this[SETTING_MANAGE_APPS]      == null) { updateSetting(SETTING_MANAGE_APPS,      DEFAULT_MANAGE_APPS) }
+    if (this[SETTING_HDMI_PORTS]       == null) { updateSetting(SETTING_HDMI_PORTS,       DEFAULT_HDMI_PORTS) }
+    if (this[SETTING_INPUT_AV]         == null) { updateSetting(SETTING_INPUT_AV,         DEFAULT_INPUT_AV) }
+    if (this[SETTING_INPUT_TUNER]      == null) { updateSetting(SETTING_INPUT_TUNER,      DEFAULT_INPUT_TUNER) }
+    if (this[SETTING_LOG_ENABLE]       == null) { updateSetting(SETTING_LOG_ENABLE,       DEFAULT_LOG_ENABLE) }
+    if (this[SETTING_DBG_ENABLE]       == null) { updateSetting(SETTING_DBG_ENABLE,       DEFAULT_DBG_ENABLE) }
+    if (this[SETTING_EXPERIMENTAL]     == null) { updateSetting(SETTING_EXPERIMENTAL,     DEFAULT_EXPERIMENTAL) }
+    if (this[SETTING_TIMEOUT]          == null) { updateSetting(SETTING_TIMEOUT,          DEFAULT_TIMEOUT) }
+    if (this[SETTING_USE_POWER_ON]     == null) { updateSetting(SETTING_USE_POWER_ON,     state.isTV ?: false) }
+    if (this[SETTING_USE_POWER_OFF]    == null) { updateSetting(SETTING_USE_POWER_OFF,    state.isTV ?: false) }
    
     if (!this[SETTING_APP_REFRESH]) {
         [SETTING_APP_UNITS, SETTING_MEDIA_UNITS, SETTING_INV_UNITS].each { key -> updateSetting(key, DEFAULT_REFRESH_UNITS) }
@@ -328,10 +353,10 @@ def updated() {
     // Override out-of-bounds values
     [SETTING_REFRESH_INTERVAL, SETTING_APP_INTERVAL, SETTING_MEDIA_INTERVAL, SETTING_INV_INTERVAL].each { key ->
         Integer value = this[key]
-        if (value  > LIMIT_REFRESH_INTERVAL_MAX) updateSetting(key, LIMIT_REFRESH_INTERVAL_MAX)
-        if (value  < LIMIT_REFRESH_INTERVAL_MIN) updateSetting(key, LIMIT_REFRESH_INTERVAL_MIN)
+        if (value  > LIMIT_REFRESH_INTERVAL_MAX) { updateSetting(key, LIMIT_REFRESH_INTERVAL_MAX) }
+        if (value  < LIMIT_REFRESH_INTERVAL_MIN) { updateSetting(key, LIMIT_REFRESH_INTERVAL_MIN) }
     }
-    if (this[SETTING_TIMEOUT] < 1) updateSetting(SETTING_TIMEOUT, LIMIT_TIMEOUT_MIN)
+    if (this[SETTING_TIMEOUT] < 1) { updateSetting(SETTING_TIMEOUT, LIMIT_TIMEOUT_MIN) }
 
     updateIpAddress(this[SETTING_DEVICE_IP])
     Map apps = volatileAtomicState.installedApps?:getInstalledApps()
@@ -340,27 +365,28 @@ def updated() {
     if (this[SETTING_CREATE_KEY]) {
         String key=this[SETTING_CREATE_KEY]
         String text=this[SETTING_CREATE_KEY].replaceAll( ~ /([A-Z])/, ' $1').trim()
-        updateSetting(SETTING_CREATE_KEY, [value: '', type:'enum'])
+        updateSetting(SETTING_CREATE_KEY, EMPTY_ENUM_SETTING)
         updateChildApp(networkIdForApp(key), text)
     }
     if (this[SETTING_DELETE_KEY]) {
         String netId=this[SETTING_DELETE_KEY]
-        updateSetting(SETTING_DELETE_KEY, [value: '', type:'enum'])
+        updateSetting(SETTING_DELETE_KEY, EMPTY_ENUM_SETTING)
         deleteChildAppDevice(netId)
     }
 
     if (this[SETTING_CREATE_APP]) {
         String netId=this[SETTING_CREATE_APP]
-        updateSetting(SETTING_CREATE_APP, [value: '', type:'enum'])
+        updateSetting(SETTING_CREATE_APP, EMPTY_ENUM_SETTING)
         if (this[SETTING_AUTO_MANAGE]==false || this[SETTING_MANAGE_APPS]==false) {
             String appName=apps[netId]
-            if (appName && netId)
+            if (appName && netId) {
                 updateChildApp(netId, appName)
+            }
         }
     }
     if (this[SETTING_DELETE_APP]) {
         String netId=this[SETTING_DELETE_APP]
-        updateSetting(SETTING_DELETE_APP, [value: '', type:'enum'])
+        updateSetting(SETTING_DELETE_APP, EMPTY_ENUM_SETTING)
         if (this[SETTING_AUTO_MANAGE]==false || this[SETTING_MANAGE_APPS]==false) {
             deleteChildAppDevice(netId)
         }
@@ -379,7 +405,7 @@ void updateIpAddress(String ipAddress) {
     updateDataValue('query/apps', "${uri}/query/apps")
     String mac = getMACFromIP(this[SETTING_DEVICE_IP])
     if (state.deviceMac != mac) {
-        if (this[SETTING_LOG_ENABLE]) log.debug "Updating Mac from IP: ${mac}"
+        if (this[SETTING_LOG_ENABLE]) { log.debug "Updating Mac from IP: ${mac}" }
         state.deviceMac = mac
     }
 
@@ -563,9 +589,9 @@ String translateDeviceToRokuAppId(def childDevice) {
         this."input_$appId"()
     } else if (isValidKey(appId)) {
         // Key presses are actually button events, and do not keep state, this implements a momentary state of on while the event is being sent.
-        child.sendEvent(name: 'switch', value: 'on')
+        sendChildSwitchEvent(child, 'on')
         this.keyPress(appId)
-        child.sendEvent(name: 'switch', value: 'off')
+        sendChildSwitchEvent(child, 'off')
     } else {
         launchApp(appId)
     }
@@ -575,10 +601,10 @@ void componentOff(child) {
     if (child.currentValue('switch') == 'off') { return }
 
     String appId = appIdForNetworkId(child.deviceNetworkId)
-    if (appId ==~ /^(AV1|Tuner|hdmi\d|\d+)$/)
+    if (appId ==~ /^(AV1|Tuner|hdmi\d|\d+)$/) {
         home()
-    else if (isValidKey(appId)) {
-        child.sendEvent(name: 'switch', value: 'off')
+    } else if (isValidKey(appId)) {
+        sendChildSwitchEvent(child, 'off')
     } else {
         home()
     }
@@ -615,8 +641,6 @@ void on() {
 }
 
 void off() {
-
-    Boolean isOn = currentValue('switch') == 'on'
 
     if (this[SETTING_USE_POWER_OFF]) {
         keyPress('PowerOff')
@@ -679,7 +703,7 @@ void volumeDown() {
 }
 
 void setVolume(Number level) {
-    log.info 'Set volume not supported by Roku. Please report the Roku ECP protocol limitation to Roku support.'
+    log.info "Set volume to ${level} not supported by Roku. Please report the Roku ECP protocol limitation to Roku support."
 }
 
 void unmute() {
@@ -820,10 +844,10 @@ void pingDevice() {
 
         if (result.packetLoss == 100 || result.packetsTransmitted == 0) {
             if (currentValue('power') != 'Off') {
-                sendEvent(name: 'switch', value: 'off')
-                sendEvent(name: 'power', value: 'Off')
-                sendEvent(name: 'mediaInputSource', value: 'Home')
-                sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+                sendNamedEvent('switch', 'off')
+                sendNamedEvent('power', 'Off')
+                sendNamedEvent('mediaInputSource', 'Home')
+                sendNamedEvent('transportStatus', MEDIA_STATE_STOPPED)
             }
             unschedule('pingDevice')
             schedulePingDevice()
@@ -913,7 +937,7 @@ String traslateInputToDeviceName(mediaInputSource) {
 
 void setCurrentApplication(currentApp) {
     def previousApp = currentValue('application')
-    sendEvent(name: 'application', value: currentApp)
+    sendNamedEvent('application', currentApp)
     
     // only perform updated if the application is different from last check
     if (currentApp != previousApp) {
@@ -924,7 +948,7 @@ void setCurrentApplication(currentApp) {
         } else  {
             if (currentValue('switch') != 'on') {
                 if (this[SETTING_LOG_ENABLE]) { log.info "turning on, because app is not roku" }
-                sendEvent(name: 'switch', value: 'on')
+                sendNamedEvent('switch', 'on')
             }
             if (this[SETTING_APP_REFRESH]) { // if an app is active, TV is on.  Don't check for power state.
                 unschedule('queryDeviceInfo') 
@@ -982,8 +1006,9 @@ def queryInstalledApps() {
         }
         if (this[SETTING_DBG_ENABLE]) { log.trace "queryInstalledApps: enter " }
 
-        if (!this[SETTING_AUTO_MANAGE]) 
+        if (!this[SETTING_AUTO_MANAGE]) {
             return
+        }
         
         // must unschedule the query first, because the scheduler may have one triggering at the same time.
         unschedule('queryInstalledApps')
@@ -1007,15 +1032,17 @@ void updateInstalledApps(Map apps) {
             
             def nodeExists = false
             
-            if (hdmiCount > 0 ) (1..hdmiCount).each { i -> 
+            if (hdmiCount > 0) { (1..hdmiCount).each { i -> 
                 nodeExists = nodeExists || networkIdForApp("hdmi${i}") == child.deviceNetworkId
-            }
+            } }
             
-            if (this[SETTING_INPUT_AV])
+            if (this[SETTING_INPUT_AV]) {
                 nodeExists = nodeExists || networkIdForApp('AV1') == child.deviceNetworkId
+            }
     
-            if (this[SETTING_INPUT_TUNER])
+            if (this[SETTING_INPUT_TUNER]) {
                 nodeExists = nodeExists || networkIdForApp('Tuner') == child.deviceNetworkId
+            }
 
             if (!appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/) {
                 nodeExists = nodeExist || isValidKey(appIdForNetworkId(child.deviceNetworkId))            
@@ -1025,26 +1052,27 @@ void updateInstalledApps(Map apps) {
             
             if (!nodeExists) {
                 if (appIdForNetworkId(child.deviceNetworkId) ==~ /^(Tuner|AV1|hdmi\d)$/ || this[SETTING_MANAGE_APPS]) {
-                    if (this[SETTING_LOG_ENABLE]) log.info "Deleting child device: ${child.name} (${child.deviceNetworkId})"
+                    if (this[SETTING_LOG_ENABLE]) { log.info "Deleting child device: ${child.name} (${child.deviceNetworkId})" }
                     deleteChildDevice(child.deviceNetworkId)
                 }
             }
         }
         
-        if (this[SETTING_INPUT_AV])    updateChildApp(networkIdForApp('AV1'), 'AV')
-        if (this[SETTING_INPUT_TUNER]) updateChildApp(networkIdForApp('Tuner'), 'Antenna TV')
-        if (hdmiCount > 0) (1..hdmiCount).each{ i -> 
+        if (this[SETTING_INPUT_AV]) { updateChildApp(networkIdForApp('AV1'), 'AV') }
+        if (this[SETTING_INPUT_TUNER]) { updateChildApp(networkIdForApp('Tuner'), 'Antenna TV') }
+        if (hdmiCount > 0) { (1..hdmiCount).each{ i -> 
             updateChildApp(networkIdForApp("hdmi${i}"), "HDMI ${i}")
-        }
+        } }
 
-        if (this[SETTING_MANAGE_APPS]) apps.each { netId, appName ->
+        if (this[SETTING_MANAGE_APPS]) { apps.each { netId, appName ->
             updateChildApp(netId, appName)
-        }
+        } }
     
     }
 }
 
 void parseDeviceInfo(response, data) {
+    if (this[SETTING_DBG_ENABLE]) { log.trace "parseDeviceInfo: data=${data}" }
     try {
         Integer status = response.getStatus()
         if (status < 200 || status > 300) { return }
@@ -1084,6 +1112,7 @@ private void parseState(body) {
 
 // private void parseMediaPlayer(body) {
 void parseMediaPlayer(response, data) {
+    if (this[SETTING_DBG_ENABLE]) { log.trace "parseMediaPlayer: data=${data}" }
     try {
         Integer status = response.getStatus()
         if (status < 200 || status > 300) { return }
@@ -1094,17 +1123,17 @@ void parseMediaPlayer(response, data) {
         switch (body.@state) {
             case 'play':
                 if (currentValue('transportStatus') != MEDIA_STATE_PLAYING) {
-                sendEvent(name: 'transportStatus', value: MEDIA_STATE_PLAYING)
+                sendNamedEvent('transportStatus', MEDIA_STATE_PLAYING)
                 }
                 break;
             case 'pause':
                 if (currentValue('transportStatus') != MEDIA_STATE_PAUSED) {
-                    sendEvent(name: 'transportStatus', value: MEDIA_STATE_PAUSED)
+                    sendNamedEvent('transportStatus', MEDIA_STATE_PAUSED)
                 }
                 break;
             default:
                 if (currentValue('transportStatus') != MEDIA_STATE_STOPPED) {
-                    sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+                    sendNamedEvent('transportStatus', MEDIA_STATE_STOPPED)
                 }
                 break;
         }
@@ -1115,6 +1144,7 @@ void parseMediaPlayer(response, data) {
 }
 
 void parseActiveApp(response, data) {
+    if (this[SETTING_DBG_ENABLE]) { log.trace "parseActiveApp: data=${data}" }
     try {
         Integer status = response.getStatus()
         if (status < 200 || status > 300) { return }
@@ -1126,7 +1156,7 @@ void parseActiveApp(response, data) {
         def appId = body.app.@id
         def app = body.app.text()
         def mediaApp = appType == 'tvin' ? appId : app
-        sendEvent(name: 'mediaInputSource', value: translateAppToInput(mediaApp))
+        sendNamedEvent('mediaInputSource', translateAppToInput(mediaApp))
         setCurrentApplication(app)
     } finally {
         volatileAtomicState._queryActiveApp = false
@@ -1166,11 +1196,11 @@ private def parsePowerState(body) {
     def powerMode = body.'power-mode'?.text()
     if (powerMode != null) {
         def mode = powerMode
-        sendEvent(name: 'power', value: mode)
+        sendNamedEvent('power', mode)
         switch (mode) {
             case 'PowerOn':
                 if (currentValue('switch') != 'on') {
-                    sendEvent(name: 'switch', value: 'on')
+                    sendNamedEvent('switch', 'on')
                     queryActiveApp()
                 }
                 break;
@@ -1179,9 +1209,9 @@ private def parsePowerState(body) {
             case 'Headless':
             case 'Ready':
                 if (currentValue('switch') != 'off') {
-                    sendEvent(name: 'switch', value: 'off')
-                    sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
-                    sendEvent(name: 'mediaInputSource', value: 'Home')
+                    sendNamedEvent('switch', 'off')
+                    sendNamedEvent('transportStatus', MEDIA_STATE_STOPPED)
+                    sendNamedEvent('mediaInputSource', 'Home')
                     scheduleQueryActiveApp()
                     unschedule('queryMediaPlayer')
                     unschedule('queryInstalledApps')
@@ -1193,20 +1223,21 @@ private def parsePowerState(body) {
 
 
 private void purgeInstalledApps() {    
-    if (this[SETTING_MANAGE_APPS]) childDevices.each{ child ->
+    if (this[SETTING_MANAGE_APPS]) { childDevices.each{ child ->
         deleteChildDevice(child.deviceNetworkId)
-    }
+    } }
 }
 
 Map getInstalledApps() {
-    if (isPowerOff()) { return }
+    if (isPowerOff()) { return [:] }
 
     def apps=[:]
     try {
         httpGet([uri:apiPath('query/apps'),timeout: this[SETTING_TIMEOUT]]) { response ->
 
-            if (!response.isSuccess())
-            return
+            if (!response.isSuccess()) {
+                return
+            }
 
             def body = response.data
 
@@ -1223,7 +1254,7 @@ Map getInstalledApps() {
         }
     } catch (ex) {
         logExceptionWithPowerWarning("getInstalledApps", ex)
-        return
+        return [:]
     }
 
     List inputs = ['Home']
@@ -1233,7 +1264,7 @@ Map getInstalledApps() {
         inputs += ((1..hdmiCount).collect { "InputHDMI${it}" })
     }
     inputs += apps.values()
-    sendEvent(name: 'supportedInputs', value: groovy.json.JsonOutput.toJson(inputs))
+    sendNamedEvent('supportedInputs', groovy.json.JsonOutput.toJson(inputs))
 
     return apps
 }
@@ -1271,7 +1302,7 @@ void keyPress(key) {
     }
     unschedule('queryDeviceInfo')
     unschedule('queryActiveApp')
-    if (this[SETTING_DBG_ENABLE]) log.debug "keyPress(${key}): enter"
+    if (this[SETTING_DBG_ENABLE]) { log.debug "keyPress(${key}): enter" }
     try {
         asynchttpPost(parseKeyPress, [uri:apiPath("keypress/${key}"), timeout: this[SETTING_TIMEOUT]]) 
     } catch (ex) {
@@ -1281,13 +1312,14 @@ void keyPress(key) {
 }
 
 void parseKeyPress(response, data) {
+    if (this[SETTING_DBG_ENABLE]) { log.trace "parseKeyPress: data=${data}" }
     try {
         Integer status = response.getStatus()
         if (status < 200 || status > 300) { return }
 
         refresh()
     } finally {
-        if (this[SETTING_DBG_ENABLE]) log.debug "keyPress: exit"
+        if (this[SETTING_DBG_ENABLE]) { log.debug "keyPress: exit" }
         scheduleRefresh()
     }
 }
@@ -1303,7 +1335,7 @@ void sequentialKeyPress(keys) {
     unschedule('queryActiveApp')
     try {
         keys.each { key -> 
-            if (this[SETTING_DBG_ENABLE]) log.debug "sequentialKeyPress(${key}): enter"
+            if (this[SETTING_DBG_ENABLE]) { log.debug "sequentialKeyPress(${key}): enter" }
             httpPost([uri:apiPath("keypress/${key}"), timeout: this[SETTING_TIMEOUT]], {}) 
         }
     } catch (ex) {
@@ -1324,8 +1356,9 @@ private Boolean isValidKey(key) {
         'ChannelUp', 'ChannelDown','InputTuner', 'InputAV1',
         'InputHDMI1','InputHDMI2', 'InputHDMI3', 'InputHDMI4' 
         ]
-    if (state.'supports-find-remote' == true)
+    if (state.'supports-find-remote' == true) {
         keys << 'FindRemote'
+    }
     
     return keys.contains(key)
 }
@@ -1333,7 +1366,7 @@ private Boolean isValidKey(key) {
 void launchApp(appId) {
     if (appId ==~ /^\d+$/ ) {
         unschedule('queryActiveApp')
-        if (this[SETTING_DBG_ENABLE]) log.debug "launchApp(${appId}): enter"
+        if (this[SETTING_DBG_ENABLE]) { log.debug "launchApp(${appId}): enter" }
         try {
             asynchttpPost(parseLaunchApp, [uri:apiPath("launch/${appId}"), timeout: this[SETTING_TIMEOUT]], [appId: appId]) 
         } catch (ex) {
@@ -1355,9 +1388,11 @@ void parseLaunchApp(response, data) {
         def netId = networkIdForApp(data.appId)
         def child = getChildDevice(netId)
         if (this[SETTING_LOG_ENABLE]) { log.info "Launch app: ${data.appId} with Network Id: ${netId}" }
-        if (child) { child.sendEvent(name: 'switch', value: 'on') }
+        if (child) { sendChildSwitchEvent(child, 'on') }
     } finally {
-        if (this[SETTING_DBG_ENABLE]) log.debug "launchApp: exit"
+        if (this[SETTING_DBG_ENABLE]) {
+            log.debug "launchApp: exit"
+        }
     }
     queryActiveApp()
 }
@@ -1376,7 +1411,9 @@ private void updateChildApp(String netId, String appName) {
     if (appName) {
         createChildAppDevice(netId, appName)
     } else {
-        if (this[SETTING_LOG_ENABLE]) log.error "Cannot create child: (${netId}) due to missing 'appName'"
+        if (this[SETTING_LOG_ENABLE]) {
+            log.error "Cannot create child: (${netId}) due to missing 'appName'"
+        }
     }
 }
 
@@ -1388,15 +1425,23 @@ void createChildAppDevice(String netId, String appName) {
              isComponent: parent ? true : false, name: "${appName}"])
         child.updateSetting('txtEnable', false)
         iconPathForDevice(child)
-        if (this[SETTING_LOG_ENABLE]) log.debug "Created child device: ${appName} (${netId})"
+        if (this[SETTING_LOG_ENABLE]) {
+            log.debug "Created child device: ${appName} (${netId})"
+        }
     } catch(IllegalArgumentException e) {
         if (getChildDevice(netId)) {
-            if (this[SETTING_LOG_ENABLE]) log.warn "Attempted to create duplicate child device for ${appName} (${netId}); Skipped"
+            if (this[SETTING_LOG_ENABLE]) {
+                log.warn "Attempted to create duplicate child device for ${appName} (${netId}); Skipped"
+            }
         } else {
-            if (this[SETTING_LOG_ENABLE]) log.error "Failed to create child device with exception: ${e}"
+            if (this[SETTING_LOG_ENABLE]) {
+                log.error "Failed to create child device with exception: ${e}"
+            }
         }
     } catch(Exception e) {
-        if (this[SETTING_LOG_ENABLE]) log.error "Failed to create child device with exception: ${e}"
+        if (this[SETTING_LOG_ENABLE]) {
+            log.error "Failed to create child device with exception: ${e}"
+        }
     }
 }
 
@@ -1404,15 +1449,20 @@ void deleteChildAppDevice(String netId) {
     try {
         def appName = getChildDevice(netId)?.name ?: ""
         deleteChildDevice(netId)
-        if (this[SETTING_LOG_ENABLE]) log.debug "Removed child device: ${appName} (${netId})"
+        if (this[SETTING_LOG_ENABLE]) {
+            log.debug "Removed child device: ${appName} (${netId})"
+        }
     } catch(Exception e) {
-        if (this[SETTING_LOG_ENABLE]) log.error "Failed to remove child device with exception: ${e}"
+        if (this[SETTING_LOG_ENABLE]) {
+            log.error "Failed to remove child device with exception: ${e}"
+        }
     }
 }
 
 private def deviceLabel() {
-    if (device.label == null)
+    if (device.label == null) {
         return device.name
+    }
     return device.label
 }
 
@@ -1426,10 +1476,10 @@ private void logExceptionWithPowerWarning(String method, ex) {
                 log.info "Lost connection to Roku device; Switching to ping mode."
             }
         }
-        sendEvent(name: 'switch', value: 'off')
-        sendEvent(name: 'power', value: 'Off')
-        sendEvent(name: 'mediaInputSource', value: 'Home')
-        sendEvent(name: 'transportStatus', value: MEDIA_STATE_STOPPED)
+        sendNamedEvent('switch', 'off')
+        sendNamedEvent('power', 'Off')
+        sendNamedEvent('mediaInputSource', 'Home')
+        sendNamedEvent('transportStatus', MEDIA_STATE_STOPPED)
         schedulePingDevice()
     } else {
         if (this[SETTING_LOG_ENABLE]) {
