@@ -445,7 +445,7 @@ def addDevice(device) {
         state.clientkey = "${device.clientkey}"
         // refreshHubStatus()
 
-        def d = childDevices?.find { dev -> dev.deviceNetworkId == dni }
+        def d = getChildDevices()?.find { dev -> dev.deviceNetworkId == dni }
         if (!d) {
             if (logEnable) { log.debug "Creating Hue Bridge device with dni: ${dni}" }
             try {
@@ -680,7 +680,7 @@ def findScenes(params){
     }
     if (scenes) {
         scenes.each {key, value ->
-            def groupName = groupOptions."${selectedGroup}"
+            def groupName = groupOptions["${selectedGroup}"] 
             def lights = value.lights ?: []
             if ( lights.size()  == 0 ) { return }
             if ( dnilist.find { dni -> dni == networkIdForScene(selectedGroup, key) } ) { return }
@@ -884,7 +884,7 @@ def installed() {
 def uninstalled() {
     unsubscribe()
     unschedule()
-    childDevices.each {
+    getChildDevices()?.each {
         deleteChildDevice(it.deviceNetworkId)
     }
 }
@@ -957,7 +957,7 @@ def ssdpHandler(evt) {
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
 
         def hubs = getHubs()
-        if (!hubs."${ssdpUSN}") {
+        if (!hubs?["${ssdpUSN}"]) {
             verifyDevice(parsedEvent)
         } else {
             updateDevice(parsedEvent)
@@ -982,7 +982,7 @@ def ssdpUpdateHandler(evt) {
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
         if ("${parsedEvent.mac}" == "${selectedDevice}") {
             def hubs = getHubs()
-            if (hubs."${ssdpUSN}") {
+            if (hubs?[ssdpUSN]) {
                 log.info "${parsedEvent.mac}: Autodetect IP address ${parsedEvent.networkAddress}"
                 updateDevice(parsedEvent)
                 setBridgeHost("${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}")
@@ -1738,7 +1738,7 @@ public String networkIdForLight(id) {
 }
 
 public networkIdForScene(sceneId) {
-    String groupId = state.scenes[sceneId]?.group
+    String groupId = state.scenes?[sceneId]?.group
     "hueScene:${app.getId()}/${groupId}/${sceneId}"
 }
 
@@ -1767,11 +1767,11 @@ public getChildDeviceById(Long id) {
 }
 
 private String bulbTypeForLight(String id) {
-    if (state.lights_v2?.id?.type) {
+    if (state.lights_v2?[id]?.type) {
         return state.lights_v2.(id).type
     }
     if (!state.lights) { return null }
-    def type = state.lights[id]?.type
+    def type = state.lights?[id]?.type
     switch (type) {
         case 'Dimmable light':
             return 'Dimmer'
@@ -1804,8 +1804,8 @@ private String driverTypeForSensor(id) {
     // https://developers.meethue.com/develop/hue-api/supported-devices/
 
     if (!state.sensors) { return null }
-    def type=state.sensors[id]?.type
-    def modelid=state.sensors[id]?.modelid // Since the RunLessWires Friends of Hue switch still says it's a ZGPSwitch gotta use modelid to find it
+    def type=state.sensors?[id]?.type
+    def modelid=state.sensors?[id]?.modelid // Since the RunLessWires Friends of Hue switch still says it's a ZGPSwitch gotta use modelid to find it
     switch (type) {
         case 'ZGPSwitch':
         if (modelid == 'FOHSWITCH') {
@@ -1992,16 +1992,16 @@ void parseSensors(json) {
 }
 
 def findGroup(String groupId) {
-    if (state.groups."${groupId}") {
-        return state.groups."${groupId}"
+    if (state.groups?["${groupId}"]) {
+        return state.groups?["${groupId}"]
     } else {
-        return state.groups.find{ it.value.name == groupId }
+        return state.groups?.find{ it.value.name == groupId }
     }
 }
 
 def findScene(String groupId, String sceneId) {
-    if (state.scenes."${sceneId}") {
-        return state.scenes."${sceneId}"
+    if (state.scenes?["${sceneId}"]) {
+        return state.scenes?["${sceneId}"]
     } else {
         return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
     }

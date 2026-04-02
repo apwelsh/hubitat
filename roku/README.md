@@ -52,7 +52,7 @@ Click **Save**.
 
 ## Configuration
 
-The configuration is quite simple, and tries to be as automatic as possible.  Once the device hander and app are installed, you will need to add the new Roku TV devices that you want to automate, and configure the IP Address.
+The configuration is quite simple, and tries to be as automatic as possible.  Once the device handler and app are installed, you will need to add the new Roku TV devices that you want to automate, and configure the IP Address.
 
 ### Prerequisite
 For smart home automation to work reliably, all devices on your network that will be access from the Hubitat hub should be configured with a static address.  This also true for the Roku TV devices.  I cannot provide details on how to do this, as each network is unique, and different routers have different solutions.  If your devices receive their network address via the router using DHCP (Dynamica Host Configuration Protocol) -- this is most typical -- then you may need to configure your router to *reserve* the IP address assigned to the Roku device.  This way, every time the Roku device is powered on, it will always have the same IP address, and the Hubitat Elevation hub, and this device handler, will know how to find it.
@@ -63,11 +63,11 @@ If you choose to use the Roku Connect App, you will not need to add the Roku TV 
 To manage your Roku device from Roku Connect, navigate to **"Apps"** in the Hubitat menu, and select **"(+) Add User App"**.
 In the pop-up, select Roku Connect, the click the **done** button.
 
-From the list of installed applicaiton, locate **"Roku Connect"** and run it.
+From the list of installed applications, locate **"Roku Connect"** and run it.
 
-From here you can **"Discover New Devices"**, and manage instsalled device.  
+From here you can **"Discover New Devices"**, and manage installed devices.  
 
-If you cannot setup DHCP reservations, and static IP addresses are not an option, be sure to turn on **Auto detect IP changes of Roku devices**.  This feature will periodically ping the SSDP connected devices, even when the app is not in discovery mode, so locate and detect IP address changes for intalled Roku devices.
+If you cannot setup DHCP reservations, and static IP addresses are not an option, be sure to turn on **Auto detect IP changes of Roku devices**.  This feature will periodically ping the SSDP connected devices, even when the app is not in discovery mode, to locate and detect IP address changes for installed Roku devices.
 
 I believe the Roku Connect application is rather simple, needs little explanation.  This is my preferred solution for managing your Roku devices.
 
@@ -101,6 +101,11 @@ The next step is a little quirky, because the Roku TV device handler is going to
 
 Once the device looks something like the above image, your TV is configured and ready to go.
 
+> Note: `roku-tv.groovy` fetches `/query/device-info` on startup to set state values such as `isTV`.  This means the first few seconds may show incomplete state; the driver may make repeated refresh attempts automatically.
+>
+> For apps that query `child.getState().isTV`, use the safe pattern:
+> `child.getState()?.isTV ?: false`
+
 At this point, you should see the installed child devices for the apps, which should look something like this:
 
 ![](../images/InstalledAppsList.png)
@@ -117,7 +122,7 @@ All the button on the Roku TV device implement the Hubitat standards for control
 | - | - |
 | Volumne Up | Increments the volume by 1 step |
 | Volume Down | Decrements the volume by 1 step |
-| Set Volume | _not supported by Roku API_ at this time |
+| Set Volume | Provides compatibility for Hubitat; Roku API only supports volume up/down, no absolute set |
 | Channel Up | Change channel up |
 | Channel Down | Change channel down |
 | Mute | Toggle the audio Mute state on/off |
