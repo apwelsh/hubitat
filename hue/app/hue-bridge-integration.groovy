@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
- * Version 1.6.9
+ * Version 1.6.10
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -901,7 +901,7 @@ def updated() {
 
 def initialize() {
     atomicStateByDeviceId.clear()
-    if (!settings.bridgeHost && state.bridgeHost) {  // migrate bridgeHost from state to setting\
+    if (!settings.bridgeHost && state.bridgeHost) {  // migrate bridgeHost from state to setting
         setBridgeHost(bridgeHost)
         state.remove('bridgeHost')
     }
