@@ -1,3 +1,4 @@
 
 hue/rest/hueTest.rest
 *.rest
+.hubitat/
