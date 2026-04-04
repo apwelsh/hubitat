@@ -80,45 +80,49 @@ preferences {
     page(name: PAGE_ADD_SCENES,       title: 'Add Scene')
     page(name: PAGE_FIND_SENSORS,     title: 'Sensor Discovery Started!', refreshTimeout:PAGE_REFRESH_TIMEOUT)
     page(name: PAGE_ADD_SENSORS,      title: 'Add Sensor')
-
 }
 
-
-synchronized Map getAtomicState(def device) {
+Map getAtomicState(def device) {
     Integer deviceId = device.deviceId ?: device.device.deviceId
-    Map result = atomicStateByDeviceId.get(deviceId)
-    if (result == null) {
-        result = new ConcurrentHashMap()
-        atomicStateByDeviceId[deviceId] = result
+    synchronized (atomicStateByDeviceId) {
+        Map result = atomicStateByDeviceId.get(deviceId)
+        if (result == null) {
+            result = new ConcurrentHashMap()
+            atomicStateByDeviceId[deviceId] = result
+        }
+        return result
     }
-    return result
 }
 
-synchronized Map getAtomicQueue(def device) {
+Map getAtomicQueue(def device) {
     Integer deviceId = device.deviceId ?: device.device.deviceId
-    Map result = atomicQueueByDeviceId.get(deviceId)
-    if (result == null) {
-        result = new ConcurrentHashMap()
-        atomicQueueByDeviceId[deviceId] = result
+    synchronized (atomicQueueByDeviceId) {
+        Map result = atomicQueueByDeviceId.get(deviceId)
+        if (result == null) {
+            result = new ConcurrentHashMap()
+            atomicQueueByDeviceId[deviceId] = result
+        }
+        return result
     }
-    return result
 }
 
-synchronized Map getRefreshQueue() {
+Map getRefreshQueue() {
     Integer appId = app.getId()
-    Map result = refreshQueue.get(appId)
-    if (result == null) {
-        result = new ConcurrentHashMap()
-        refreshQueue[appId] = result
+    synchronized (refreshQueue) {
+        Map result = refreshQueue.get(appId)
+        if (result == null) {
+            result = new ConcurrentHashMap()
+            refreshQueue[appId] = result
+        }
+        return result
     }
-    return result
 }
 
 public String getBridgeHost() {
     String host = settings.bridgeHost
     if (!host) {
         host = state.remove('bridgeHost')
-        if (!host) return null
+        if (!host) { return null }
     }
 
     // Only add :443 if no port is present
@@ -226,9 +230,9 @@ def mainPage(Map params=[:]) {
 }
 
 def getFormat(type, myText="") {            // Borrowed from @dcmeglio HPM code
-    if(type == "line") return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>"
-    if(type == "title") return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>"
-    if(type == "subtitle") return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>"
+    if(type == "line") { return "<hr style='background-color:#1A77C9; height: 1px; border: 0;'>" }
+    if(type == "title") { return "<h2 style='color:#1A77C9;font-weight: bold'>${myText}</h2>" }
+    if(type == "subtitle") { return "<h3 style='color:#1A77C9;font-weight: normal'>${myText}</h3>" }
 }
 
 def hubRefresh(Map iParams=[:]) {
@@ -265,21 +269,13 @@ def hubRefresh(Map iParams=[:]) {
             paragraphText = 'Found hub on network.  Proceeding with metadata refresh.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
         } else {
             try {
-                if (dbgEnable) log.debug "Enumerating lights..."
                 enumerateLights()
-                if (dbgEnable) log.debug "Enumerating groups..."
                 enumerateGroups()
-                if (dbgEnable) log.debug "Enumerating scenes..."
                 enumerateScenes()
-                if (dbgEnable) log.debug "Enumerating devices..."
                 enumerateDevices()
-                if (dbgEnable) log.debug "Enumerating sensors..."
                 enumerateSensors()
-                if (dbgEnable) log.debug "Enumerating lights V2..."
                 enumerateLightsV2()
-                if (dbgEnable) log.debug "Enumerating groups V2..."
                 enumerateGroupsV2()
-                if (dbgEnable) log.debug "Enumerating scenes V2..."
                 enumerateScenesV2()
 
                 def hub = getChildDeviceForMac(selectedDevice)
@@ -481,7 +477,7 @@ def findLights() {
 
 // TODO:
     Map options = [:]
-    Map lights = state.lights
+    Map lights = getLights()
     if (lights) {
         lights.each {key, value ->
             // def lights = value.lights ?: []
@@ -526,7 +522,7 @@ def addLights(Map params=[:]) {
     List lights = selectedLights.collect { it }
 
     selectedLights.each { lightId ->
-        String name = state.lights[lightId].name
+        String name = getLight(lightId).name
         String dni = networkIdForLight(lightId)
         String type = bulbTypeForLight(lightId)
         try {
@@ -574,7 +570,7 @@ def findGroups(params){
     def dnilist = getInstalledGroups().collect { it.deviceNetworkId }
 
     Map options = [:]
-    def groups = state.groups
+    def groups = getGroups()
     if (groups) {
         groups.each {key, value ->
             List lights = value.lights ?: []
@@ -617,7 +613,7 @@ def addGroups(params){
     def groups = selectedGroups.collect { it }
 
     selectedGroups.each { groupId ->
-        String name = state.groups[groupId].name
+        String name = getGroup(groupId).name
         String dni = networkIdForGroup(groupId)
         try {
 
@@ -654,7 +650,7 @@ def addGroups(params){
 
 Map scenesForGroupId(groupNetworkId) {
     def groupId = deviceIdNode(groupNetworkId)
-    state.scenes?.findAll { it.value.type == 'GroupScene' && it.value.group == groupId }
+    getScenes()?.findAll { it.value.type == 'GroupScene' && it.value.group == groupId }
 }
 
 def findScenes(params){
@@ -727,7 +723,7 @@ def addScenes(params){
     def scenes = selectedScenes.collect { it }
 
     selectedScenes.each { sceneId ->
-        String name = "${group.label ?: group.name} - ${state.scenes[sceneId].name}"
+        String name = "${group.label ?: group.name} - ${getScene(sceneId)?.name}"
         String dni = networkIdForScene(selectedGroup, sceneId)
         try {
 
@@ -773,7 +769,7 @@ def findSensors(){
 
 // TODO:
     Map options = [:]
-    Map sensors = state.sensors
+    Map sensors = getSensors()
     if (sensors) {
         sensors.each {key, value ->
             // def sensors = value.sensors ?: []
@@ -826,13 +822,13 @@ def addSensors(Map params=[:]){
     List sensors = selectedSensors.collect { it }
 
     selectedSensors.each { sensorId ->
-        String name = state.sensors[sensorId].name
+        String name = getSensor(sensorId).name
         String dni = networkIdForSensor(sensorId)
         String type = driverTypeForSensor(sensorId)
-        String model = state.sensors[sensorId].productname ?: "Advanced Hue ${type} Sensor"
+        String model = getSensor(sensorId).productname ?: "Advanced Hue ${type} Sensor"
         if (!type) {
             sectionText = "\nCannot install sensor ${name}; a compatible driver is not available.\n"
-            sectionText += "\nTo request support for the sensor, open a support ticket on GitHub, and include the following device details:\n\n${state.sensors[sensorId]}"
+            sectionText += "\nTo request support for the sensor, open a support ticket on GitHub, and include the following device details:\n\n${getSensor(sensorId)}"
             log.error "Failed to add sensor [${name}]; not supported"
         } else {
             try {
@@ -957,7 +953,7 @@ def ssdpHandler(evt) {
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
 
         def hubs = getHubs()
-        if (!hubs?["${ssdpUSN}"]) {
+        if (!hubs."${ssdpUSN}") {
             verifyDevice(parsedEvent)
         } else {
             updateDevice(parsedEvent)
@@ -982,7 +978,7 @@ def ssdpUpdateHandler(evt) {
         def ssdpUSN = parsedEvent.ssdpUSN.toString()
         if ("${parsedEvent.mac}" == "${selectedDevice}") {
             def hubs = getHubs()
-            if (hubs?[ssdpUSN]) {
+            if (hubs."${ssdpUSN}") {
                 log.info "${parsedEvent.mac}: Autodetect IP address ${parsedEvent.networkAddress}"
                 updateDevice(parsedEvent)
                 setBridgeHost("${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}")
@@ -1188,6 +1184,7 @@ private renameInstalledDevicesV2(type, data) {
 }
 
 private enumerateGroups() {
+    if (dbgEnable) { log.debug "Enumerating groups..." }
 
     if (apiUrl == null) {
         log.warn "Hub communications are offline, due to missing bridge host."
@@ -1209,7 +1206,7 @@ private enumerateGroups() {
             } else {
                 if (data) {
                     state.groups = data
-                    renameInstalledDevices('groups', state.groups)
+                    renameInstalledDevices('groups', getGroups())
                 }
                 parseGroups(data)
             }
@@ -1220,6 +1217,8 @@ private enumerateGroups() {
 }
 
 private enumerateGroupsV2() {
+    if (dbgEnable) { log.debug "Enumerating groups V2..." }
+
     enumerateRooms()
     enumerateZones()
     enumerateGroupedLights()
@@ -1280,6 +1279,8 @@ private enumerateGroupedLights() {
 }
 
 private enumerateDevices() {
+    if (dbgEnable) { log.debug "Enumerating devices..." }
+
     def data = enumerateResourcesV2('/device')  // Get the status of a group (room or zone)
 
     if (data) {
@@ -1295,6 +1296,7 @@ private enumerateDevices() {
 }
 
 private enumerateLights() {
+    if (dbgEnable) { log.debug "Enumerating lights..." }
 
     if (apiUrl == null) {
         log.warn "Hub communications are offline, due to missing bridge host."
@@ -1315,7 +1317,7 @@ private enumerateLights() {
             } else {
                 if (data) {
                     state.lights = data
-                    renameInstalledDevices('lights', state.lights)
+                    renameInstalledDevices('lights', getLights())
                 }
                 parseLights(data)
             }
@@ -1325,6 +1327,8 @@ private enumerateLights() {
 }
 
 private enumerateLightsV2() {
+    if (dbgEnable) { log.debug "Enumerating lights V2..." }
+
     def data = enumerateResourcesV2('/light')
     if (data) {
         Map lights = [:]
@@ -1355,6 +1359,7 @@ private enumerateLightsV2() {
 }
 
 private enumerateScenes() {
+    if (dbgEnable) { log.debug "Enumerating scenes..." }
 
     if (apiUrl == null) {
         log.warn "Hub communications are offline, due to missing bridge host."
@@ -1375,7 +1380,7 @@ private enumerateScenes() {
             } else {
                 if (data) {
                     state.scenes = data
-                    renameInstalledDevices('scenes', state.scenes)
+                    renameInstalledDevices('scenes', getScenes())
                 }
                 parseScenes(data)
             }
@@ -1385,6 +1390,8 @@ private enumerateScenes() {
 }
 
 private enumerateScenesV2() {
+    if (dbgEnable) { log.debug "Enumerating scenes V2..." }
+
     def data = enumerateResourcesV2('/scene')
     if (data) {
         Map scenes = [:]
@@ -1425,6 +1432,7 @@ private enumerateScenesV2() {
 }
 
 private enumerateSensors() {
+    if (dbgEnable) { log.debug "Enumerating sensors..." }
 
     if (apiUrl == null) {
         log.warn "Hub communications are offline, due to missing bridge host."
@@ -1445,7 +1453,7 @@ private enumerateSensors() {
             } else {
                 if (data) {
                     state.sensors = fixupSensorNames(data)
-                    renameInstalledDevices(sensors, state.sensors)
+                    renameInstalledDevices(sensors, getSensors())
                 }
 
                 parseSensors(data)
@@ -1598,9 +1606,6 @@ void setDeviceState(def child, Map deviceState) {
         }
     }
 
-    // Disabling scheduled refreshes for hub.
-    def hub = getChildDeviceForMac(selectedDevice)
-
     String url = "${apiUrl}/${type}/${node}/${action}"
     if (dbgEnable) { log.debug "URL: ${url}" }
     if (dbgEnable) { log.debug "args: ${deviceState}" }
@@ -1629,7 +1634,7 @@ void setDeviceState(def child, Map deviceState) {
                         if (logEnable) { log.warn "Unhandled device state handler repsonse: ${result}" }
                         return
                 }
-                def device = type == 'group' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
+                //def device = type == 'group' && node == '0' ? getChildDevice(child.device.deviceNetworkId) : getChildDevice(nid)
                 //setHueProperty(device, [(result[3]): [(result[4]): value]])
             }
         }
@@ -1725,11 +1730,11 @@ public String networkIdForGroup(id) {
 }
 
 public String networkIdForZone(id) {
-    "hueGroup:${app.getId()}/${state.zones[id].id_v1.replaceFirst('/groups/', '')}"
+    "hueGroup:${app.getId()}/${getZone(id).id_v1.replaceFirst('/groups/', '')}"
 }
 
 public String networkIdForRoom(id) {
-    "hueGroup:${app.getId()}/${state.rooms[id].id_v1.replaceFirst('/groups/', '')}"
+    "hueGroup:${app.getId()}/${getRoom(id).id_v1.replaceFirst('/groups/', '')}"
 }
 
 public String networkIdForLight(id) {
@@ -1738,26 +1743,26 @@ public String networkIdForLight(id) {
 }
 
 public networkIdForScene(sceneId) {
-    String groupId = state.scenes?[sceneId]?.group
-    "hueScene:${app.getId()}/${groupId}/${sceneId}"
+    String groupId = getScene(sceneId)?.group
+    return "hueScene:${app.getId()}/${groupId}/${sceneId}"
 }
 
 public networkIdForScene(groupId, sceneId) {
-    "hueScene:${app.getId()}/${groupId}/${sceneId}"
+    return "hueScene:${app.getId()}/${groupId}/${sceneId}"
 }
 
 public networkIdForSensor(sensorId) {
-    "hueSensor:${app.getId()}/${sensorId}"
+    return "hueSensor:${app.getId()}/${sensorId}"
 }
 
 public stateForNetworkId(deviceNetworkId) {
     def (String type, String address) = deviceNetworkId.split(':', 2)
     String hueId = address.split('/').last()
     switch (type) {
-        case 'hueGroup':   return state.groups[hueId]
-        case ~/hueBulb.*/: return state.lights[hueId]
-        case 'hueScene':   return state.scenes[hueId]
-        case 'hueSensor':  return state.sensors[hueId]
+        case 'hueGroup':   return getGroup(hueId)
+        case ~/hueBulb.*/: return getLight(hueId)
+        case 'hueScene':   return getScene(hueId)
+        case 'hueSensor':  return getSensor(hueId)
     }
     return null
 }
@@ -1767,11 +1772,11 @@ public getChildDeviceById(Long id) {
 }
 
 private String bulbTypeForLight(String id) {
-    if (state.lights_v2?[id]?.type) {
-        return state.lights_v2.(id).type
+    if (getLightV2(id)?.type) {
+        return getLightV2(id).type
     }
-    if (!state.lights) { return null }
-    def type = state.lights?[id]?.type
+    if (!getLights()) { return null }
+    def type = getLight(id)?.type
     switch (type) {
         case 'Dimmable light':
             return 'Dimmer'
@@ -1803,9 +1808,9 @@ private String driverTypeForSensor(id) {
     // All supported sensors are here,
     // https://developers.meethue.com/develop/hue-api/supported-devices/
 
-    if (!state.sensors) { return null }
-    def type=state.sensors?[id]?.type
-    def modelid=state.sensors?[id]?.modelid // Since the RunLessWires Friends of Hue switch still says it's a ZGPSwitch gotta use modelid to find it
+    if (!getSensors()) { return null }
+    def type=getSensor(id)?.type
+    def modelid=getSensor(id)?.modelid // Since the RunLessWires Friends of Hue switch still says it's a ZGPSwitch gotta use modelid to find it
     switch (type) {
         case 'ZGPSwitch':
         if (modelid == 'FOHSWITCH') {
@@ -1898,12 +1903,165 @@ def getSelectedHub() {
     getHubs().find{ key, value -> value.mac == selectedDevice}?.value
 }
 
+/*
+*
+* State Accessor Functions
+*
+* These functions provide safe, consistent access to application state data.
+* All plural getters (getHubs, getLights, etc.) guarantee non-null returns by
+* returning empty maps [:] when state is missing or null.
+*
+* PLURAL GETTERS - Return complete state maps (never null):
+* - getHubs(): Map of all discovered Hue bridges
+* - getScenes(): Map of all Hue scenes
+* - getLights(): Map of all Hue lights (V1 API)
+* - getLightsV2(): Map of all Hue lights (V2 API)
+* - getGroups(): Map of all Hue groups (rooms/zones)
+* - getSensors(): Map of all Hue sensors
+* - getZones(): Map of all Hue zones
+* - getRooms(): Map of all Hue rooms
+* - getGroupedLights(): Map of all grouped lights
+* - getDevices(): Map of all devices
+*
+*/
+
 def getHubForMac(mac) {
     getHubs().find{ key, value -> value.mac == mac}?.value
 }
 
 def getHubs() {
-    state.hubs = state.hubs ?: [:]
+    if (!state || !state.hubs) {
+        return [:]
+    }
+    return state.hubs
+}
+
+def getScene(sceneId) {
+    if (!state || !state.scenes || !sceneId) {
+        return [:]
+    }
+    return state.scenes[sceneId]
+}
+
+def getScenes() {
+    if (!state || !state.scenes) {
+        return [:]
+    }
+    return state.scenes
+}
+
+def getLights() {
+    if (!state || !state.lights) {
+        return [:]
+    }
+    return state.lights
+}
+
+def getLightsV2() {
+    if (!state || !state.lights_v2) {
+        return [:]
+    }
+    return state.lights_v2
+}
+
+def getGroups() {
+    if (!state || !state.groups) {
+        return [:]
+    }
+    return state.groups
+}
+
+def getSensors() {
+    if (!state || !state.sensors) {
+        return [:]
+    }
+    return state.sensors
+}
+
+def getZones() {
+    if (!state || !state.zones) {
+        return [:]
+    }
+    return state.zones
+}
+
+def getRooms() {
+    if (!state || !state.rooms) {
+        return [:]
+    }
+    return state.rooms
+}
+
+def getGroupedLights() {
+    if (!state || !state.grouped_lights) {
+        return [:]
+    }
+    return state.grouped_lights
+}
+
+def getDevices() {
+    if (!state || !state.devices) {
+        return [:]
+    }
+    return state.devices
+}
+
+/*
+*
+* State Accessor Helpers
+*
+* SINGULAR GETTERS - Return individual state items (empty map [:] if not found):
+* - getLight(lightId): Individual light data from V1 API
+* - getLightV2(lightId): Individual light data from V2 API
+* - getGroup(groupId): Individual group/room/zone data
+* - getSensor(sensorId): Individual sensor data
+* - getZone(zoneId): Individual zone data
+* - getRoom(roomId): Individual room data
+*
+* Usage: Always prefer singular getters over direct map access for safety.
+*
+*/
+
+def getLight(String lightId) {
+    if (!lightId) {
+        return [:]
+    }
+    return getLights()[lightId] ?: [:]
+}
+
+def getLightV2(String lightId) {
+    if (!lightId) {
+        return [:]
+    }
+    return getLightsV2()[lightId] ?: [:]
+}
+
+def getGroup(String groupId) {
+    if (!groupId) {
+        return [:]
+    }
+    return getGroups()[groupId] ?: [:]
+}
+
+def getSensor(String sensorId) {
+    if (!sensorId) {
+        return [:]
+    }
+    return getSensors()[sensorId] ?: [:]
+}
+
+def getZone(String zoneId) {
+    if (!zoneId) {
+        return [:]
+    }
+    return getZones()[zoneId] ?: [:]
+}
+
+def getRoom(String roomId) {
+    if (!roomId) {
+        return [:]
+    }
+    return getRooms()[roomId] ?: [:]
 }
 
 /*
@@ -1962,7 +2120,6 @@ void parseLightsV2(json) {
 
         if (light) {
             if (dbgEnable) { log.debug "$light; Parsing response: $data for $id" }
-            Map state = [:]
             Map events = parseDeviceHandler(data)
             setHueProperty(light, [state: events.state, action: events.action])
         }
@@ -1992,18 +2149,20 @@ void parseSensors(json) {
 }
 
 def findGroup(String groupId) {
-    if (state.groups?["${groupId}"]) {
-        return state.groups?["${groupId}"]
+    def group = getGroup(groupId)
+    if (group && group.size() > 0) {
+        return group
     } else {
-        return state.groups?.find{ it.value.name == groupId }
+        return getGroups()?.find{ it.value.name == groupId }
     }
 }
 
 def findScene(String groupId, String sceneId) {
-    if (state.scenes?["${sceneId}"]) {
-        return state.scenes?["${sceneId}"]
+    def scene = getScene(sceneId)
+    if (scene) {
+        return scene
     } else {
-        return state.scenes.find{ it.value.group == groupId && it.value.name == sceneId }
+        return getScenes()?.find{ it.value.group == groupId && it.value.name == sceneId }
     }
 }
 
@@ -2017,7 +2176,6 @@ Object getDeviceForChild(def child) {
 }
 
 Object currentValue(def child, String attributeName) {
-    def nid = (child.device?:child).deviceNetworkId
     def device = getDeviceForChild(child)
 
     if (!device.hasAttribute(attributeName)) {
@@ -2137,7 +2295,7 @@ void setHueProperty(def child, Map args) {
     // log.debug "Received State ($child): $devstate"
     // log.debug "Translated Events ($child): $events"
 
-    if (child.hasAttribute('colorMode') && devstate.colormode == 'xy' && state.lights_v2) {
+    if (child.hasAttribute('colorMode') && devstate.colormode == 'xy' && getLightsV2()) {
         if (devstate.containsKey('xy')) {
             List xy = devstate.xy
             double bri
@@ -2147,7 +2305,7 @@ void setHueProperty(def child, Map args) {
                 bri = child.currentValue('level') as double
             }
 
-            Map gamut = state.lights_v2[args.id]?.color?.gamut
+            Map gamut = getLightV2(args.id)?.color?.gamut
             if (!gamut) {
                 gamut = [
                     "red":   ["x":1.0, "y":0.0],
@@ -2156,7 +2314,7 @@ void setHueProperty(def child, Map args) {
                 ]
             }
 
-            String gamutType = state.lights_v2[args.id]?.color?.gamut_type
+            String gamutType = getLightV2(args.id)?.color?.gamut_type
             List<Double> rawCalib
             switch (gamutType) {
                 case "C":
