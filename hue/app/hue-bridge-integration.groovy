@@ -2405,8 +2405,8 @@ void componentRefresh(child){
 }
 
 void componentSetLevel(child, level, duration=null){
-    Float heLevel = convertToHueLevel(level as int)
-    Map args = ['on': (heLevel > 0), 'bri': heLevel]
+    Integer heLevel = convertToHueLevel(level as int)
+    Map args = ['on': (heLevel > 0), 'bri': heLevel as Integer]
     if (duration != null) { args['transitiontime'] = (duration as int) * 10 }
 
     setDeviceState(child, args)
@@ -2434,27 +2434,27 @@ void componentSetColor(def child, Map colormap) {
     if (colormap?.level == null)      { colormap.level      = currentValue(child, 'level') ?: 100 }
 
     Map args = ['on': colormap.level > 0,
-                'hue': convertToHueHue(colormap.hue as int),
-                'sat': convertToHueSaturation(colormap.saturation as int),
-                'bri': convertToHueLevel(colormap.level as int)]
+                'hue': convertToHueHue(colormap.hue as int) as Integer,
+                'sat': convertToHueSaturation(colormap.saturation as int) as Integer,
+                'bri': convertToHueLevel(colormap.level as int) as Integer]
 
     setDeviceState(child, args)
 
 }
 
 void componentSetHue(def child, hue) {
-    setDeviceState(child, ['on': true, 'hue': convertToHueHue(hue as int)])
+    setDeviceState(child, ['on': true, 'hue': convertToHueHue(hue as int) as Integer])
 }
 
 void componentSetSaturation(def child, saturation) {
-    setDeviceState(child, ['on': true, 'sat': convertToHueSaturation(saturation as int)])
+    setDeviceState(child, ['on': true, 'sat': convertToHueSaturation(saturation as int) as Integer])
 }
 
 void componentSetColorTemperature(def child, colortemperature, level = null, transitionTime = null) {
     Map values = [
         'on': (level?:100) > 0,
-        'ct': convertToHueColortemp(colortemperature as int)]
-    if (level)          { values['bri']            = convertToHueLevel(level as int) }
+        'ct': convertToHueColortemp(colortemperature as int) as Integer]
+    if (level)          { values['bri']            = convertToHueLevel(level as int) as Integer }
     if (transitionTime) { values['transitiontime'] = (transitionTime as int) * 10}
 
     setDeviceState(child, values)
