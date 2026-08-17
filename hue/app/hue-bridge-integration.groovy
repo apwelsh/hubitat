@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
- * Version 1.6.10
+ * Version 1.6.11
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
