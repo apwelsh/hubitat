@@ -1,6 +1,6 @@
 /**
 * Advanced Philips Hue Bridge Integration application
- * Version 1.6.11
+ * Version 1.6.12
 * Download: https://github.com/apwelsh/hubitat
 * Description:
 * This is a parent application for locating your Philips Hue Bridges, and installing
@@ -27,6 +27,7 @@ import groovy.transform.Field
 import java.util.concurrent.ConcurrentHashMap
 import java.math.RoundingMode
 import hubitat.helper.ColorUtils
+import hubitat.helper.NetworkUtils
 import groovy.json.JsonOutput
 
 definition(
@@ -172,10 +173,7 @@ def mainPage(Map params=[:]) {
         discoveredHubs()[selectedDevice]
         title=discoveredHubs()[selectedDevice]
         if (!getHubForMac(selectedDevice)) {
-            ssdpSubscribe()
-            ssdpDiscover()
-        } else {
-            ssdpUnsubscribe()
+            mdnsDiscover()
         }
     } else {
         title='Find Bridge'
@@ -257,8 +255,7 @@ def hubRefresh(Map iParams=[:]) {
     } else if (!getBridgeHost()) {
         refreshInterval = 2
         nextPage = ''
-        ssdpSubscribeUpdate()
-        ssdpDiscover()
+        mdnsDiscover()
         title = 'Hub Discovery'
         paragraphText = 'Looking for hub on network.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
     } else {
@@ -308,6 +305,9 @@ def hubRefresh(Map iParams=[:]) {
 
 def bridgeDiscovery(Map params=[:]) {
 
+    // Perform the actual mDNS browse before rendering the page so the UI has live results.
+    mdnsDiscover()
+
     if (logEnable) { log.debug 'Searching for Hub additions and updates' }
     Map hubs = discoveredHubs() // pull app state for known hubs
 
@@ -325,12 +325,11 @@ def bridgeDiscovery(Map params=[:]) {
     if (!options && state.deviceRefreshCount > DEVICE_REFRESH_MAX_COUNT) {
         /* groovylint-disable-next-line DuplicateNumberLiteral */
         state.deviceRefreshCount = 0
-        ssdpSubscribe()
     }
 
     //bridge discovery request every 5th refresh, retry discovery
     if (!(deviceRefreshCount % DEVICE_REFRESH_DISCOVER_INTERVAL)) {
-        ssdpDiscover()
+        mdnsDiscover()
     }
 
     Boolean uninstall = getBridgeHost() ? false : true
@@ -382,12 +381,10 @@ def bridgeLinking(Map params=[:]) {
 
     // If bridge IP is undefined, wait for IP discovery before starting linking.
     if (selectedDevice && !getBridgeHost() && params.search) {
-        ssdpSubscribeUpdate()
-        ssdpDiscover()
+        mdnsDiscover()
         paragraphText = 'Looking for hub on network.\n\nPlease wait. Do Not Click Done (this page will auto-update)'
 
     } else {
-        ssdpUnsubscribe()  // force-stop all SSDP discovery, to reduce network chatter
 
         /* groovylint-disable-next-line DuplicateNumberLiteral */
         Integer linkRefreshcount = state.linkRefreshcount ?: 0
@@ -873,8 +870,7 @@ def addSensors(Map params=[:]){
 def installed() {
     app.updateSetting('logEnable', true)
     app.updateSetting('dbgEnable', false)
-    ssdpSubscribe()
-    ssdpDiscover()
+    mdnsDiscover()
 }
 
 def uninstalled() {
@@ -901,12 +897,7 @@ def initialize() {
         setBridgeHost(bridgeHost)
         state.remove('bridgeHost')
     }
-    if (selectedDevice) {
-        ssdpSubscribeUpdate() // Setup listener to update the configured hub details
-    } else {
-        ssdpSubscribe() // Setup listener to find all hue hubs
-    }
-    ssdpDiscover()
+    mdnsDiscover()
 }
 
 def subscribe() {
@@ -914,125 +905,64 @@ def subscribe() {
 }
 
 /*
-* SSDP Device Discover
+* mDNS Device Discovery
 */
 
-void ssdpSubscribe() {
-    subscribe(location, 'ssdpTerm.upnp:rootdevice', ssdpHandler)
+private String hueServiceType() {
+    return '_hue._tcp'
 }
 
-void ssdpSubscribeUpdate() {
-    subscribe(location, 'ssdpTerm.upnp:rootdevice', ssdpUpdateHandler)
-}
+private Map mdnsDiscover() {
+    Map discovered = [:]
+    List<Map> entries = []
+    try {
+        entries = NetworkUtils.getMDNSServiceResults(hueServiceType(), 5000) ?: []
+    } catch (Exception e) {
+        if (logEnable) { log.warn "Unable to browse Hue mDNS services: ${e.message}" }
+        state.hubs = [:]
+        return discovered
+    }
 
-void ssdpUnsubscribe() {
-    unsubscribe(ssdpHandler)
-    unsubscribe(ssdpUpdateHandler)
-    unschedule(ssdpDiscover)
-}
+    entries.findAll { service ->
+        service && (
+            service.qualifiedName?.toString()?.contains('_hue') ||
+            service.name?.toString()?.contains('_hue') ||
+            service.type?.toString()?.contains('_hue') ||
+            service.serviceType?.toString()?.contains('_hue') ||
+            service.server?.toString()?.contains('_hue')
+        )
+    }.each { service ->
+        if (!service) { return }
 
-void ssdpDiscover() {
-    sendHubCommand(new hubitat.device.HubAction('lan discovery upnp:rootdevice', hubitat.device.Protocol.LAN))
+        String networkAddress = service.ip4Addresses?.find { it } ?:
+            service.ip6Addresses?.find { it } ?:
+            service.networkAddress ?:
+            service.ipAddress ?:
+            service.address ?:
+            service.host
+        if (!networkAddress) { return }
 
-}
+        Integer deviceAddress = service.port ?: service.deviceAddress ?: 443
+        String key = service.mac ?: service.MAC ?: service.id ?: service.hardwareAddress ?: service.server ?: service.name ?: networkAddress
+        String name = service.name ?: service.server ?: "Hue Bridge (${networkAddress})"
 
-def ssdpHandler(evt) {
-    def description = evt.description
-    def parsedEvent = parseLanMessage(description)
-    def ssdpPath = parsedEvent.ssdpPath
+        def hub = [
+            'mac': key.toString(),
+            'networkAddress': networkAddress.toString(),
+            'deviceAddress': deviceAddress,
+            'name': name,
+            'serialNumber': service.serialNumber
+        ]
 
-    // The Hue bridge publishes the device information in /description.xml, so if this ssdpPath does not match, skip this device.
-    if (ssdpPath != '/description.xml') { return }
+        discovered[key.toString()] = hub
 
-    def hub = evt?.hubId
-    if (parsedEvent.networkAddress) {
-        parsedEvent << ['hub':hub,
-                        'networkAddress': convertHexToIP(parsedEvent.networkAddress),
-                        'deviceAddress': convertHexToInt(parsedEvent.deviceAddress)]
-
-        def ssdpUSN = parsedEvent.ssdpUSN.toString()
-
-        def hubs = getHubs()
-        if (!hubs."${ssdpUSN}") {
-            verifyDevice(parsedEvent)
-        } else {
-            updateDevice(parsedEvent)
+        if (selectedDevice && key.toString() == selectedDevice) {
+            setBridgeHost("${hub.networkAddress}:${hub.deviceAddress}")
         }
     }
-}
 
-def ssdpUpdateHandler(evt) {
-    def description = evt.description
-    def parsedEvent = parseLanMessage(description)
-    def ssdpPath = parsedEvent.ssdpPath
-
-    // The Hue bridge publishes the device information in /description.xml, so if this ssdpPath does not match, skip this device.
-    if (ssdpPath != '/description.xml') { return }
-
-    def hub = evt?.hubId
-    if (parsedEvent.networkAddress) {
-        parsedEvent << ['hub':hub,
-                        'networkAddress': convertHexToIP(parsedEvent.networkAddress),
-                        'deviceAddress': convertHexToInt(parsedEvent.deviceAddress)]
-
-        def ssdpUSN = parsedEvent.ssdpUSN.toString()
-        if ("${parsedEvent.mac}" == "${selectedDevice}") {
-            def hubs = getHubs()
-            if (hubs."${ssdpUSN}") {
-                log.info "${parsedEvent.mac}: Autodetect IP address ${parsedEvent.networkAddress}"
-                updateDevice(parsedEvent)
-                setBridgeHost("${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}")
-            }
-            ssdpUnsubscribe()
-        }
-    }
-}
-
-void updateDevice(parsedEvent) {
-    def ssdpUSN = parsedEvent.ssdpUSN.toString()
-    def hubs = getHubs()
-    def device = hubs["${ssdpUSN}"]
-
-    if (device.networkAddress != parsedEvent.networkAddress || device.deviceAddress != parsedEvent.deviceAddress) {
-        device << ['networkAddress': parsedEvent.networkAddress,
-                'deviceAddress': parsedEvent.deviceAddress]
-
-        if (logEnable) { log.debug "Discovered hub address update: ${device.name}" }
-    }
-}
-
-void verifyDevice(parsedEvent) {
-    def ssdpPath = parsedEvent.ssdpPath
-
-    // The Hue bridge publishes the device information in /description.xml, so if this ssdpPath does not match, skip this device.
-    if (ssdpPath != '/description.xml') { return }
-
-    // Using the httpGet method, and arrow function, perform the validation check w/o the need for a callback function.
-    httpGet("http://${parsedEvent.networkAddress}:${parsedEvent.deviceAddress}${ssdpPath}") { response ->
-        if (!response.isSuccess()) {return}
-
-        def data = response.data
-        if (data) {
-            def device = data.device
-            String model = device.modelName
-            String ssdpUSN = "${parsedEvent.ssdpUSN.toString()}"
-
-            if (logEnable) { log.debug "Identified model: ${model}" }
-            if (model =~ 'Philips hue bridge.*') {
-                def hubId = "${parsedEvent.mac}"[-6..-1]
-                String name = "${device.friendlyName}".replaceAll(~/\(.*\)/, "(${hubId})")
-
-                parsedEvent << ['url':          "${data.URLBase}",
-                                'name':         "${name}",
-                                'serialNumber': "${device.serialNumber}"]
-
-                def hubs = getHubs()
-                hubs << ["${ssdpUSN}": parsedEvent]
-                if (logEnable) { log.debug "Discovered new hub: ${name}" }
-            }
-        }
-
-    }
+    state.hubs = discovered
+    return discovered
 }
 
 /*
@@ -1890,6 +1820,9 @@ private getChildDeviceForMac(mac) {
 
 Map discoveredHubs() {
     Map vhubs = getHubs()
+    if (!vhubs || vhubs.isEmpty()) {
+        vhubs = mdnsDiscover()
+    }
     Map map = [:]
     vhubs.each {
         String value = "${it.value?.name}"
@@ -1930,8 +1863,11 @@ def getHubForMac(mac) {
 }
 
 def getHubs() {
-    if (!state || !state.hubs) {
+    if (!state) {
         return [:]
+    }
+    if (!state.hubs) {
+        state.hubs = [:]
     }
     return state.hubs
 }
